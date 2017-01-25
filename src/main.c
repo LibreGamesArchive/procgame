@@ -1,7 +1,6 @@
 #include <stdio.h>
 #include <SDL2/SDL.h>
 #include <GL/glew.h>
-#include "lodepng.h"
 #include "linmath.h"
 #include "procgl/noise1234.h"
 
@@ -11,6 +10,7 @@
 #include "procgl/wave.h"
 #include "procgl/terrain.h"
 
+#if 0
 GLuint load_texture(const char* filename)
 {
     GLuint tex;
@@ -28,6 +28,7 @@ GLuint load_texture(const char* filename)
     free(pixels);
     return tex;
 }
+#endif
 
 static void color_texture(struct procgl_texture* tex)
 {
