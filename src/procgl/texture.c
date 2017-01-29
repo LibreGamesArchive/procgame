@@ -3,7 +3,7 @@
 
 #include "noise1234.h"
 
-void procgl_texture_init(struct procgl_texture* tex, int w, int h)
+void pg_texture_init(struct pg_texture* tex, int w, int h)
 {
     tex->pixels = calloc(w * h, sizeof(*tex->pixels));
     tex->normals = calloc(w * h, sizeof(*tex->normals));
@@ -23,14 +23,14 @@ void procgl_texture_init(struct procgl_texture* tex, int w, int h)
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
 }
 
-void procgl_texture_deinit(struct procgl_texture* tex)
+void pg_texture_deinit(struct pg_texture* tex)
 {
     glDeleteTextures(1, &tex->pixels_gl);
     glDeleteTextures(1, &tex->normals_gl);
     free(tex->pixels);
     free(tex->normals);
 }
-void procgl_texture_buffer(struct procgl_texture* tex)
+void pg_texture_buffer(struct pg_texture* tex)
 {
     glBindTexture(GL_TEXTURE_2D, tex->pixels_gl);
     glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, tex->w, tex->h, 0, GL_RGBA,
@@ -40,8 +40,8 @@ void procgl_texture_buffer(struct procgl_texture* tex)
                  GL_UNSIGNED_BYTE, tex->normals);
 }
 
-void procgl_texture_use(struct procgl_texture* tex,
-                        struct procgl_renderer* rend, int slot)
+void pg_texture_use(struct pg_texture* tex,
+                        struct pg_renderer* rend, int slot)
 {
     glActiveTexture(GL_TEXTURE0 + (slot * 3));
     glBindTexture(GL_TEXTURE_2D, tex->pixels_gl);
@@ -50,15 +50,14 @@ void procgl_texture_use(struct procgl_texture* tex,
     rend->tex_slots[0][slot] = slot + 3;
     rend->tex_slots[1][slot] = slot + 3 + 1;
     rend->tex_slots[2][slot] = slot + 3 + 2;
-
 }
 
-void procgl_texture_use_terrain(struct procgl_texture* tex,
-                                struct procgl_renderer* rend, int slot,
+void pg_texture_use_terrain(struct pg_texture* tex,
+                                struct pg_renderer* rend, int slot,
                                 float height_mod, float scale,
                                 float detail_weight)
 {
-    procgl_texture_use(tex, rend, slot);
+    pg_texture_use(tex, rend, slot);
     rend->shader_terrain.data.height_mod[slot] = height_mod;
     rend->shader_terrain.data.scale[slot] = scale;
     if(slot & 1) {
@@ -66,7 +65,7 @@ void procgl_texture_use_terrain(struct procgl_texture* tex,
     }
 }
 
-void procgl_texture_perlin(struct procgl_texture* tex,
+void pg_texture_perlin(struct pg_texture* tex,
                            float x1, float y1, float x2, float y2)
 {
     int x, y;
@@ -86,7 +85,7 @@ void procgl_texture_perlin(struct procgl_texture* tex,
     }
 }
 
-void procgl_texture_shitty(struct procgl_texture* tex)
+void pg_texture_shitty(struct pg_texture* tex)
 {
     int x, y;
     for(x = 0; x < tex->w; ++x) {
@@ -102,7 +101,7 @@ void procgl_texture_shitty(struct procgl_texture* tex)
     }
 }
 
-static unsigned procgl_texture_height(struct procgl_texture* tex, int x, int y)
+static unsigned pg_texture_height(struct pg_texture* tex, int x, int y)
 {
     if(x < 0) x = tex->w - (-x) % tex->w;
     else if(x >= tex->w) x = x % tex->w;
@@ -111,19 +110,19 @@ static unsigned procgl_texture_height(struct procgl_texture* tex, int x, int y)
     return tex->normals[x + y * tex->w].h;
 }
 
-void procgl_texture_generate_normals(struct procgl_texture* tex)
+void pg_texture_generate_normals(struct pg_texture* tex)
 {
     int x, y;
     for(x = 0; x < tex->w; ++x) {
         for(y = 0; y < tex->h; ++y) {
             float u, d, r, l;
-            u = (float)procgl_texture_height(tex, x, y - 1) / 256;
-            d = (float)procgl_texture_height(tex, x, y + 1) / 256;
-            l = (float)procgl_texture_height(tex, x - 1, y) / 256;
-            r = (float)procgl_texture_height(tex, x + 1, y) / 256;
+            u = (float)pg_texture_height(tex, x, y - 1) / 256;
+            d = (float)pg_texture_height(tex, x, y + 1) / 256;
+            l = (float)pg_texture_height(tex, x - 1, y) / 256;
+            r = (float)pg_texture_height(tex, x + 1, y) / 256;
             vec3 normal = { r - l, u - d, 2.0f };
             vec3_normalize(normal, normal);
-            tex->normals[x + y * tex->w] = (struct procgl_texture_normal) {
+            tex->normals[x + y * tex->w] = (struct pg_texture_normal) {
                 (normal[0] + 1) / 2 * 256,
                 (normal[1] + 1) / 2 * 256,
                 (normal[2] + 1) / 2 * 128 + 127,

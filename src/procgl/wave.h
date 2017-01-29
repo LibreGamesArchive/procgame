@@ -1,6 +1,6 @@
 /*  A wave handling API
     -------------------
-    A struct procgl_wave can be in one of two states: a wave function, or waveform data.
+    A struct pg_wave can be in one of two states: a wave function, or waveform data.
     As a wave function, its `func` member points to a function taking a float
     and returning a float. As waveform data, its `samples` member will be
     `num_samples` elements long.
@@ -11,7 +11,7 @@
 
 #include <stdarg.h>
 
-struct procgl_wave {
+struct pg_wave {
     int dim;
     float frequency[4];
     float phase[4];
@@ -33,22 +33,22 @@ struct procgl_wave {
             float (*func4_s)(void*, float, float, float, float);
         };
         struct {
-            struct procgl_wave* comp0;
-            struct procgl_wave* comp1;
+            struct pg_wave* comp0;
+            struct pg_wave* comp1;
             float influence;
             float (*mix)(float,float,float);
         };
     };
 };
 
-float procgl_wave_sample(struct procgl_wave* wave, int d, ...);
+float pg_wave_sample(struct pg_wave* wave, int d, ...);
 
-void procgl_wave_composite(struct procgl_wave* wave,
-                    struct procgl_wave* comp0, struct procgl_wave* comp1,
+void pg_wave_composite(struct pg_wave* wave,
+                    struct pg_wave* comp0, struct pg_wave* comp1,
                     float influence, float (*mix)(float, float, float));
-void procgl_wave_init_sine(struct procgl_wave* wave);
-void procgl_wave_init_crater(struct procgl_wave* wave);
-void procgl_wave_crater_add(struct procgl_wave* wave, float x, float y, float r);
-void procgl_wave_deinit(struct procgl_wave* wave);
+void pg_wave_init_sine(struct pg_wave* wave);
+void pg_wave_init_crater(struct pg_wave* wave);
+void pg_wave_crater_add(struct pg_wave* wave, float x, float y, float r);
+void pg_wave_deinit(struct pg_wave* wave);
 
-float procgl_wave_mix_add(float a, float b, float x);
+float pg_wave_mix_add(float a, float b, float x);

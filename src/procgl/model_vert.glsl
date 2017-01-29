@@ -26,7 +26,7 @@ void main()
     f_depth = length(view_matrix * model_matrix * vec4(v_position, 1.0));
     f_normal = mat3(model_matrix) * v_normal;
     f_tangent = mat3(model_matrix) * v_tangent;
-    f_bitangent = cross(f_normal, f_tangent);
+    f_bitangent = mat3(model_matrix) * v_bitangent;
     f_tex_coord = v_tex_coord;
 }
 

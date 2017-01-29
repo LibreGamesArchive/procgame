@@ -4,7 +4,7 @@
 #include <math.h>
 #include "wave.h"
 
-float procgl_wave_sample(struct procgl_wave* wave, int d, ...)
+float pg_wave_sample(struct pg_wave* wave, int d, ...)
 {
     va_list args;
     va_start(args, d);
@@ -52,24 +52,24 @@ float procgl_wave_sample(struct procgl_wave* wave, int d, ...)
         float w0, w1;
         switch(dim) {
         case 0:
-            w0 = procgl_wave_sample(wave->comp0, 0);
-            w1 = procgl_wave_sample(wave->comp1, 0);
+            w0 = pg_wave_sample(wave->comp0, 0);
+            w1 = pg_wave_sample(wave->comp1, 0);
             break;
         case 1:
-            w0 = procgl_wave_sample(wave->comp0, 1, _x);
-            w1 = procgl_wave_sample(wave->comp1, 1, _x);
+            w0 = pg_wave_sample(wave->comp0, 1, _x);
+            w1 = pg_wave_sample(wave->comp1, 1, _x);
             break;
         case 2:
-            w0 = procgl_wave_sample(wave->comp0, 2, _x, _y);
-            w1 = procgl_wave_sample(wave->comp1, 2, _x, _y);
+            w0 = pg_wave_sample(wave->comp0, 2, _x, _y);
+            w1 = pg_wave_sample(wave->comp1, 2, _x, _y);
             break;
         case 3:
-            w0 = procgl_wave_sample(wave->comp0, 3, _x, _y, _z);
-            w1 = procgl_wave_sample(wave->comp1, 3, _x, _y, _z);
+            w0 = pg_wave_sample(wave->comp0, 3, _x, _y, _z);
+            w1 = pg_wave_sample(wave->comp1, 3, _x, _y, _z);
             break;
         case 4:
-            w0 = procgl_wave_sample(wave->comp0, 4, _x, _y, _z, _w);
-            w1 = procgl_wave_sample(wave->comp1, 4, _x, _y, _z, _w);
+            w0 = pg_wave_sample(wave->comp0, 4, _x, _y, _z, _w);
+            w1 = pg_wave_sample(wave->comp1, 4, _x, _y, _z, _w);
         }
         return wave->mix(w0, w1, wave->influence);
         }
@@ -77,12 +77,12 @@ float procgl_wave_sample(struct procgl_wave* wave, int d, ...)
     return 0;
 }
 
-void procgl_wave_composite(struct procgl_wave* wave,
-                    struct procgl_wave* comp0, struct procgl_wave* comp1,
+void pg_wave_composite(struct pg_wave* wave,
+                    struct pg_wave* comp0, struct pg_wave* comp1,
                     float influence, float (*mix)(float, float, float))
 {
     
-    *wave = (struct procgl_wave) {
+    *wave = (struct pg_wave) {
         .dim = -1, .type = WAVE_COMPOSITE,
         .frequency = { 1, 1, 1, 1 }, .scale = 1,
         .comp0 = comp0, .comp1 = comp1, .influence = influence, .mix = mix
@@ -106,16 +106,16 @@ static float sin4(float x, float y, float z, float w)
     return (sin(x) + sin(y) + sin(z) + sin(w)) / 4;
 }
 
-void procgl_wave_init_sine(struct procgl_wave* wave)
+void pg_wave_init_sine(struct pg_wave* wave)
 {
-    *wave = (struct procgl_wave) {
+    *wave = (struct pg_wave) {
         .dim = -1, .type = WAVE_FUNCTION,
         .frequency = { 1, 1, 1, 1 }, .scale = 1,
         .func1 = sin1, .func2 = sin2, .func3 = sin3, .func4 = sin4
     };
 }
 
-float procgl_wave_mix_add(float a, float b, float x)
+float pg_wave_mix_add(float a, float b, float x)
 {
     return a + b;
 }

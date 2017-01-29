@@ -54,7 +54,7 @@ static void shader_get_tex_bank(GLuint prog, shader_tex_bank bank)
     bank[2] = glGetUniformLocation(prog, "extra_map");
 }
 
-int procgl_renderer_init(struct procgl_renderer* rend,
+int pg_renderer_init(struct pg_renderer* rend,
                   const char* vert_filename, const char* frag_filename)
 {
     /*  Initialize the projection matrix, and the viewport info */
@@ -76,6 +76,15 @@ int procgl_renderer_init(struct procgl_renderer* rend,
                  NULL, GL_DYNAMIC_DRAW);
     /*  Load the shader sources, compile and link the program, and get all
         the attributes and uniforms */
+    shader_program(&rend->shader_2d.vert, &rend->shader_2d.frag,
+                   &rend->shader_2d.prog,
+                   "src/procgl/2d_vert.glsl", "src/procgl/2d_frag.glsl");
+    rend->shader_2d.model_matrix = glGetUniformLocation(rend->shader_2d.prog, "model_matrix");
+    rend->shader_2d.attrs.pos = glGetAttribLocation(rend->shader_2d.prog, "v_position");
+    rend->shader_2d.attrs.color = glGetAttribLocation(rend->shader_2d.prog, "v_color");
+    rend->shader_2d.attrs.tex_coord = glGetAttribLocation(rend->shader_2d.prog, "v_tex_coord");
+    rend->shader_2d.attrs.tex_weight = glGetAttribLocation(rend->shader_2d.prog, "v_tex_weight");
+
     shader_program(&rend->shader_model.vert, &rend->shader_model.frag,
                    &rend->shader_model.prog,
                    "src/procgl/model_vert.glsl",
@@ -122,7 +131,7 @@ int procgl_renderer_init(struct procgl_renderer* rend,
     return 1;
 }
 
-static void build_projection(struct procgl_renderer* rend)
+static void build_projection(struct pg_renderer* rend)
 {
     mat4_look_at(rend->vert_base.view_matrix,
                  (vec3){ 0.0f, 0.0f, 0.0f },
@@ -136,10 +145,10 @@ static void build_projection(struct procgl_renderer* rend)
                             -rend->view_pos[1], -rend->view_pos[2]);
     mat4_mul(rend->vert_base.projview_matrix, rend->vert_base.proj_matrix,
              rend->vert_base.view_matrix);
-    /*  Next: procgl_renderer_begin_*() */
+    /*  Next: pg_renderer_begin_*() */
 }
 
-static void update_shader_base(struct procgl_renderer* rend)
+static void update_shader_base(struct pg_renderer* rend)
 {
     glBindBuffer(GL_UNIFORM_BUFFER, rend->vert_base_buffer);
     GLvoid* ptr = glMapBuffer(GL_UNIFORM_BUFFER, GL_WRITE_ONLY);
@@ -165,7 +174,12 @@ static void load_textures(shader_tex_bank sh_slot, buffer_tex_bank tex_slot)
     }
 }
 
-void procgl_renderer_begin_model(struct procgl_renderer* rend)
+void pg_renderer_begin_2d(struct pg_renderer* rend)
+{
+    glUseProgram(rend->shader_2d.prog);
+}
+
+void pg_renderer_begin_model(struct pg_renderer* rend)
 {
     build_projection(rend);
     glUseProgram(rend->shader_model.prog);
@@ -173,7 +187,7 @@ void procgl_renderer_begin_model(struct procgl_renderer* rend)
     load_textures(rend->shader_model.tex_slots, rend->tex_slots);
 }
 
-void procgl_renderer_begin_terrain(struct procgl_renderer* rend)
+void pg_renderer_begin_terrain(struct pg_renderer* rend)
 {
     build_projection(rend);
     glUseProgram(rend->shader_terrain.prog);
@@ -187,7 +201,7 @@ void procgl_renderer_begin_terrain(struct procgl_renderer* rend)
     load_textures(rend->shader_terrain.tex_slots, rend->tex_slots);
 }
 
-void procgl_renderer_deinit(struct procgl_renderer* rend)
+void pg_renderer_deinit(struct pg_renderer* rend)
 {
     glDeleteShader(rend->shader_model.vert);
     glDeleteShader(rend->shader_model.frag);
@@ -197,14 +211,14 @@ void procgl_renderer_deinit(struct procgl_renderer* rend)
     glDeleteProgram(rend->shader_terrain.prog);
 }
 
-void procgl_renderer_set_view(struct procgl_renderer* rend,
+void pg_renderer_set_view(struct pg_renderer* rend,
                               vec3 pos, vec2 angle)
 {
     if(pos) vec3_dup(rend->view_pos, pos);
     if(angle) vec2_dup(rend->view_angle, angle);
 }
 
-void procgl_renderer_set_sun(struct procgl_renderer* rend,
+void pg_renderer_set_sun(struct pg_renderer* rend,
                              vec3 dir, vec3 color, vec3 amb_color)
 {
     if(dir) vec3_dup(rend->frag_base.sun_dir, dir);
@@ -212,21 +226,21 @@ void procgl_renderer_set_sun(struct procgl_renderer* rend,
     if(amb_color) vec3_dup(rend->frag_base.amb_color, amb_color);
 }
 
-void procgl_renderer_set_fog(struct procgl_renderer* rend,
+void pg_renderer_set_fog(struct pg_renderer* rend,
                              vec2 plane, vec3 color)
 {
     if(plane) vec2_dup(rend->frag_base.fog_plane, plane);
     if(color) vec3_dup(rend->frag_base.fog_color, color);
 }
 
-void procgl_renderer_get_view(struct procgl_renderer* rend,
+void pg_renderer_get_view(struct pg_renderer* rend,
                               vec3 pos, vec2 angle)
 {
     if(pos) vec3_dup(pos, rend->view_pos);
     if(angle) vec2_dup(angle, rend->view_angle);
 }
 
-void procgl_renderer_get_sun(struct procgl_renderer* rend,
+void pg_renderer_get_sun(struct pg_renderer* rend,
                              vec3 dir, vec3 color, vec3 amb_color)
 {
     if(dir) vec3_dup(dir, rend->frag_base.sun_dir);
@@ -234,7 +248,7 @@ void procgl_renderer_get_sun(struct procgl_renderer* rend,
     if(amb_color) vec3_dup(amb_color, rend->frag_base.amb_color);
 }
 
-void procgl_renderer_get_fog(struct procgl_renderer* rend,
+void pg_renderer_get_fog(struct pg_renderer* rend,
                              vec2 plane, vec3 color)
 {
     if(plane) vec2_dup(plane, rend->frag_base.fog_plane);

@@ -2,7 +2,7 @@
 #include "texture.h"
 #include "model.h"
 
-void procgl_model_init(struct procgl_model* model)
+void pg_model_init(struct pg_model* model)
 {
     ARR_INIT(model->verts);
     ARR_INIT(model->tris);
@@ -11,7 +11,7 @@ void procgl_model_init(struct procgl_model* model)
     glGenVertexArrays(1, &model->vao);
 }
 
-void procgl_model_deinit(struct procgl_model* model)
+void pg_model_deinit(struct pg_model* model)
 {
     ARR_DEINIT(model->verts);
     ARR_DEINIT(model->tris);
@@ -20,22 +20,15 @@ void procgl_model_deinit(struct procgl_model* model)
     glDeleteVertexArrays(1, &model->vao);
 }
 
-void procgl_model_buffer(struct procgl_model* model)
+void pg_model_buffer(struct pg_model* model, struct pg_renderer* rend)
 {
     glBindVertexArray(model->vao);
     glBindBuffer(GL_ARRAY_BUFFER, model->verts_gl);
     glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, model->tris_gl);
-    glBufferData(GL_ARRAY_BUFFER, model->verts.len * sizeof(struct vertex),
+    glBufferData(GL_ARRAY_BUFFER, model->verts.len * sizeof(struct pg_vert3d),
                  model->verts.data, GL_STATIC_DRAW);
     glBufferData(GL_ELEMENT_ARRAY_BUFFER, model->tris.len * sizeof(unsigned),
                  model->tris.data, GL_STATIC_DRAW);
-}
-
-void procgl_model_begin(struct procgl_model* model, struct procgl_renderer* rend)
-{
-    glBindBuffer(GL_ARRAY_BUFFER, model->verts_gl);
-    glBindVertexArray(model->vao);
-    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, model->tris_gl);
     glVertexAttribPointer(rend->shader_model.attrs.pos, 3, GL_FLOAT, GL_FALSE,
                           14 * sizeof(float), 0);
     glVertexAttribPointer(rend->shader_model.attrs.normal, 3, GL_FLOAT, GL_FALSE,
@@ -53,18 +46,25 @@ void procgl_model_begin(struct procgl_model* model, struct procgl_renderer* rend
     glEnableVertexAttribArray(rend->shader_model.attrs.tex_coord);
 }
 
-void procgl_model_draw(struct procgl_renderer* rend, struct procgl_model* model,
+void pg_model_begin(struct pg_model* model, struct pg_renderer* rend)
+{
+    glBindVertexArray(model->vao);
+    glBindBuffer(GL_ARRAY_BUFFER, model->verts_gl);
+    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, model->tris_gl);
+}
+
+void pg_model_draw(struct pg_renderer* rend, struct pg_model* model,
                        mat4 transform)
 {
     glUniformMatrix4fv(rend->shader_model.model_matrix, 1, GL_FALSE, *transform);
     glDrawElements(GL_TRIANGLES, model->tris.len, GL_UNSIGNED_INT, 0);
 }
 
-void procgl_model_split_tris(struct procgl_model* model)
+void pg_model_split_tris(struct pg_model* model)
 {
-    struct vertex* v[3];
+    struct pg_vert3d* v[3];
     unsigned t[3];
-    struct vertex new_v[model->tris.len];
+    struct pg_vert3d new_v[model->tris.len];
     int i;
     for(i = 0; i < model->tris.len; i += 3) {
         t[0] = model->tris.data[i];
@@ -80,13 +80,13 @@ void procgl_model_split_tris(struct procgl_model* model)
         model->tris.data[i + 1] = i + 1;
         model->tris.data[i + 2] = i + 2;
     }
-    procgl_model_reserve_verts(model, model->tris.len);
+    pg_model_reserve_verts(model, model->tris.len);
     memcpy(model->verts.data, new_v, sizeof(new_v));
 }
 
-void procgl_model_precalc_verts(struct procgl_model* model)
+void pg_model_precalc_verts(struct pg_model* model)
 {
-    struct vertex* v[3];
+    struct pg_vert3d* v[3];
     unsigned int t[3];
     int i;
     for(i = 0; i < model->tris.len; i += 3) {
@@ -133,11 +133,11 @@ void procgl_model_precalc_verts(struct procgl_model* model)
     }
 }
 
-void procgl_model_generate_texture(struct procgl_model* model,
-                                   struct procgl_texture* texture,
+void pg_model_generate_texture(struct pg_model* model,
+                                   struct pg_texture* texture,
                                    unsigned w, unsigned h)
 {
-    struct vertex* v[3];
+    struct pg_vert3d* v[3];
     unsigned t[3];
     int i;
     for(i = 0; i < model->tris.len; i += 3) {
@@ -167,25 +167,25 @@ void procgl_model_generate_texture(struct procgl_model* model,
     }
 }
 
-void procgl_model_reserve_verts(struct procgl_model* model, unsigned count)
+void pg_model_reserve_verts(struct pg_model* model, unsigned count)
 {
     ARR_RESERVE(model->verts, count);
     model->verts.len = count;
 }
 
-void procgl_model_reserve_tris(struct procgl_model* model, unsigned count)
+void pg_model_reserve_tris(struct pg_model* model, unsigned count)
 {
     ARR_RESERVE(model->tris, count * 3);
     model->tris.len = count * 3;
 }
 
-unsigned procgl_model_add_vertex(struct procgl_model* model, struct vertex* vert)
+unsigned pg_model_add_vertex(struct pg_model* model, struct pg_vert3d* vert)
 {
     ARR_PUSH(model->verts, *vert);
     return model->verts.len - 1;
 }
 
-void procgl_model_add_triangle(struct procgl_model* model, unsigned v0,
+void pg_model_add_triangle(struct pg_model* model, unsigned v0,
                                unsigned v1, unsigned v2)
 {
     int i = model->tris.len;
@@ -196,13 +196,13 @@ void procgl_model_add_triangle(struct procgl_model* model, unsigned v0,
     model->tris.data[i + 2] = v2;
 }
 
-void procgl_model_append(struct procgl_model* dst, struct procgl_model* src,
+void pg_model_append(struct pg_model* dst, struct pg_model* src,
                          mat4 transform)
 {
     int dst_vert_len = dst->verts.len;
     int dst_tri_len = dst->tris.len;
     int i;
-    struct vertex* v;
+    struct pg_vert3d* v;
     ARR_RESERVE(dst->verts, dst_vert_len + src->verts.len);
     ARR_FOREACH_PTR(src->verts, v, i) {
         vec4 old = { v->pos[0], v->pos[1], v->pos[2], 1.0f };
@@ -216,7 +216,7 @@ void procgl_model_append(struct procgl_model* dst, struct procgl_model* src,
         vec4 new_norm;
         mat4_mul_vec4(new_norm, norm, old_norm);
         dst->verts.data[dst_vert_len + i] =
-            (struct vertex){ .pos = { new[0], new[1], new[2] },
+            (struct pg_vert3d){ .pos = { new[0], new[1], new[2] },
                              .normal = { new_norm[0], new_norm[1], new_norm[2] },
                              .tex_coord = { v->tex_coord[0], v->tex_coord[1] } };
     }
@@ -229,10 +229,10 @@ void procgl_model_append(struct procgl_model* dst, struct procgl_model* src,
     dst->tris.len += src->tris.len;
 }
 
-void procgl_model_transform(struct procgl_model* model, mat4 transform)
+void pg_model_transform(struct pg_model* model, mat4 transform)
 {
     int i;
-    struct vertex* v;
+    struct pg_vert3d* v;
     ARR_FOREACH_PTR(model->verts, v, i) {
         vec4 old = { v->pos[0], v->pos[1], v->pos[2], 1.0f };
         vec4 new;
@@ -244,7 +244,7 @@ void procgl_model_transform(struct procgl_model* model, mat4 transform)
         vec4 old_norm = { v->normal[0], v->normal[1], v->normal[2], 0.0f };
         vec4 new_norm;
         mat4_mul_vec4(new_norm, norm, old_norm);
-        *v = (struct vertex){ .pos = { new[0], new[1], new[2] },
+        *v = (struct pg_vert3d){ .pos = { new[0], new[1], new[2] },
                               .normal = { new_norm[0], new_norm[1], new_norm[2] },
                               .tex_coord = { v->tex_coord[0], v->tex_coord[1] } };
     }
