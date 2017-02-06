@@ -94,7 +94,6 @@ typedef ARR_T(unsigned) tri_buf_t;
 int pg_renderer_init(struct pg_renderer* rend,
                   const char* vert_filename, const char* frag_filename);
 void pg_renderer_deinit(struct pg_renderer* rend);
-void pg_renderer_begin_terrain(struct pg_renderer* rend);
 void pg_renderer_build_projection(struct pg_renderer* rend);
 void pg_renderer_begin_2d(struct pg_renderer* rend);
 void pg_renderer_begin_model(struct pg_renderer* rend);
