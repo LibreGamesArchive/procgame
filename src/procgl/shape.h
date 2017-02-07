@@ -10,6 +10,7 @@ void pg_shape_init(struct pg_shape* shape);
 void pg_shape_deinit(struct pg_shape* shape);
 void pg_shape_buffer(struct pg_shape* shape, struct pg_renderer* rend);
 void pg_shape_begin(struct pg_shape* shape);
+void pg_shape_texture(struct pg_renderer* rend, struct pg_texture* tex);
 unsigned pg_shape_add_vertex(struct pg_shape* shape, struct pg_vert2d* vert);
 void pg_shape_add_triangle(struct pg_shape* shape, unsigned v0, unsigned v1,
                            unsigned v2);

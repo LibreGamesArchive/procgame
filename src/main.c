@@ -85,7 +85,8 @@ int main(int argc, char *argv[])
     printf("Discarding routine GLEW error: %d\n", err);
     /*  Building the renderer; handles viewport, lighting, fog  */
     struct pg_renderer test_rend;
-    pg_renderer_init(&test_rend, "src/pg/terrain_vert.glsl", "src/pg/terrain_frag.glsl");
+    int init = pg_renderer_init(&test_rend, (vec2){ 800, 600 });
+    if(!init) return 1;
     pg_renderer_set_view(&test_rend, (vec3){ 0, 0, 3 }, (vec2){ 0, 0 });
     pg_renderer_set_sun(&test_rend, (vec3){ 0, -1, 0.2 },
                             (vec3){ 0.67 * 3, 0.58 * 3, 0.42 * 3 },
@@ -190,6 +191,7 @@ int main(int argc, char *argv[])
         mat4 shape_transform;
         mat4_identity(shape_transform);
         /*  Do The Thing    */
+        //glBindFramebuffer(GL_FRAMEBUFFER, 0);
         glEnable(GL_DEPTH_TEST);
         glDepthMask(1);
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
@@ -203,7 +205,9 @@ int main(int argc, char *argv[])
         glDepthMask(0);
         pg_renderer_begin_2d(&test_rend);
         pg_shape_begin(&test_shape);
+        pg_shape_texture(&test_rend, &tex_regolith);
         pg_shape_draw(&test_rend, &test_shape, shape_transform);
+        pg_renderer_finish(&test_rend);
         SDL_GL_SwapWindow(window);
     }
     /*  Clean it all up */

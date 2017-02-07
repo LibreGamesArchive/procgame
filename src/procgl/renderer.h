@@ -10,8 +10,10 @@ struct pg_renderer {
     /*  Easy view position/angle    */
     vec3 view_pos;
     vec2 view_angle;
+    vec2 view_size;
     /*  The rest of this points to data/code on the GPU */
     /****************************************************/
+    GLuint color_buf, depth_buf, frame_buf;
     /*  First: UNIFORMS */
     /*  Vertex shader base uniform buffer   */
     GLuint vert_base_buffer;
@@ -34,7 +36,13 @@ struct pg_renderer {
         vec3 fog_color;
     } frag_base;
     buffer_tex_bank tex_slots;
-    /*  SHADER PROGRAMS */
+    /*  SHADER PROGRAMS TODO: MAKE THIS LESS SHITTY BECAUSE WOW THIS IS SHIT    */
+    /*  The basic post shader program   */
+    struct {
+        GLuint vert_buf, tri_buf, vao;
+        GLuint vert, frag, prog;
+        GLint tex, pos;
+    } shader_post;
     /*  The 2d shader program   */
     struct {
         GLuint vert, frag, prog;
@@ -91,13 +99,13 @@ typedef ARR_T(struct pg_vert3d) vert3d_buf_t;
 typedef ARR_T(struct pg_vert2d) vert2d_buf_t;
 typedef ARR_T(unsigned) tri_buf_t;
 
-int pg_renderer_init(struct pg_renderer* rend,
-                  const char* vert_filename, const char* frag_filename);
+int pg_renderer_init(struct pg_renderer* rend, vec2 view_size);
 void pg_renderer_deinit(struct pg_renderer* rend);
 void pg_renderer_build_projection(struct pg_renderer* rend);
 void pg_renderer_begin_2d(struct pg_renderer* rend);
 void pg_renderer_begin_model(struct pg_renderer* rend);
 void pg_renderer_begin_terrain(struct pg_renderer* rend);
+void pg_renderer_finish(struct pg_renderer* rend);
 
 void pg_renderer_set_view(struct pg_renderer* rend,
                               vec3 pos, vec2 angle);

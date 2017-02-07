@@ -54,13 +54,58 @@ static void shader_get_tex_bank(GLuint prog, shader_tex_bank bank)
     bank[2] = glGetUniformLocation(prog, "extra_map");
 }
 
-int pg_renderer_init(struct pg_renderer* rend,
-                  const char* vert_filename, const char* frag_filename)
+vec2 fb_verts[4] = { { -1, -1 }, { 1, -1 }, { -1, 1 }, { 1, 1 } };
+unsigned fb_tris[6] = { 0, 1, 2, 2, 1, 3 };
+
+int pg_renderer_init(struct pg_renderer* rend, vec2 view_size)
 {
     /*  Initialize the projection matrix, and the viewport info */
     vec3_set(rend->view_pos, 0, 0, 0);
     vec2_set(rend->view_angle, 0, 0);
-    mat4_perspective(rend->vert_base.proj_matrix, 1.0f, 800.0f / 600.0f, 0.1f, 100.0f);
+    vec2_dup(rend->view_size, view_size);
+    mat4_perspective(rend->vert_base.proj_matrix, 1.0f,
+                     view_size[0] / view_size[1], 0.1f, 100.0f);
+    /*  Initialize the framebuffer objects  */
+    glActiveTexture(GL_TEXTURE0);
+    glGenTextures(1, &rend->color_buf);
+    glBindTexture(GL_TEXTURE_2D, rend->color_buf);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, view_size[0], view_size[1], 0,
+                 GL_RGBA, GL_UNSIGNED_BYTE, NULL);
+    glBindTexture(GL_TEXTURE_2D, 0);
+
+    glGenRenderbuffers(1, &rend->depth_buf);
+    glBindRenderbuffer(GL_RENDERBUFFER, rend->depth_buf);
+    glRenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH_COMPONENT16,
+                          view_size[0], view_size[1]);
+    glBindRenderbuffer(GL_RENDERBUFFER, 0);
+
+    glGenFramebuffers(1, &rend->frame_buf);
+    glBindFramebuffer(GL_FRAMEBUFFER, rend->frame_buf);
+    glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0,
+                           GL_TEXTURE_2D, rend->color_buf, 0);
+    glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT,
+                              GL_RENDERBUFFER, rend->depth_buf);
+    GLenum status;
+    if ((status = glCheckFramebufferStatus(GL_FRAMEBUFFER)) != GL_FRAMEBUFFER_COMPLETE) {
+        fprintf(stderr, "glCheckFramebufferStatus: error %d", status);
+        return 0;
+    }
+    /*  Set up the verts for drawing the post-process screen quad   */
+    glGenBuffers(1, &rend->shader_post.vert_buf);
+    glGenBuffers(1, &rend->shader_post.tri_buf);
+    glGenVertexArrays(1, &rend->shader_post.vao);
+    glBindVertexArray(rend->shader_post.vao);
+    glBindBuffer(GL_ARRAY_BUFFER, rend->shader_post.vert_buf);
+    glBufferData(GL_ARRAY_BUFFER, sizeof(fb_verts), fb_verts, GL_STATIC_DRAW);
+    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, rend->shader_post.tri_buf);
+    glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(fb_tris), fb_tris, GL_STATIC_DRAW);
+    glVertexAttribPointer(rend->shader_2d.attrs.pos, 2, GL_FLOAT, GL_FALSE,
+                          sizeof(vec2), 0);
+    glEnableVertexAttribArray(rend->shader_2d.attrs.pos);
     /*  Initialize the vertex and fragment shader base uniform buffers  */
     glGenBuffers(1, &rend->vert_base_buffer);
     glBindBuffer(GL_UNIFORM_BUFFER, rend->vert_base_buffer);
@@ -76,9 +121,16 @@ int pg_renderer_init(struct pg_renderer* rend,
                  NULL, GL_DYNAMIC_DRAW);
     /*  Load the shader sources, compile and link the program, and get all
         the attributes and uniforms */
+    shader_program(&rend->shader_post.vert, &rend->shader_post.frag,
+                   &rend->shader_post.prog,
+                   "src/procgl/post_vert.glsl", "src/procgl/post_frag.glsl");
+    rend->shader_post.tex = glGetUniformLocation(rend->shader_post.prog, "tex");
+    rend->shader_post.pos = glGetAttribLocation(rend->shader_post.prog, "v_position");
+
     shader_program(&rend->shader_2d.vert, &rend->shader_2d.frag,
                    &rend->shader_2d.prog,
                    "src/procgl/2d_vert.glsl", "src/procgl/2d_frag.glsl");
+    rend->shader_2d.tex = glGetUniformLocation(rend->shader_2d.prog, "tex");
     rend->shader_2d.model_matrix = glGetUniformLocation(rend->shader_2d.prog, "model_matrix");
     rend->shader_2d.attrs.pos = glGetAttribLocation(rend->shader_2d.prog, "v_position");
     rend->shader_2d.attrs.color = glGetAttribLocation(rend->shader_2d.prog, "v_color");
@@ -199,6 +251,19 @@ void pg_renderer_begin_terrain(struct pg_renderer* rend)
     glUnmapBuffer(GL_UNIFORM_BUFFER);
     glBindBufferBase(GL_UNIFORM_BUFFER, 2, rend->shader_terrain.data_buffer);
     load_textures(rend->shader_terrain.tex_slots, rend->tex_slots);
+}
+
+void pg_renderer_finish(struct pg_renderer* rend)
+{
+    glUseProgram(rend->shader_post.prog);
+    glUniform1i(rend->shader_post.tex, 16);
+    glActiveTexture(GL_TEXTURE0 + 16);
+    glBindTexture(GL_TEXTURE_2D, rend->color_buf);
+    glBindFramebuffer(GL_FRAMEBUFFER, 0);
+    glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+    glBindVertexArray(rend->shader_post.vao);
+    glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, 0);
+    glBindFramebuffer(GL_FRAMEBUFFER, rend->frame_buf);
 }
 
 void pg_renderer_deinit(struct pg_renderer* rend)
