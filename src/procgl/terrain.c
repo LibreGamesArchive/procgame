@@ -43,24 +43,7 @@ void pg_terrain_deinit(struct pg_terrain* terr)
 void pg_terrain_begin(struct pg_terrain* terr,
                           struct pg_renderer* rend)
 {
-    glBindBuffer(GL_ARRAY_BUFFER, terr->model.verts_gl);
     glBindVertexArray(terr->model.vao);
-    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, terr->model.tris_gl);
-    glVertexAttribPointer(rend->shader_terrain.attrs.pos, 3, GL_FLOAT, GL_FALSE,
-                          14 * sizeof(float), 0);
-    glVertexAttribPointer(rend->shader_terrain.attrs.normal, 3, GL_FLOAT, GL_FALSE,
-                          14 * sizeof(float), (void*)(3 * sizeof(float)));
-    glVertexAttribPointer(rend->shader_terrain.attrs.tangent, 3, GL_FLOAT, GL_FALSE,
-                          14 * sizeof(float), (void*)(6 * sizeof(float)));
-    glVertexAttribPointer(rend->shader_terrain.attrs.bitangent, 3, GL_FLOAT, GL_FALSE,
-                          14 * sizeof(float), (void*)(9 * sizeof(float)));
-    glVertexAttribPointer(rend->shader_terrain.attrs.tex_coord, 2, GL_FLOAT, GL_FALSE,
-                          14 * sizeof(float), (void*)(12 * sizeof(float)));
-    glEnableVertexAttribArray(rend->shader_terrain.attrs.pos);
-    glEnableVertexAttribArray(rend->shader_terrain.attrs.normal);
-    glEnableVertexAttribArray(rend->shader_terrain.attrs.tangent);
-    glEnableVertexAttribArray(rend->shader_terrain.attrs.bitangent);
-    glEnableVertexAttribArray(rend->shader_terrain.attrs.tex_coord);
 }
 
 void pg_terrain_buffer(struct pg_terrain* terr, struct pg_renderer* rend)

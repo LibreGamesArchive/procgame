@@ -77,11 +77,10 @@ int main(int argc, char *argv[])
 {
     SDL_Window* window;
     SDL_GLContext context = procgl_init(&window);
-    GLenum err = glGetError();
     glEnable(GL_CULL_FACE);
     glewExperimental = GL_TRUE;
     glewInit();
-    err = glGetError();
+    GLenum err = glGetError();
     printf("Discarding routine GLEW error: %d\n", err);
     /*  Building the renderer; handles viewport, lighting, fog  */
     struct pg_renderer test_rend;
@@ -203,7 +202,7 @@ int main(int argc, char *argv[])
         pg_model_draw(&test_rend, &test_model, model_transform);
         glDisable(GL_DEPTH_TEST);
         glDepthMask(0);
-        pg_renderer_begin_2d(&test_rend);
+        pg_shader_begin(&test_rend.shader_2d);
         pg_shape_begin(&test_shape);
         pg_shape_texture(&test_rend, &tex_regolith);
         pg_shape_draw(&test_rend, &test_shape, shape_transform);

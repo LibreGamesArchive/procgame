@@ -22,6 +22,7 @@ static GLuint load_shader(const char* filename, GLenum type)
         printf("Shader compilation log:\n%s\n", buffer);
         return 0;
     }
+    fclose(f);
     return s;
 }
 
@@ -94,18 +95,6 @@ int pg_renderer_init(struct pg_renderer* rend, vec2 view_size)
         fprintf(stderr, "glCheckFramebufferStatus: error %d", status);
         return 0;
     }
-    /*  Set up the verts for drawing the post-process screen quad   */
-    glGenBuffers(1, &rend->shader_post.vert_buf);
-    glGenBuffers(1, &rend->shader_post.tri_buf);
-    glGenVertexArrays(1, &rend->shader_post.vao);
-    glBindVertexArray(rend->shader_post.vao);
-    glBindBuffer(GL_ARRAY_BUFFER, rend->shader_post.vert_buf);
-    glBufferData(GL_ARRAY_BUFFER, sizeof(fb_verts), fb_verts, GL_STATIC_DRAW);
-    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, rend->shader_post.tri_buf);
-    glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(fb_tris), fb_tris, GL_STATIC_DRAW);
-    glVertexAttribPointer(rend->shader_2d.attrs.pos, 2, GL_FLOAT, GL_FALSE,
-                          sizeof(vec2), 0);
-    glEnableVertexAttribArray(rend->shader_2d.attrs.pos);
     /*  Initialize the vertex and fragment shader base uniform buffers  */
     glGenBuffers(1, &rend->vert_base_buffer);
     glBindBuffer(GL_UNIFORM_BUFFER, rend->vert_base_buffer);
@@ -127,15 +116,23 @@ int pg_renderer_init(struct pg_renderer* rend, vec2 view_size)
     rend->shader_post.tex = glGetUniformLocation(rend->shader_post.prog, "tex");
     rend->shader_post.pos = glGetAttribLocation(rend->shader_post.prog, "v_position");
 
-    shader_program(&rend->shader_2d.vert, &rend->shader_2d.frag,
-                   &rend->shader_2d.prog,
-                   "src/procgl/2d_vert.glsl", "src/procgl/2d_frag.glsl");
-    rend->shader_2d.tex = glGetUniformLocation(rend->shader_2d.prog, "tex");
-    rend->shader_2d.model_matrix = glGetUniformLocation(rend->shader_2d.prog, "model_matrix");
-    rend->shader_2d.attrs.pos = glGetAttribLocation(rend->shader_2d.prog, "v_position");
-    rend->shader_2d.attrs.color = glGetAttribLocation(rend->shader_2d.prog, "v_color");
-    rend->shader_2d.attrs.tex_coord = glGetAttribLocation(rend->shader_2d.prog, "v_tex_coord");
-    rend->shader_2d.attrs.tex_weight = glGetAttribLocation(rend->shader_2d.prog, "v_tex_weight");
+    /*  Set up the verts for drawing the post-process screen quad   */
+    glGenBuffers(1, &rend->shader_post.vert_buf);
+    glGenBuffers(1, &rend->shader_post.tri_buf);
+    glGenVertexArrays(1, &rend->shader_post.vao);
+    glBindVertexArray(rend->shader_post.vao);
+    glBindBuffer(GL_ARRAY_BUFFER, rend->shader_post.vert_buf);
+    glBufferData(GL_ARRAY_BUFFER, sizeof(fb_verts), fb_verts, GL_STATIC_DRAW);
+    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, rend->shader_post.tri_buf);
+    glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(fb_tris), fb_tris, GL_STATIC_DRAW);
+    glVertexAttribPointer(rend->shader_post.pos, 2, GL_FLOAT, GL_FALSE,
+                          2 * sizeof(float), 0);
+    glEnableVertexAttribArray(rend->shader_post.pos);
+    glBindVertexArray(0);
+
+    pg_shader_2d(&rend->shader_2d);
+    GLenum err = glGetError();
+    printf("Error: %d\n", err);
 
     shader_program(&rend->shader_model.vert, &rend->shader_model.frag,
                    &rend->shader_model.prog,
@@ -224,11 +221,6 @@ static void load_textures(shader_tex_bank sh_slot, buffer_tex_bank tex_slot)
     for(i = 0; i < 3; ++i) {
         glUniform1iv(sh_slot[i], 4, tex_uniform[i]);
     }
-}
-
-void pg_renderer_begin_2d(struct pg_renderer* rend)
-{
-    glUseProgram(rend->shader_2d.prog);
 }
 
 void pg_renderer_begin_model(struct pg_renderer* rend)

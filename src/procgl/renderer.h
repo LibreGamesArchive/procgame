@@ -2,6 +2,7 @@
 #include <GL/glew.h>
 #include "../linmath.h"
 #include "../arr.h"
+#include "shader.h"
 
 typedef GLuint buffer_tex_bank[3][4];
 typedef GLint shader_tex_bank[3];
@@ -44,14 +45,7 @@ struct pg_renderer {
         GLint tex, pos;
     } shader_post;
     /*  The 2d shader program   */
-    struct {
-        GLuint vert, frag, prog;
-        GLuint model_matrix;
-        GLint tex;
-        struct {
-            GLint pos, color, tex_coord, tex_weight;
-        } attrs;
-    } shader_2d;
+    struct pg_shader shader_2d;
     /*  The model shader program    */
     struct {
         GLuint vert, frag, prog;

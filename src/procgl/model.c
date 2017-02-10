@@ -49,8 +49,6 @@ void pg_model_buffer(struct pg_model* model, struct pg_renderer* rend)
 void pg_model_begin(struct pg_model* model, struct pg_renderer* rend)
 {
     glBindVertexArray(model->vao);
-    glBindBuffer(GL_ARRAY_BUFFER, model->verts_gl);
-    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, model->tris_gl);
 }
 
 void pg_model_draw(struct pg_renderer* rend, struct pg_model* model,
