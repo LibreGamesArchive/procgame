@@ -70,14 +70,14 @@ static inline void vec2_set(vec2 a, float x, float y)
     a[1] = y;
 }
 
-static inline void vec3_set(vec2 a, float x, float y, float z)
+static inline void vec3_set(vec3 a, float x, float y, float z)
 {
     a[0] = x;
     a[1] = y;
     a[2] = z;
 }
 
-static inline void vec4_set(vec2 a, float x, float y, float z, float w)
+static inline void vec4_set(vec4 a, float x, float y, float z, float w)
 {
     a[0] = x;
     a[1] = y;
