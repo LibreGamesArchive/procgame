@@ -1,11 +1,12 @@
-#include "renderer.h"
+#include <GL/glew.h>
+#include "vertex.h"
+#include "shader.h"
 #include "texture.h"
 #include "model.h"
 
 void pg_model_quad(struct pg_model* model)
 {
-    ARR_TRUNCATE(model->verts, 0);
-    ARR_TRUNCATE(model->tris, 0);
+    pg_model_init(model);
     pg_model_add_vertex(model, &(struct pg_vert3d) {
         .pos = { -0.5, 0, 0.5 }, .tex_coord = { 0, 0 }
     });
@@ -24,6 +25,7 @@ void pg_model_quad(struct pg_model* model)
 
 void pg_model_cube(struct pg_model* model)
 {
+    pg_model_init(model);
     static const vec3 verts[8] = {
         { 0.5, 0.5, 0.5 },
         { -0.5, 0.5, 0.5 },

@@ -1,5 +1,6 @@
-#include "renderer.h"
-#include "texture.h"
+#include <GL/glew.h>
+#include "vertex.h"
+#include "shader.h"
 #include "shape.h"
 
 void pg_shape_init(struct pg_shape* shape)
@@ -20,7 +21,7 @@ void pg_shape_deinit(struct pg_shape* shape)
     glDeleteVertexArrays(1, &shape->vao);
 }
 
-void pg_shape_buffer(struct pg_shape* shape, struct pg_renderer* rend)
+void pg_shape_buffer(struct pg_shape* shape, struct pg_shader* shader)
 {
     glBindVertexArray(shape->vao);
     glBindBuffer(GL_ARRAY_BUFFER, shape->verts_gl);
@@ -29,7 +30,7 @@ void pg_shape_buffer(struct pg_shape* shape, struct pg_renderer* rend)
                  shape->verts.data, GL_STATIC_DRAW);
     glBufferData(GL_ELEMENT_ARRAY_BUFFER, shape->tris.len * sizeof(unsigned),
                  shape->tris.data, GL_STATIC_DRAW);
-    pg_shader_buffer_attribs(&rend->shader_2d);
+    pg_shader_buffer_attribs(shader);
     glBindVertexArray(0);
     glBindBuffer(GL_ARRAY_BUFFER, 0);
     glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0);
@@ -57,16 +58,9 @@ void pg_shape_add_triangle(struct pg_shape* shape, unsigned v0,
     shape->tris.data[i + 2] = v2;
 }
 
-void pg_shape_texture(struct pg_renderer* rend, struct pg_texture* tex)
-{
-    glActiveTexture(GL_TEXTURE0);
-    glBindTexture(GL_TEXTURE_2D, tex->pixels_gl);
-    pg_shader_2d_set_texture(&rend->shader_2d, 0);
-}
-
-void pg_shape_draw(struct pg_renderer* rend, struct pg_shape* shape,
+void pg_shape_draw(struct pg_shape* shape, struct pg_shader* shader,
                    mat4 transform)
 {
-    pg_shader_2d_set_transform(&rend->shader_2d, transform);
+    pg_shader_set_matrix(shader, PG_MODEL_MATRIX, transform);
     glDrawElements(GL_TRIANGLES, shape->tris.len, GL_UNSIGNED_INT, 0);
 }

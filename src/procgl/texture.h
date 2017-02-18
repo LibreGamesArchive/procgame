@@ -17,12 +17,6 @@ struct pg_texture {
 void pg_texture_init(struct pg_texture* tex, int w, int h);
 void pg_texture_deinit(struct pg_texture* tex);
 void pg_texture_buffer(struct pg_texture* tex);
-void pg_texture_use(struct pg_texture* tex,
-                        struct pg_renderer* rend, int slot);
-void pg_texture_use_terrain(struct pg_texture* tex,
-                                struct pg_renderer* rend, int slot,
-                                float height_mod, float scale,
-                                float detail_weight);
 void pg_texture_perlin(struct pg_texture* tex,
                            float x1, float y1, float x2, float y2);
 void pg_texture_shitty(struct pg_texture* tex);

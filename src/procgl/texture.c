@@ -1,6 +1,9 @@
-#include "renderer.h"
-#include "texture.h"
+#include <math.h>
+#include <stdlib.h>
+#include "GL/glew.h"
 
+#include "../linmath.h"
+#include "texture.h"
 #include "noise1234.h"
 
 void pg_texture_init(struct pg_texture* tex, int w, int h)
@@ -38,31 +41,6 @@ void pg_texture_buffer(struct pg_texture* tex)
     glBindTexture(GL_TEXTURE_2D, tex->normals_gl);
     glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, tex->w, tex->h, 0, GL_RGBA,
                  GL_UNSIGNED_BYTE, tex->normals);
-}
-
-void pg_texture_use(struct pg_texture* tex,
-                        struct pg_renderer* rend, int slot)
-{
-    glActiveTexture(GL_TEXTURE0 + (slot * 3));
-    glBindTexture(GL_TEXTURE_2D, tex->pixels_gl);
-    glActiveTexture(GL_TEXTURE1 + (slot * 3));
-    glBindTexture(GL_TEXTURE_2D, tex->normals_gl);
-    rend->tex_slots[0][slot] = slot + 3;
-    rend->tex_slots[1][slot] = slot + 3 + 1;
-    rend->tex_slots[2][slot] = slot + 3 + 2;
-}
-
-void pg_texture_use_terrain(struct pg_texture* tex,
-                                struct pg_renderer* rend, int slot,
-                                float height_mod, float scale,
-                                float detail_weight)
-{
-    pg_texture_use(tex, rend, slot);
-    rend->shader_terrain.data.height_mod[slot] = height_mod;
-    rend->shader_terrain.data.scale[slot] = scale;
-    if(slot & 1) {
-        rend->shader_terrain.data.detail_weight[slot >> 1] = detail_weight;
-    }
 }
 
 void pg_texture_perlin(struct pg_texture* tex,

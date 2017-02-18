@@ -2,7 +2,10 @@
 #include <GL/glew.h>
 #include "shader.h"
 
-static GLuint load_shader(const char* filename, GLenum type)
+/*  Shadow state for the currently used OpenGL shader   */
+static struct pg_shader* pg_active_shader;
+
+static GLuint compile_glsl(const char* filename, GLenum type)
 {
     /*  Read the file into a buffer */
     FILE* f = fopen(filename, "r");
@@ -37,8 +40,8 @@ static GLuint load_shader(const char* filename, GLenum type)
 int pg_shader_load(struct pg_shader* shader,
                    const char* vert_filename, const char* frag_filename)
 {
-    shader->vert = load_shader(vert_filename, GL_VERTEX_SHADER);
-    shader->frag = load_shader(frag_filename, GL_FRAGMENT_SHADER);
+    shader->vert = compile_glsl(vert_filename, GL_VERTEX_SHADER);
+    shader->frag = compile_glsl(frag_filename, GL_FRAGMENT_SHADER);
     if(!(shader->vert) || !(shader->frag)) return 0;
     shader->prog = glCreateProgram();
     glAttachShader(shader->prog, shader->vert);
@@ -58,11 +61,61 @@ int pg_shader_load(struct pg_shader* shader,
     return 1;
 }
 
+
+void pg_shader_link_matrix(struct pg_shader* shader, enum pg_matrix type,
+                           const char* name)
+{
+    shader->mat_idx[type] = glGetUniformLocation(shader->prog, name);
+}
+
+void pg_shader_set_matrix(struct pg_shader* shader, enum pg_matrix type,
+                          mat4 matrix)
+{
+    mat4_dup(shader->matrix[type], matrix);
+    if(shader->mat_idx[type] != -1) {
+        glUniformMatrix4fv(shader->mat_idx[type], 1, GL_FALSE, *matrix);
+    }
+}
+
+void pg_shader_rebuild_matrices(struct pg_shader* shader)
+{
+    if(shader->mat_idx[PG_MODELVIEW_MATRIX] != -1) {
+        mat4_mul(shader->matrix[PG_MODELVIEW_MATRIX],
+                 shader->matrix[PG_MODEL_MATRIX],
+                 shader->matrix[PG_VIEW_MATRIX]);
+        glUniformMatrix4fv(shader->mat_idx[PG_MODELVIEW_MATRIX], 1, GL_FALSE,
+                           *shader->matrix[PG_MODELVIEW_MATRIX]);
+    }
+    if(shader->mat_idx[PG_PROJECTIONVIEW_MATRIX] != -1) {
+        mat4_mul(shader->matrix[PG_PROJECTIONVIEW_MATRIX],
+                 shader->matrix[PG_PROJECTION_MATRIX],
+                 shader->matrix[PG_VIEW_MATRIX]);
+        glUniformMatrix4fv(shader->mat_idx[PG_PROJECTIONVIEW_MATRIX], 1, GL_FALSE,
+                           *shader->matrix[PG_PROJECTIONVIEW_MATRIX]);
+    }
+    if(shader->mat_idx[PG_MVP_MATRIX] != -1) {
+        mat4_mul(shader->matrix[PG_MVP_MATRIX],
+                 shader->matrix[PG_MODEL_MATRIX],
+                 shader->matrix[PG_VIEW_MATRIX]);
+        mat4_mul(shader->matrix[PG_MVP_MATRIX],
+                 shader->matrix[PG_PROJECTION_MATRIX],
+                 shader->matrix[PG_MVP_MATRIX]);
+        glUniformMatrix4fv(shader->mat_idx[PG_MVP_MATRIX], 1, GL_FALSE,
+                           *shader->matrix[PG_MVP_MATRIX]);
+    }
+}
+
+int pg_shader_is_active(struct pg_shader* shader)
+{
+    return (shader == pg_active_shader);
+}
+
 void pg_shader_deinit(struct pg_shader* shader)
 {
     glDeleteShader(shader->vert);
     glDeleteShader(shader->frag);
     glDeleteProgram(shader->prog);
+    shader->deinit(shader->data);
 }
 
 void pg_shader_buffer_attribs(struct pg_shader* shader)
@@ -70,8 +123,9 @@ void pg_shader_buffer_attribs(struct pg_shader* shader)
     shader->buffer_attribs(shader);
 }
 
-void pg_shader_begin(struct pg_shader* shader)
+void pg_shader_begin(struct pg_shader* shader, struct pg_viewer* view)
 {
+    pg_active_shader = shader;
     glUseProgram(shader->prog);
-    shader->begin(shader);
+    shader->begin(shader, view);
 }

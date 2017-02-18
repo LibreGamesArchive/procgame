@@ -1,4 +1,6 @@
-#include "renderer.h"
+#include <GL/glew.h>
+#include "vertex.h"
+#include "shader.h"
 #include "texture.h"
 #include "model.h"
 
@@ -20,7 +22,7 @@ void pg_model_deinit(struct pg_model* model)
     glDeleteVertexArrays(1, &model->vao);
 }
 
-void pg_model_buffer(struct pg_model* model, struct pg_renderer* rend)
+void pg_model_buffer(struct pg_model* model, struct pg_shader* shader)
 {
     glBindVertexArray(model->vao);
     glBindBuffer(GL_ARRAY_BUFFER, model->verts_gl);
@@ -29,32 +31,22 @@ void pg_model_buffer(struct pg_model* model, struct pg_renderer* rend)
                  model->verts.data, GL_STATIC_DRAW);
     glBufferData(GL_ELEMENT_ARRAY_BUFFER, model->tris.len * sizeof(unsigned),
                  model->tris.data, GL_STATIC_DRAW);
-    glVertexAttribPointer(rend->shader_model.attrs.pos, 3, GL_FLOAT, GL_FALSE,
-                          14 * sizeof(float), 0);
-    glVertexAttribPointer(rend->shader_model.attrs.normal, 3, GL_FLOAT, GL_FALSE,
-                          14 * sizeof(float), (void*)(3 * sizeof(float)));
-    glVertexAttribPointer(rend->shader_model.attrs.tangent, 3, GL_FLOAT, GL_FALSE,
-                          14 * sizeof(float), (void*)(6 * sizeof(float)));
-    glVertexAttribPointer(rend->shader_model.attrs.bitangent, 3, GL_FLOAT, GL_FALSE,
-                          14 * sizeof(float), (void*)(9 * sizeof(float)));
-    glVertexAttribPointer(rend->shader_model.attrs.tex_coord, 2, GL_FLOAT, GL_FALSE,
-                          14 * sizeof(float), (void*)(12 * sizeof(float)));
-    glEnableVertexAttribArray(rend->shader_model.attrs.pos);
-    glEnableVertexAttribArray(rend->shader_model.attrs.normal);
-    glEnableVertexAttribArray(rend->shader_model.attrs.tangent);
-    glEnableVertexAttribArray(rend->shader_model.attrs.bitangent);
-    glEnableVertexAttribArray(rend->shader_model.attrs.tex_coord);
+    pg_shader_buffer_attribs(shader);
+    glBindVertexArray(0);
+    glBindBuffer(GL_ARRAY_BUFFER, 0);
+    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0);
 }
 
-void pg_model_begin(struct pg_model* model, struct pg_renderer* rend)
+void pg_model_begin(struct pg_model* model)
 {
     glBindVertexArray(model->vao);
 }
 
-void pg_model_draw(struct pg_renderer* rend, struct pg_model* model,
-                       mat4 transform)
+void pg_model_draw(struct pg_model* model, struct pg_shader* shader,
+                   mat4 transform)
 {
-    glUniformMatrix4fv(rend->shader_model.model_matrix, 1, GL_FALSE, *transform);
+    pg_shader_set_matrix(shader, PG_MODEL_MATRIX, transform);
+    pg_shader_rebuild_matrices(shader);
     glDrawElements(GL_TRIANGLES, model->tris.len, GL_UNSIGNED_INT, 0);
 }
 

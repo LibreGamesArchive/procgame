@@ -1,12 +1,9 @@
 #version 330
 
 uniform mat4 model_matrix;
-
-layout(std140) uniform vert_base {
-    mat4 proj_matrix;
-    mat4 view_matrix;
-    mat4 projview_matrix;
-};
+uniform mat4 proj_matrix;
+uniform mat4 view_matrix;
+uniform mat4 projview_matrix;
 
 in vec3 v_position;
 in vec3 v_normal;
