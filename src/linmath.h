@@ -2,7 +2,9 @@
 #define LINMATH_H
 
 #include <math.h>
+#ifndef M_PI
 #define M_PI (3.14159265359)
+#endif
 
 #define LINMATH_H_DEFINE_VEC(n) \
 typedef float vec##n[n]; \
