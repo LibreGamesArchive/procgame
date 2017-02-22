@@ -45,26 +45,6 @@ int main(int argc, char *argv[])
                             (vec3){ 0, -1, 0.2 },
                             (vec3){ 0.67 * 3, 0.58 * 3, 0.42 * 3 },
                             (vec3){ 0.2, 0.2, 0.2 });
-    struct pg_ppbuffer framebuffer;
-    pg_ppbuffer_init(&framebuffer, 800, 600, 16, 17, 18, 19);
-    pg_ppbuffer_bind_all(&framebuffer);
-    struct pg_postproc post_sine;
-    pg_postproc_load(&post_sine,
-                     "src/procgl/post_sine_vert.glsl",
-                     "src/procgl/post_sine_frag.glsl",
-                     "v_position", "color", "depth");
-    /*  Make a viewer object to view the things */
-    struct pg_viewer test_view;
-    pg_viewer_init(&test_view, (vec3){ 0, 0, 3 }, (vec2){ 0, 0 },
-                   (vec2){ 800, 600 }, (vec2){ 0.1, 100 });
-    /*  A test shape and a test model   */
-    struct pg_shape test_shape;
-    pg_shape_rect(&test_shape);
-    pg_shape_buffer(&test_shape, &shader_2d);
-    struct pg_model test_model;
-    pg_model_cube(&test_model);
-    pg_model_precalc_verts(&test_model);
-    pg_model_buffer(&test_model, &shader_3d);
     int user_exit = 0;
     //glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
     while (!user_exit)
@@ -82,33 +62,15 @@ int main(int argc, char *argv[])
             (vec2){ test_view.dir[0] + mouse_x * 0.001,
                     test_view.dir[1] + mouse_y * 0.001 });
         /*  Set up the transformation matrix    */
-        mat4 shape_transform;
-        mat4_identity(shape_transform);
-        mat4 model_transform;
-        mat4_identity(model_transform);
-        /*  A bit down, to the right, and ahead of the camera   */
-        mat4_translate(model_transform, 2, 6, 0);
         /*  Do The Thing!   */
         glEnable(GL_DEPTH_TEST);
         glDepthMask(1);
-        pg_ppbuffer_dst(&framebuffer);
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-        pg_shader_begin(&shader_3d, &test_view);
-        pg_model_begin(&test_model);
-        pg_model_draw(&test_model, &shader_3d, model_transform);
-        pg_shader_begin(&shader_2d, NULL);
-        pg_shape_begin(&test_shape);
-        pg_shape_draw(&test_shape, &shader_2d, shape_transform);
-        pg_ppbuffer_swap(&framebuffer);
-        pg_postproc_apply(&post_sine, &framebuffer, NULL);
         SDL_GL_SwapWindow(window);
     }
     /*  Clean it all up */
     pg_shader_deinit(&shader_2d);
     pg_shader_deinit(&shader_3d);
-    pg_postproc_deinit(&post_sine);
-    pg_model_deinit(&test_model);
-    pg_shape_deinit(&test_shape);
     SDL_DestroyWindow(window);
     SDL_GL_DeleteContext(context);
     SDL_Quit();
