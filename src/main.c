@@ -4,6 +4,7 @@
 #include "linmath.h"
 #include "procgl/vertex.h"
 #include "procgl/shader.h"
+#include "procgl/postproc.h"
 #include "procgl/texture.h"
 #include "procgl/model.h"
 #include "procgl/shape.h"
@@ -44,6 +45,14 @@ int main(int argc, char *argv[])
                             (vec3){ 0, -1, 0.2 },
                             (vec3){ 0.67 * 3, 0.58 * 3, 0.42 * 3 },
                             (vec3){ 0.2, 0.2, 0.2 });
+    struct pg_ppbuffer framebuffer;
+    pg_ppbuffer_init(&framebuffer, 800, 600, 16, 17, 18, 19);
+    pg_ppbuffer_bind_all(&framebuffer);
+    struct pg_postproc post_sine;
+    pg_postproc_load(&post_sine,
+                     "src/procgl/post_sine_vert.glsl",
+                     "src/procgl/post_sine_frag.glsl",
+                     "v_position", "color", "depth");
     /*  Make a viewer object to view the things */
     struct pg_viewer test_view;
     pg_viewer_init(&test_view, (vec3){ 0, 0, 3 }, (vec2){ 0, 0 },
@@ -82,6 +91,7 @@ int main(int argc, char *argv[])
         /*  Do The Thing!   */
         glEnable(GL_DEPTH_TEST);
         glDepthMask(1);
+        pg_ppbuffer_dst(&framebuffer);
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
         pg_shader_begin(&shader_3d, &test_view);
         pg_model_begin(&test_model);
@@ -89,9 +99,16 @@ int main(int argc, char *argv[])
         pg_shader_begin(&shader_2d, NULL);
         pg_shape_begin(&test_shape);
         pg_shape_draw(&test_shape, &shader_2d, shape_transform);
+        pg_ppbuffer_swap(&framebuffer);
+        pg_postproc_apply(&post_sine, &framebuffer, NULL);
         SDL_GL_SwapWindow(window);
     }
     /*  Clean it all up */
+    pg_shader_deinit(&shader_2d);
+    pg_shader_deinit(&shader_3d);
+    pg_postproc_deinit(&post_sine);
+    pg_model_deinit(&test_model);
+    pg_shape_deinit(&test_shape);
     SDL_DestroyWindow(window);
     SDL_GL_DeleteContext(context);
     SDL_Quit();

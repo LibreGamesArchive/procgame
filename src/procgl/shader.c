@@ -37,28 +37,36 @@ static GLuint compile_glsl(const char* filename, GLenum type)
     return shader;
 }
 
-int pg_shader_load(struct pg_shader* shader,
+int pg_compile_glsl(GLuint* vert, GLuint* frag, GLuint* prog,
                    const char* vert_filename, const char* frag_filename)
 {
-    shader->vert = compile_glsl(vert_filename, GL_VERTEX_SHADER);
-    shader->frag = compile_glsl(frag_filename, GL_FRAGMENT_SHADER);
-    if(!(shader->vert) || !(shader->frag)) return 0;
-    shader->prog = glCreateProgram();
-    glAttachShader(shader->prog, shader->vert);
-    glAttachShader(shader->prog, shader->frag);
-    glLinkProgram(shader->prog);
+    *vert = compile_glsl(vert_filename, GL_VERTEX_SHADER);
+    *frag = compile_glsl(frag_filename, GL_FRAGMENT_SHADER);
+    if(!(*vert) || !(*frag)) return 0;
+    *prog = glCreateProgram();
+    glAttachShader(*prog, *vert);
+    glAttachShader(*prog, *frag);
+    glLinkProgram(*prog);
     /*  Print the info log if there were any errors */
     GLint link_status;
-    glGetProgramiv(shader->prog, GL_LINK_STATUS, &link_status);
+    glGetProgramiv(*prog, GL_LINK_STATUS, &link_status);
     if(!link_status) {
         GLint log_length;
-        glGetProgramiv(shader->prog, GL_INFO_LOG_LENGTH, &log_length);
+        glGetProgramiv(*prog, GL_INFO_LOG_LENGTH, &log_length);
         GLchar log[log_length];
-        glGetProgramInfoLog(shader->prog, log_length, &log_length, log);
+        glGetProgramInfoLog(*prog, log_length, &log_length, log);
         printf("Shader program info log:\n%s\n", log);
         return 0;
     }
     return 1;
+}
+
+int pg_shader_load(struct pg_shader* shader,
+                   const char* vert_filename, const char* frag_filename)
+{
+    *shader = (struct pg_shader){ .mat_idx = { -1, -1, -1, -1, -1, -1 } };
+    return pg_compile_glsl(&shader->vert, &shader->frag, &shader->prog,
+                           vert_filename, frag_filename);
 }
 
 

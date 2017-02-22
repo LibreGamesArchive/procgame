@@ -21,6 +21,10 @@ struct pg_shader {
     void (*begin)(struct pg_shader* shader, struct pg_viewer* view);
 };
 
+/*  Generic GLSL shader loader  */
+int pg_compile_glsl(GLuint* vert, GLuint* frag, GLuint* prog,
+                    const char* vert_filename, const char* frag_filename);
+
 /*  Read/compile a shader program and store it in the given shader object   */
 int pg_shader_load(struct pg_shader* shader,
                    const char* vert_filename, const char* frag_filename);

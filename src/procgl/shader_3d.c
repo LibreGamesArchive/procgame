@@ -103,6 +103,9 @@ int pg_shader_3d(struct pg_shader* shader)
     d->attribs.tangent = glGetAttribLocation(shader->prog, "v_tangent");
     d->attribs.bitangent = glGetAttribLocation(shader->prog, "v_bitangent");
     d->attribs.tex_coord = glGetAttribLocation(shader->prog, "tex_coord");
+    d->tex_dirty = 1;
+    d->sun_dirty = 1;
+    d->fog_dirty = 1;
     shader->data = d;
     shader->deinit = free;
     shader->buffer_attribs = buffer_attribs;

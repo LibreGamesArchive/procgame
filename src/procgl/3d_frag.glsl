@@ -34,4 +34,5 @@ void main()
                       (tex_color * vec4(sun_color, 1) * reflectance);
     float fog_depth = clamp((fog_plane[1] - f_depth) / (fog_plane[1] - fog_plane[0]), 0.0, 1.0);
     frag_color = mix(vec4(fog_color, 1.0), draw_color, fog_depth);
+    frag_color = vec4(gl_FragCoord.x / 800, 0, 0, 1);
 }
