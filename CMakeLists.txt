@@ -2,8 +2,9 @@ cmake_minimum_required(VERSION 2.8.9)
 set(CMAKE_MODULE_PATH "./cmake")
 project(procgl)
 
-file(GLOB SOURCES src/*.c src/procgl/*.c)
+file(GLOB SOURCES src/*.c src/procgl/*.c src/shaders/*.c src/game/*.c)
 add_executable(procgl ${SOURCES})
+set_target_properties(procgl PROPERTIES OUTPUT_NAME "LudumHadronCollider")
 
 find_package(GLEW REQUIRED)
 if (GLEW_FOUND)

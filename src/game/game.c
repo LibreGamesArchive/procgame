@@ -41,7 +41,7 @@ void collider_init(struct collider_state* coll)
     pg_model_buffer(&coll->ring_model, &coll->shader_3d);
     pg_viewer_init(&coll->view, (vec3){ 0, 0, 0 }, (vec2){ 0, 0 },
                    (vec2){ 800, 600 }, (vec2){ 0.1, 100 });
-    coll->player_angle = 0;
+    coll->player_angle = 0.3;
     vec2_set(coll->player_pos, 0, 0);
     ARR_INIT(coll->rings);
 }
@@ -59,17 +59,24 @@ void collider_update(struct collider_state* coll)
     int mouse_x, mouse_y;
     SDL_GetRelativeMouseState(&mouse_x, &mouse_y);
     /*  Handle input; get the current view angle, add mouse motion to it  */
-    pg_viewer_set(&coll->view, coll->view.pos,
-        (vec2){ coll->view.dir[0] + mouse_x * 0.001,
-                coll->view.dir[1] + mouse_y * 0.001 });
-    //coll->player_angle += 0.01;
+    #if 0
+    pg_viewer_set(&coll->view,
+        (vec3){ 10 * cos(coll->player_angle),
+                10 * sin(coll->player_angle), 0 },
+        (vec2){ coll->player_angle, 0 });
+    #else
+    pg_viewer_set(&coll->view, (vec3){ 1, 0, 0 },
+        (vec2){ coll->view.dir[0] + mouse_x * 0.001, coll->view.dir[1] + mouse_y * 0.001 });
+    #endif
+    coll->player_angle -= 0.001;
 }
 
 void collider_draw(struct collider_state* coll)
 {
     mat4 model_transform;
+    mat4_identity(model_transform);
     mat4_translate(model_transform, 0, 3, 0);
-    mat4_rotate(model_transform, model_transform, 1, 0, 0, coll->player_angle);
+    mat4_rotate_Z(model_transform, model_transform, coll->player_angle * 100);
     pg_shader_begin(&coll->shader_3d, &coll->view);
     pg_model_begin(&coll->ring_model);
     pg_model_draw(&coll->ring_model, &coll->shader_3d, model_transform);
