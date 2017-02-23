@@ -1,7 +1,6 @@
 #include <stdio.h>
 #include <GL/glew.h>
-#include "shader.h"
-#include "vertex.h"
+#include "../procgl/procgl.h"
 
 struct data_3d {
     struct {
@@ -83,8 +82,8 @@ static void begin(struct pg_shader* shader, struct pg_viewer* view)
 int pg_shader_3d(struct pg_shader* shader)
 {
     int load = pg_shader_load(shader,
-                              "src/procgl/3d_vert.glsl",
-                              "src/procgl/3d_frag.glsl");
+                              "src/shaders/3d_vert.glsl",
+                              "src/shaders/3d_frag.glsl");
     if(!load) return 0;
     struct data_3d* d = malloc(sizeof(struct data_3d));
     pg_shader_link_matrix(shader, PG_MODEL_MATRIX, "model_matrix");
@@ -93,7 +92,7 @@ int pg_shader_3d(struct pg_shader* shader)
     pg_shader_link_matrix(shader, PG_PROJECTIONVIEW_MATRIX, "projview_matrix");
     d->unis.tex_unit = glGetUniformLocation(shader->prog, "tex");
     d->unis.norm_unit = glGetUniformLocation(shader->prog, "norm");
-    d->unis.ambient_color = glGetUniformLocation(shader->prog, "ambient_color");
+    d->unis.ambient_color = glGetUniformLocation(shader->prog, "amb_color");
     d->unis.sun_dir = glGetUniformLocation(shader->prog, "sun_dir");
     d->unis.sun_color = glGetUniformLocation(shader->prog, "sun_color");
     d->unis.fog_color = glGetUniformLocation(shader->prog, "fog_color");
@@ -102,7 +101,7 @@ int pg_shader_3d(struct pg_shader* shader)
     d->attribs.normal = glGetAttribLocation(shader->prog, "v_normal");
     d->attribs.tangent = glGetAttribLocation(shader->prog, "v_tangent");
     d->attribs.bitangent = glGetAttribLocation(shader->prog, "v_bitangent");
-    d->attribs.tex_coord = glGetAttribLocation(shader->prog, "tex_coord");
+    d->attribs.tex_coord = glGetAttribLocation(shader->prog, "v_tex_coord");
     d->tex_dirty = 1;
     d->sun_dirty = 1;
     d->fog_dirty = 1;
@@ -113,17 +112,18 @@ int pg_shader_3d(struct pg_shader* shader)
     return 1;
 }
 
-void pg_shader_3d_set_texture(struct pg_shader* shader,
-                                 GLint tex_unit, GLint norm_unit)
+void pg_shader_3d_set_texture(struct pg_shader* shader, struct pg_texture* tex,
+                              int color_slot, int normal_slot)
 {
     struct data_3d* d = shader->data;
-    d->state.tex_unit = tex_unit;
-    d->state.norm_unit = norm_unit;
+    d->state.tex_unit = color_slot;
+    d->state.norm_unit = normal_slot;
+    pg_texture_bind(tex, color_slot, normal_slot);
     if(pg_shader_is_active(shader)) {
-        glUniform1i(d->unis.tex_unit, tex_unit);
-        glUniform1i(d->unis.norm_unit, norm_unit);
+        glUniform1i(d->unis.tex_unit, color_slot);
+        glUniform1i(d->unis.norm_unit, normal_slot);
         d->tex_dirty = 0;
-    } else d->fog_dirty = 1;
+    } else d->tex_dirty = 1;
 }
 
 void pg_shader_3d_set_light(struct pg_shader* shader, vec3 ambient_color,
