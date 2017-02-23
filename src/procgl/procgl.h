@@ -1,0 +1,9 @@
+#include <GL/glew.h>
+#include <SDL2/SDL.h>
+#include "../linmath.h"
+#include "wave.h"
+#include "texture.h"
+#include "shader.h"
+#include "vertex.h"
+#include "model.h"
+#include "shape.h"
