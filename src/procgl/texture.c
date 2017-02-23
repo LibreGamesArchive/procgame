@@ -33,6 +33,19 @@ void pg_texture_deinit(struct pg_texture* tex)
     free(tex->pixels);
     free(tex->normals);
 }
+
+void pg_texture_bind(struct pg_texture* tex, int color_slot, int normal_slot)
+{
+    if(color_slot >= 0) {
+        glActiveTexture(GL_TEXTURE0 + color_slot);
+        glBindTexture(GL_TEXTURE_2D, tex->pixels_gl);
+    }
+    if(normal_slot >= 0) {
+        glActiveTexture(GL_TEXTURE0 + normal_slot);
+        glBindTexture(GL_TEXTURE_2D, tex->normals_gl);
+    }
+}
+
 void pg_texture_buffer(struct pg_texture* tex)
 {
     glBindTexture(GL_TEXTURE_2D, tex->pixels_gl);
@@ -98,7 +111,7 @@ void pg_texture_generate_normals(struct pg_texture* tex)
             d = (float)pg_texture_height(tex, x, y + 1) / 256;
             l = (float)pg_texture_height(tex, x - 1, y) / 256;
             r = (float)pg_texture_height(tex, x + 1, y) / 256;
-            vec3 normal = { r - l, u - d, 2.0f };
+            vec3 normal = { l - r, d - u, 2.0f };
             vec3_normalize(normal, normal);
             tex->normals[x + y * tex->w] = (struct pg_texture_normal) {
                 (normal[0] + 1) / 2 * 256,

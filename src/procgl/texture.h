@@ -16,6 +16,7 @@ struct pg_texture {
 
 void pg_texture_init(struct pg_texture* tex, int w, int h);
 void pg_texture_deinit(struct pg_texture* tex);
+void pg_texture_bind(struct pg_texture* tex, int color_slot, int normal_slot);
 void pg_texture_buffer(struct pg_texture* tex);
 void pg_texture_perlin(struct pg_texture* tex,
                            float x1, float y1, float x2, float y2);
