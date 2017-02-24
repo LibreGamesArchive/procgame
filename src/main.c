@@ -10,7 +10,7 @@ SDL_GLContext procgl_init(SDL_Window** window)
     SDL_GL_SetAttribute(SDL_GL_CONTEXT_MAJOR_VERSION, 3);
     SDL_GL_SetAttribute(SDL_GL_CONTEXT_MINOR_VERSION, 3);
     SDL_GL_SetAttribute(SDL_GL_STENCIL_SIZE, 8);
-    *window = SDL_CreateWindow("OpenGL",
+    *window = SDL_CreateWindow("Ludum Hadron Collider",
                                SDL_WINDOWPOS_UNDEFINED,
                                SDL_WINDOWPOS_UNDEFINED,
                                800, 600, SDL_WINDOW_OPENGL);
