@@ -44,6 +44,12 @@ void collider_init(struct collider_state* coll)
     coll->player_angle = 0.3;
     vec2_set(coll->player_pos, 0, 0);
     ARR_INIT(coll->rings);
+    int i;
+    for(i = 0; i < 12; ++i) {
+        struct coll_ring r =
+            { (M_PI * 2) / 12 * i, { (i - 6) * 0.25, (i - 6) * 0.25 } };
+        ARR_PUSH(coll->rings, r);
+    }
 }
 
 void collider_deinit(struct collider_state* coll)

@@ -1,4 +1,4 @@
-struct game_ring {
+struct coll_ring {
     float angle;
     vec2 pos;
 };
