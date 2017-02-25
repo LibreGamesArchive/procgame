@@ -66,7 +66,7 @@ void collider_update(struct collider_state* coll)
         (vec2){ coll->player_angle, 0 });
     #else
     pg_viewer_set(&coll->view, (vec3){ 1, 0, 0 },
-        (vec2){ coll->view.dir[0] + mouse_x * 0.001, coll->view.dir[1] + mouse_y * 0.001 });
+        (vec2){ coll->view.dir[0] - mouse_x * 0.001, coll->view.dir[1] - mouse_y * 0.001 });
     #endif
     coll->player_angle -= 0.001;
 }
@@ -75,7 +75,7 @@ void collider_draw(struct collider_state* coll)
 {
     mat4 model_transform;
     mat4_identity(model_transform);
-    mat4_translate(model_transform, 0, 3, 0);
+    mat4_translate(model_transform, 3, 0, 0);
     mat4_rotate_Z(model_transform, model_transform, coll->player_angle * 100);
     pg_shader_begin(&coll->shader_3d, &coll->view);
     pg_model_begin(&coll->ring_model);
