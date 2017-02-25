@@ -6,19 +6,24 @@
 #include "texture.h"
 #include "noise1234.h"
 
-void pg_texture_init(struct pg_texture* tex, int w, int h)
+void pg_texture_init(struct pg_texture* tex, int w, int h,
+                     int color_slot, int normal_slot)
 {
     tex->pixels = calloc(w * h, sizeof(*tex->pixels));
     tex->normals = calloc(w * h, sizeof(*tex->normals));
     tex->w = w;
     tex->h = h;
+    tex->color_slot = color_slot;
+    tex->normal_slot = normal_slot;
     glGenTextures(1, &tex->pixels_gl);
     glGenTextures(1, &tex->normals_gl);
+    glActiveTexture(GL_TEXTURE0 + color_slot);
     glBindTexture(GL_TEXTURE_2D, tex->pixels_gl);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+    glActiveTexture(GL_TEXTURE0 + normal_slot);
     glBindTexture(GL_TEXTURE_2D, tex->normals_gl);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
@@ -48,12 +53,18 @@ void pg_texture_bind(struct pg_texture* tex, int color_slot, int normal_slot)
 
 void pg_texture_buffer(struct pg_texture* tex)
 {
-    glBindTexture(GL_TEXTURE_2D, tex->pixels_gl);
-    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, tex->w, tex->h, 0, GL_RGBA,
-                 GL_UNSIGNED_BYTE, tex->pixels);
-    glBindTexture(GL_TEXTURE_2D, tex->normals_gl);
-    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, tex->w, tex->h, 0, GL_RGBA,
-                 GL_UNSIGNED_BYTE, tex->normals);
+    if(tex->color_slot >= 0) {
+        glActiveTexture(GL_TEXTURE0 + tex->color_slot);
+        glBindTexture(GL_TEXTURE_2D, tex->pixels_gl);
+        glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, tex->w, tex->h, 0, GL_RGBA,
+                     GL_UNSIGNED_BYTE, tex->pixels);
+    }
+    if(tex->normal_slot >= 0) {
+        glActiveTexture(GL_TEXTURE0 + tex->normal_slot);
+        glBindTexture(GL_TEXTURE_2D, tex->normals_gl);
+        glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, tex->w, tex->h, 0, GL_RGBA,
+                     GL_UNSIGNED_BYTE, tex->normals);
+    }
 }
 
 void pg_texture_perlin(struct pg_texture* tex,

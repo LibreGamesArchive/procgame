@@ -112,13 +112,12 @@ int pg_shader_3d(struct pg_shader* shader)
     return 1;
 }
 
-void pg_shader_3d_set_texture(struct pg_shader* shader, struct pg_texture* tex,
+void pg_shader_3d_set_texture(struct pg_shader* shader,
                               int color_slot, int normal_slot)
 {
     struct data_3d* d = shader->data;
     d->state.tex_unit = color_slot;
     d->state.norm_unit = normal_slot;
-    pg_texture_bind(tex, color_slot, normal_slot);
     if(pg_shader_is_active(shader)) {
         glUniform1i(d->unis.tex_unit, color_slot);
         glUniform1i(d->unis.norm_unit, normal_slot);

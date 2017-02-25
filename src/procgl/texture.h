@@ -10,11 +10,13 @@ struct pg_texture {
     struct pg_texture_pixel* pixels;
     struct pg_texture_normal* normals;
     int w, h;
+    int color_slot, normal_slot;
     GLuint pixels_gl;
     GLuint normals_gl;
 };
 
-void pg_texture_init(struct pg_texture* tex, int w, int h);
+void pg_texture_init(struct pg_texture* tex, int w, int h,
+                     int color_slot, int normal_slot);
 void pg_texture_deinit(struct pg_texture* tex);
 void pg_texture_bind(struct pg_texture* tex, int color_slot, int normal_slot);
 void pg_texture_buffer(struct pg_texture* tex);

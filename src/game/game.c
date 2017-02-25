@@ -2,10 +2,13 @@
 #include "../procgl/procgl.h"
 #include "../shaders/shaders.h"
 #include "game.h"
+#define GAME_WIDTH 10
+#define GAME_RADIUS 20
+#define GAME_SEGMENTS 20
 
 static void collider_generate_ring_texture(struct pg_texture* tex)
 {
-    pg_texture_init(tex, 128, 128);
+    pg_texture_init(tex, 128, 128, 0, 1);
     int x, y;
     for(x = 0; x < 128; ++x) {
         for(y = 0; y < 128; ++y) {
