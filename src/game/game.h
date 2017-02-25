@@ -5,6 +5,8 @@ struct collider_state {
     struct pg_shader shader_3d;
     struct pg_texture ring_texture;
     struct pg_model ring_model;
+    struct pg_texture env_texture;
+    struct pg_model env_model;
     struct pg_viewer view;
     float player_angle;
     vec2 player_pos;
