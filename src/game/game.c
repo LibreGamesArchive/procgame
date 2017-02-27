@@ -2,8 +2,8 @@
 #include "../procgl/procgl.h"
 #include "../shaders/shaders.h"
 #include "game.h"
-#define GAME_WIDTH 10
-#define GAME_RADIUS 20
+#define GAME_WIDTH 8
+#define GAME_RADIUS 40
 #define GAME_SEGMENTS 20
 
 static void collider_generate_ring_texture(struct pg_texture* tex)
@@ -66,41 +66,77 @@ static void collider_generate_env_model(struct pg_model* model,
     float half_angle = M_PI / GAME_SEGMENTS;
     pg_model_init(model);
     pg_model_add_vertex(model, &(struct pg_vert3d) {
-        .pos = { (GAME_RADIUS - GAME_WIDTH / 2) * cos(half_angle),
-                 (GAME_RADIUS - GAME_WIDTH / 2) * sin(half_angle), 0 },
+        .pos = { (GAME_RADIUS + GAME_WIDTH / 2) * cos(half_angle),
+                 (GAME_RADIUS + GAME_WIDTH / 2) * sin(half_angle), GAME_WIDTH / 2 },
         .tex_coord = { 0, 0 } });
-    pg_model_add_vertex(model, &(struct pg_vert3d) {
-        .pos = { (GAME_RADIUS) * cos(half_angle),
-                 (GAME_RADIUS) * sin(half_angle), -GAME_WIDTH / 2 },
-        .tex_coord = { 0, 1 } });
-    pg_model_add_vertex(model, &(struct pg_vert3d) {
-        .pos = { (GAME_RADIUS - GAME_WIDTH / 2) * cos(-half_angle),
-                 (GAME_RADIUS - GAME_WIDTH / 2) * sin(-half_angle), 0 },
-        .tex_coord = { 1, 0 } });
-    pg_model_add_vertex(model, &(struct pg_vert3d) {
-        .pos = { (GAME_RADIUS) * cos(-half_angle),
-                 (GAME_RADIUS) * sin(-half_angle), -GAME_WIDTH / 2 },
-        .tex_coord = { 1, 1 } });
-    pg_model_add_triangle(model, 1, 0, 2);
-    pg_model_add_triangle(model, 1, 2, 3);
     pg_model_add_vertex(model, &(struct pg_vert3d) {
         .pos = { (GAME_RADIUS + GAME_WIDTH / 2) * cos(half_angle),
-                 (GAME_RADIUS + GAME_WIDTH / 2) * sin(half_angle), 0 },
-        .tex_coord = { 0, 0 } });
-    pg_model_add_vertex(model, &(struct pg_vert3d) {
-        .pos = { (GAME_RADIUS) * cos(half_angle),
-                 (GAME_RADIUS) * sin(half_angle), -GAME_WIDTH / 2 },
+                 (GAME_RADIUS + GAME_WIDTH / 2) * sin(half_angle), -GAME_WIDTH / 2 },
         .tex_coord = { 0, 1 } });
     pg_model_add_vertex(model, &(struct pg_vert3d) {
         .pos = { (GAME_RADIUS + GAME_WIDTH / 2) * cos(-half_angle),
-                 (GAME_RADIUS + GAME_WIDTH / 2) * sin(-half_angle), 0 },
+                 (GAME_RADIUS + GAME_WIDTH / 2) * sin(-half_angle), GAME_WIDTH / 2 },
         .tex_coord = { 1, 0 } });
     pg_model_add_vertex(model, &(struct pg_vert3d) {
-        .pos = { (GAME_RADIUS) * cos(-half_angle),
-                 (GAME_RADIUS) * sin(-half_angle), -GAME_WIDTH / 2 },
+        .pos = { (GAME_RADIUS + GAME_WIDTH / 2) * cos(-half_angle),
+                 (GAME_RADIUS + GAME_WIDTH / 2) * sin(-half_angle), -GAME_WIDTH / 2 },
         .tex_coord = { 1, 1 } });
-    pg_model_add_triangle(model, 4, 5, 6);
-    pg_model_add_triangle(model, 6, 5, 7);
+    pg_model_add_triangle(model, 0, 1, 2);
+    pg_model_add_triangle(model, 2, 1, 3);
+    pg_model_add_vertex(model, &(struct pg_vert3d) {
+        .pos = { (GAME_RADIUS - GAME_WIDTH / 2) * cos(half_angle),
+                 (GAME_RADIUS - GAME_WIDTH / 2) * sin(half_angle), GAME_WIDTH / 2 },
+        .tex_coord = { 0, 0 } });
+    pg_model_add_vertex(model, &(struct pg_vert3d) {
+        .pos = { (GAME_RADIUS - GAME_WIDTH / 2) * cos(half_angle),
+                 (GAME_RADIUS - GAME_WIDTH / 2) * sin(half_angle), -GAME_WIDTH / 2 },
+        .tex_coord = { 0, 1 } });
+    pg_model_add_vertex(model, &(struct pg_vert3d) {
+        .pos = { (GAME_RADIUS - GAME_WIDTH / 2) * cos(-half_angle),
+                 (GAME_RADIUS - GAME_WIDTH / 2) * sin(-half_angle), GAME_WIDTH / 2 },
+        .tex_coord = { 1, 0 } });
+    pg_model_add_vertex(model, &(struct pg_vert3d) {
+        .pos = { (GAME_RADIUS - GAME_WIDTH / 2) * cos(-half_angle),
+                 (GAME_RADIUS - GAME_WIDTH / 2) * sin(-half_angle), -GAME_WIDTH / 2 },
+        .tex_coord = { 1, 1 } });
+    pg_model_add_triangle(model, 5, 4, 6);
+    pg_model_add_triangle(model, 5, 6, 7);
+    pg_model_add_vertex(model, &(struct pg_vert3d) {
+        .pos = { (GAME_RADIUS - GAME_WIDTH / 2) * cos(half_angle),
+                 (GAME_RADIUS - GAME_WIDTH / 2) * sin(half_angle), -GAME_WIDTH / 2 },
+        .tex_coord = { 0, 0 } });
+    pg_model_add_vertex(model, &(struct pg_vert3d) {
+        .pos = { (GAME_RADIUS + GAME_WIDTH / 2) * cos(half_angle),
+                 (GAME_RADIUS + GAME_WIDTH / 2) * sin(half_angle), -GAME_WIDTH / 2 },
+        .tex_coord = { 0, 1 } });
+    pg_model_add_vertex(model, &(struct pg_vert3d) {
+        .pos = { (GAME_RADIUS - GAME_WIDTH / 2) * cos(-half_angle),
+                 (GAME_RADIUS - GAME_WIDTH / 2) * sin(-half_angle), -GAME_WIDTH / 2 },
+        .tex_coord = { 1, 0 } });
+    pg_model_add_vertex(model, &(struct pg_vert3d) {
+        .pos = { (GAME_RADIUS + GAME_WIDTH / 2) * cos(-half_angle),
+                 (GAME_RADIUS + GAME_WIDTH / 2) * sin(-half_angle), -GAME_WIDTH / 2 },
+        .tex_coord = { 1, 1 } });
+    pg_model_add_triangle(model, 9, 8, 10);
+    pg_model_add_triangle(model, 9, 10, 11);
+    pg_model_add_vertex(model, &(struct pg_vert3d) {
+        .pos = { (GAME_RADIUS - GAME_WIDTH / 2) * cos(half_angle),
+                 (GAME_RADIUS - GAME_WIDTH / 2) * sin(half_angle), GAME_WIDTH / 2 },
+        .tex_coord = { 0, 0 } });
+    pg_model_add_vertex(model, &(struct pg_vert3d) {
+        .pos = { (GAME_RADIUS + GAME_WIDTH / 2) * cos(half_angle),
+                 (GAME_RADIUS + GAME_WIDTH / 2) * sin(half_angle), GAME_WIDTH / 2 },
+        .tex_coord = { 0, 1 } });
+    pg_model_add_vertex(model, &(struct pg_vert3d) {
+        .pos = { (GAME_RADIUS - GAME_WIDTH / 2) * cos(-half_angle),
+                 (GAME_RADIUS - GAME_WIDTH / 2) * sin(-half_angle), GAME_WIDTH / 2 },
+        .tex_coord = { 1, 0 } });
+    pg_model_add_vertex(model, &(struct pg_vert3d) {
+        .pos = { (GAME_RADIUS + GAME_WIDTH / 2) * cos(-half_angle),
+                 (GAME_RADIUS + GAME_WIDTH / 2) * sin(-half_angle), GAME_WIDTH / 2 },
+        .tex_coord = { 1, 1 } });
+    pg_model_add_triangle(model, 12, 13, 14);
+    pg_model_add_triangle(model, 14, 13, 15);
     pg_model_precalc_verts(model);
     pg_model_buffer(model, shader);
 }
@@ -152,7 +188,7 @@ void collider_update(struct collider_state* coll)
     pg_viewer_set(&coll->view, (vec3){ 1, 0, 0 },
         (vec2){ coll->view.dir[0] - mouse_x * 0.001, coll->view.dir[1] - mouse_y * 0.001 });
     #endif
-    coll->player_angle += 0.0005;
+    coll->player_angle += 0.01;
 }
 
 void collider_draw(struct collider_state* coll)
