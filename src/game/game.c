@@ -15,7 +15,11 @@ static void collider_generate_ring_texture(struct pg_texture* tex)
             float _x = x - 64;
             float _y = y - 64;
             float dist = sqrt(_x * _x + _y * _y) - 44;
-            if(dist < 0 || dist >= 16) continue;
+            if(dist < 0 || dist >= 16) {
+                tex->pixels[x + y * tex->w] =
+                    (struct pg_texture_pixel){ 50, 50, 100, 0 };
+                continue;
+            }
             dist -= 8;
             float r_dist = 1 - fabs(dist) / 8;
             uint8_t c = r_dist * 128 + 100;
