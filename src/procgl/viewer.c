@@ -18,5 +18,5 @@ void pg_viewer_set(struct pg_viewer* view, vec3 pos, vec2 dir)
     mat4_identity(view->view_matrix);
     mat4_rotate_X(view->view_matrix, view->view_matrix, (-M_PI / 2) - dir[1]);
     mat4_rotate_Z(view->view_matrix, view->view_matrix, (M_PI / 2) - dir[0]);
-    mat4_translate_in_place(view->view_matrix, pos[0], pos[1], pos[2]);
+    mat4_translate_in_place(view->view_matrix, -pos[0], -pos[1], -pos[2]);
 }

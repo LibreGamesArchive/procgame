@@ -4,6 +4,8 @@
 #include "wave.h"
 #include "texture.h"
 #include "shader.h"
+#include "postproc.h"
 #include "vertex.h"
 #include "model.h"
 #include "shape.h"
+#include "gbuffer.h"

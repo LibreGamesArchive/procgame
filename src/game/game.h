@@ -8,6 +8,7 @@ struct collider_state {
     struct pg_texture env_texture;
     struct pg_model env_model;
     struct pg_viewer view;
+    struct pg_gbuffer gbuf;
     float player_angle;
     vec2 player_pos;
     ARR_T(struct coll_ring) rings;

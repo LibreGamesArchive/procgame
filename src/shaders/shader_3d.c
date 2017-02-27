@@ -92,19 +92,12 @@ int pg_shader_3d(struct pg_shader* shader)
     pg_shader_link_matrix(shader, PG_PROJECTIONVIEW_MATRIX, "projview_matrix");
     d->unis.tex_unit = glGetUniformLocation(shader->prog, "tex");
     d->unis.norm_unit = glGetUniformLocation(shader->prog, "norm");
-    d->unis.ambient_color = glGetUniformLocation(shader->prog, "amb_color");
-    d->unis.sun_dir = glGetUniformLocation(shader->prog, "sun_dir");
-    d->unis.sun_color = glGetUniformLocation(shader->prog, "sun_color");
-    d->unis.fog_color = glGetUniformLocation(shader->prog, "fog_color");
-    d->unis.fog_plane = glGetUniformLocation(shader->prog, "fog_plane");
     d->attribs.pos = glGetAttribLocation(shader->prog, "v_position");
     d->attribs.normal = glGetAttribLocation(shader->prog, "v_normal");
     d->attribs.tangent = glGetAttribLocation(shader->prog, "v_tangent");
     d->attribs.bitangent = glGetAttribLocation(shader->prog, "v_bitangent");
     d->attribs.tex_coord = glGetAttribLocation(shader->prog, "v_tex_coord");
     d->tex_dirty = 1;
-    d->sun_dirty = 1;
-    d->fog_dirty = 1;
     shader->data = d;
     shader->deinit = free;
     shader->buffer_attribs = buffer_attribs;
@@ -123,33 +116,4 @@ void pg_shader_3d_set_texture(struct pg_shader* shader,
         glUniform1i(d->unis.norm_unit, normal_slot);
         d->tex_dirty = 0;
     } else d->tex_dirty = 1;
-}
-
-void pg_shader_3d_set_light(struct pg_shader* shader, vec3 ambient_color,
-                               vec3 sun_dir, vec3 sun_color)
-{
-    struct data_3d* d = shader->data;
-    if(ambient_color) vec3_dup(d->state.ambient_color, ambient_color);
-    if(sun_color) vec3_dup(d->state.sun_color, sun_color);
-    if(sun_dir) vec3_dup(d->state.sun_dir, sun_dir);
-    if(pg_shader_is_active(shader)) {
-        glUniform3f(d->unis.ambient_color,
-                    ambient_color[0], ambient_color[1], ambient_color[2]);
-        glUniform3f(d->unis.sun_dir, sun_dir[0], sun_dir[1], sun_dir[2]);
-        glUniform3f(d->unis.sun_color, sun_color[0], sun_color[1], sun_color[2]);
-        d->sun_dirty = 0;
-    } else d->sun_dirty = 1;
-}
-
-void pg_shader_3d_set_fog(struct pg_shader* shader, vec2 fog_plane,
-                             vec3 fog_color)
-{
-    struct data_3d* d = shader->data;
-    if(fog_plane) vec3_dup(d->state.fog_color, fog_color);
-    if(fog_color) vec2_dup(d->state.fog_plane, fog_plane);
-    if(pg_shader_is_active(shader)) {
-        glUniform2f(d->unis.fog_plane, fog_plane[0], fog_plane[1]);
-        glUniform3f(d->unis.fog_color, fog_color[0], fog_color[1], fog_color[2]);
-        d->fog_dirty = 0;
-    } d->fog_dirty = 1;
 }

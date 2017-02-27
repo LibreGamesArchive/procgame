@@ -107,21 +107,17 @@ static void collider_generate_env_model(struct pg_model* model,
 
 void collider_init(struct collider_state* coll)
 {
+    pg_gbuffer_init(&coll->gbuf, 800, 600);
+    pg_gbuffer_bind(&coll->gbuf, 16, 17, 18, 19);
     collider_generate_ring_texture(&coll->ring_texture);
     collider_generate_env_texture(&coll->env_texture);
     pg_shader_3d(&coll->shader_3d);
-    pg_shader_3d_set_fog(&coll->shader_3d,
-                         (vec2){ 180, 200 }, (vec3){ 0.67, 0.58, 0.42 });
-    pg_shader_3d_set_light(&coll->shader_3d,
-                           (vec3){ 0.2, 0.2, 0.2 },
-                           (vec3){ 0, 1, 0 },
-                           (vec3){ 2, 2, 2 });
-    pg_viewer_init(&coll->view, (vec3){ 0, 0, 0 }, (vec2){ 0, 0 },
-                   (vec2){ 800, 600 }, (vec2){ 0.1, 100 });
     collider_generate_ring_model(&coll->ring_model, &coll->shader_3d);
     collider_generate_env_model(&coll->env_model, &coll->shader_3d);
     coll->player_angle = 0.3;
     vec2_set(coll->player_pos, 0, 0);
+    pg_viewer_init(&coll->view, (vec3){ 0, 0, 0 }, (vec2){ 0, 0 },
+                   (vec2){ 800, 600 }, (vec2){ 0.1, 100 });
     ARR_INIT(coll->rings);
     int i;
     for(i = 0; i < 12; ++i) {
@@ -146,26 +142,36 @@ void collider_update(struct collider_state* coll)
     /*  Handle input; get the current view angle, add mouse motion to it  */
     #if 1
     coll->player_pos[0] += mouse_x * 0.001;
-    coll->player_pos[1] += mouse_y * 0.001;
+    coll->player_pos[1] -= mouse_y * 0.001;
     pg_viewer_set(&coll->view,
         (vec3){ (GAME_RADIUS + coll->player_pos[0]) * cos(coll->player_angle),
                 (GAME_RADIUS + coll->player_pos[0]) * sin(coll->player_angle),
                 coll->player_pos[1] },
-        (vec2){ coll->player_angle - M_PI / 2, 0 });
+        (vec2){ coll->player_angle + M_PI / 2, 0 });
     #else
     pg_viewer_set(&coll->view, (vec3){ 1, 0, 0 },
         (vec2){ coll->view.dir[0] - mouse_x * 0.001, coll->view.dir[1] - mouse_y * 0.001 });
     #endif
-    coll->player_angle += 0.01;
+    coll->player_angle += 0.0005;
 }
 
 void collider_draw(struct collider_state* coll)
 {
+    pg_gbuffer_dst(&coll->gbuf);
+    /*  All of this renders to the gbuffer, for lighting later  */
     pg_shader_begin(&coll->shader_3d, &coll->view);
+    pg_shader_3d_set_texture(&coll->shader_3d, 2, 3);
+    pg_model_begin(&coll->env_model);
+    int i;
+    for(i = 0; i < GAME_SEGMENTS; ++i) {
+        mat4 model_transform;
+        mat4_identity(model_transform);
+        mat4_rotate_Z(model_transform, model_transform, (M_PI * 2) / GAME_SEGMENTS * i);
+        pg_model_draw(&coll->env_model, &coll->shader_3d, model_transform);
+    }
     pg_shader_3d_set_texture(&coll->shader_3d, 0, 1);
     pg_model_begin(&coll->ring_model);
     struct coll_ring* r;
-    int i;
     ARR_FOREACH_PTR(coll->rings, r, i) {
         mat4 model_transform;
         mat4_translate(model_transform,
@@ -174,12 +180,20 @@ void collider_draw(struct collider_state* coll)
         mat4_rotate_Z(model_transform, model_transform, r->angle);
         pg_model_draw(&coll->ring_model, &coll->shader_3d, model_transform);
     }
-    pg_shader_3d_set_texture(&coll->shader_3d, 2, 3);
-    pg_model_begin(&coll->env_model);
-    for(i = 0; i < GAME_SEGMENTS; ++i) {
-        mat4 model_transform;
-        mat4_identity(model_transform);
-        mat4_rotate_Z(model_transform, model_transform, (M_PI * 2) / GAME_SEGMENTS * i);
-        pg_model_draw(&coll->env_model, &coll->shader_3d, model_transform);
-    }
+    /*  Now we start drawing all the lights */
+    pg_gbuffer_begin_light(&coll->gbuf, &coll->view);
+    pg_gbuffer_draw_light(&coll->gbuf,
+        (vec4){ GAME_RADIUS * cos(coll->player_angle + 1),
+                GAME_RADIUS * sin(coll->player_angle + 1), -2, 10 },
+        (vec3){ 1, 1, 1 });
+    pg_gbuffer_draw_light(&coll->gbuf,
+        (vec4){ GAME_RADIUS * cos(coll->player_angle + 0.5),
+                GAME_RADIUS * sin(coll->player_angle + 0.5), -2, 10 },
+        (vec3){ 0, 1, 0 });
+    pg_gbuffer_draw_light(&coll->gbuf,
+        (vec4){ (GAME_RADIUS+coll->player_pos[0]) * cos(coll->player_angle + 0.01),
+                (GAME_RADIUS+coll->player_pos[0]) * sin(coll->player_angle + 0.01), coll->player_pos[1] + 4, 10 },
+        (vec3){ 1, 1, 1 });
+    /*  And finish directly to the screen, with a tiny bit of ambient light */
+    pg_gbuffer_finish(&coll->gbuf, NULL, (vec3){ 0.05, 0.05, 0.05 });
 }

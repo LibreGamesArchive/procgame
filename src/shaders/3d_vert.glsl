@@ -16,10 +16,12 @@ out vec3 f_normal;
 out vec3 f_tangent;
 out vec3 f_bitangent;
 out vec2 f_tex_coord;
+out vec3 f_pos;
 
 void main()
 {
     gl_Position = projview_matrix * model_matrix * vec4(v_position, 1.0);
+    f_pos = vec3(model_matrix * vec4(v_position, 1.0));
     f_depth = length(view_matrix * model_matrix * vec4(v_position, 1.0));
     f_normal = mat3(model_matrix) * v_normal;
     f_tangent = mat3(model_matrix) * v_tangent;
