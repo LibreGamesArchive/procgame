@@ -15,6 +15,7 @@ SDL_GLContext procgl_init(SDL_Window** window)
                                SDL_WINDOWPOS_UNDEFINED,
                                800, 600, SDL_WINDOW_OPENGL);
     SDL_SetRelativeMouseMode(SDL_TRUE);
+    SDL_ShowCursor(SDL_DISABLE);
     return SDL_GL_CreateContext(*window);
 }
 
@@ -34,10 +35,10 @@ int main(int argc, char *argv[])
     while (!user_exit)
     {
         /*  Get input   */
-        SDL_Event windowEvent;
-        while(SDL_PollEvent(&windowEvent))
+        SDL_Event e;
+        while(SDL_PollEvent(&e))
         {
-            if (windowEvent.type == SDL_QUIT) user_exit = 1;
+            if (e.type == SDL_QUIT) user_exit = 1;
         }
         /*  Set up the transformation matrix    */
         /*  Do The Thing!   */
