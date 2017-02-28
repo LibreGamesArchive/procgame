@@ -1,5 +1,10 @@
 #include "../arr.h"
-#include "ring.h"
+
+struct coll_ring {
+    float power;
+    float angle;
+    vec2 pos;
+};
 
 struct collider_state {
     struct pg_shader shader_3d;
@@ -10,6 +15,8 @@ struct collider_state {
     struct pg_viewer view;
     struct pg_gbuffer gbuf;
     float player_angle;
+    float player_speed;
+    float player_light_intensity;
     vec2 player_pos;
     ARR_T(struct coll_ring) rings;
 };
