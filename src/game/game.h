@@ -8,6 +8,8 @@ struct coll_ring {
 
 struct collider_state {
     struct pg_shader shader_3d;
+    struct pg_shader shader_text;
+    struct pg_texture font;
     struct pg_texture ring_texture;
     struct pg_model ring_model;
     struct pg_texture env_texture;

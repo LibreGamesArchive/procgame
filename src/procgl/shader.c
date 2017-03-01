@@ -128,7 +128,7 @@ void pg_shader_deinit(struct pg_shader* shader)
 
 void pg_shader_buffer_attribs(struct pg_shader* shader)
 {
-    shader->buffer_attribs(shader);
+    if(shader->buffer_attribs) shader->buffer_attribs(shader);
 }
 
 void pg_shader_begin(struct pg_shader* shader, struct pg_viewer* view)

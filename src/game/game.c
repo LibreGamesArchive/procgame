@@ -159,6 +159,10 @@ void collider_init(struct collider_state* coll)
     pg_gbuffer_bind(&coll->gbuf, 16, 17, 18, 19);
     collider_generate_ring_texture(&coll->ring_texture);
     collider_generate_env_texture(&coll->env_texture);
+    pg_texture_init_from_file(&coll->font, "font_8x8.png", NULL, 8, -1);
+    pg_texture_set_atlas(&coll->font, 8, 8);
+    pg_shader_text(&coll->shader_text);
+    pg_shader_text_set_font(&coll->shader_text, &coll->font);
     pg_shader_3d(&coll->shader_3d);
     collider_generate_ring_model(&coll->ring_model, &coll->shader_3d);
     collider_generate_env_model(&coll->env_model, &coll->shader_3d);
@@ -258,12 +262,15 @@ void collider_draw(struct collider_state* coll)
         pg_gbuffer_draw_light(&coll->gbuf,
             (vec4){ (GAME_RADIUS) * cos(angle),
                     (GAME_RADIUS) * sin(angle), 3, 15 },
-            (vec3){ 1, 0, 1 });
+            (vec3){ 1, 0.5, 0.5 });
     }
     pg_gbuffer_draw_light(&coll->gbuf,
         (vec4){ coll->view.pos[0], coll->view.pos[1], coll->view.pos[2],
                 coll->player_light_intensity },
         (vec3){ 1, 1, 1 });
     /*  And finish directly to the screen, with a tiny bit of ambient light */
-    pg_gbuffer_finish(&coll->gbuf, NULL, (vec3){ 0.2, 0.2, 0.2 });
+    pg_gbuffer_finish(&coll->gbuf, NULL, (vec3){ 0.0, 0.0, 0.0 });
+    pg_shader_begin(&coll->shader_text, &coll->view);
+    pg_shader_text_write(&coll->shader_text, "ABCDEFG",
+        (vec2){ 400, 0 }, (vec2){ 16, 16 }, 2);
 }
