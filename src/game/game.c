@@ -46,14 +46,26 @@ static void collider_generate_env_texture(struct pg_texture* tex)
     int x, y;
     for(x = 0; x < 128; ++x) {
         for(y = 0; y < 128; ++y) {
+            struct pg_texture_pixel* p = &tex->pixels[x + y * tex->w];
+            struct pg_texture_normal* n = &tex->normals[x + y * tex->w];
             float _x = x - 64;
             float _y = y - 64;
-            float dist = sqrt(_x * _x + _y * _y) - 40;
-            float r_dist = 1 - (fabs(dist) / 8);
-            uint8_t c = r_dist * 128 + 100;
-            tex->pixels[x + y * tex->w] =
-                (struct pg_texture_pixel) { c * 0.5, c * 0.5, c, 255 };
-            tex->normals[x + y * tex->w].h = r_dist * 255;
+            float dist = sqrt(_x * _x + _y * _y);
+            if(dist >= 50) {
+                float s = fabs(sin(y / (128 / (M_PI * 2)) * 8));
+                s = abs((y % 8) - 4);
+                float c = s * 16 + 64;
+                *p = (struct pg_texture_pixel){ 128, 128, 128, 255 };
+                n->h = pow(s, 3) * 3;
+            } else if(dist >= 35) {
+                float s = pow(8 - fabs(dist - 43), 2) + 60;
+                *p = (struct pg_texture_pixel){ s * 2, s * 2, s * 2, 255 };
+                n->h = s * 2;
+            } else {
+                float c = dist * 3;
+                *p = (struct pg_texture_pixel){ c * 0.25, c * 0.25, c, 255 };
+                n->h = dist * 10;
+            }
         }
     }
     pg_texture_generate_normals(tex);
