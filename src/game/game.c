@@ -2,9 +2,9 @@
 #include "../procgl/procgl.h"
 #include "../shaders/shaders.h"
 #include "game.h"
-#define GAME_WIDTH 8
+#define GAME_WIDTH 16
 #define GAME_RADIUS 80
-#define GAME_SEGMENTS 40
+#define GAME_SEGMENTS 30
 
 static void collider_generate_ring_texture(struct pg_texture* tex)
 {
@@ -60,7 +60,7 @@ static void collider_generate_env_texture(struct pg_texture* tex)
             } else if(dist >= 35) {
                 float s = pow(8 - fabs(dist - 43), 2) + 60;
                 *p = (struct pg_texture_pixel){ s * 2, s * 2, s * 2, 255 };
-                n->h = s * 2;
+                n->h = 255 - (s * 2);
             } else {
                 float c = dist * 3;
                 *p = (struct pg_texture_pixel){ c * 0.25, c * 0.25, c, 255 };
@@ -167,7 +167,7 @@ void collider_init(struct collider_state* coll)
     collider_generate_ring_model(&coll->ring_model, &coll->shader_3d);
     collider_generate_env_model(&coll->env_model, &coll->shader_3d);
     coll->player_angle = 0.3;
-    coll->player_speed = 0.001;
+    coll->player_speed = 0.1;
     coll->player_light_intensity = 10;
     vec2_set(coll->player_pos, 0, 0);
     pg_viewer_init(&coll->view, (vec3){ 0, 0, 0 }, (vec2){ 0, 0 },
@@ -176,7 +176,7 @@ void collider_init(struct collider_state* coll)
     int i;
     for(i = 0; i < 12; ++i) {
         struct coll_ring r =
-            { 0.1, (M_PI * 2) / 12 * i, { (i - 6) * 0.25, (i - 6) * 0.25 } };
+            { 0.5, (M_PI * 2) / 12 * i, { (i - 6) * 0.25, (i - 6) * 0.25 } };
         ARR_PUSH(coll->rings, r);
     }
 }
@@ -189,12 +189,17 @@ void collider_deinit(struct collider_state* coll)
     ARR_DEINIT(coll->rings);
 }
 
+/*  This function should approach 1 as x approaches infinity
+    1 here represents the speed of light    */
+static float speed_func(float x)
+{
+    return (x / (x + 1.5)) * 0.1;
+}
+
 void collider_update(struct collider_state* coll)
 {
     int mouse_x, mouse_y;
     SDL_GetRelativeMouseState(&mouse_x, &mouse_y);
-    /*  Handle input; get the current view angle, add mouse motion to it  */
-    #if 1
     coll->player_pos[0] += mouse_x * 0.005;
     coll->player_pos[1] -= mouse_y * 0.005;
     pg_viewer_set(&coll->view,
@@ -202,11 +207,7 @@ void collider_update(struct collider_state* coll)
                 (GAME_RADIUS + coll->player_pos[0]) * sin(coll->player_angle),
                 coll->player_pos[1] },
         (vec2){ coll->player_angle + M_PI / 2, 0 });
-    #else
-    pg_viewer_set(&coll->view, (vec3){ 1, 0, 0 },
-        (vec2){ coll->view.dir[0] - mouse_x * 0.001, coll->view.dir[1] - mouse_y * 0.001 });
-    #endif
-    float new_angle = coll->player_angle + coll->player_speed;
+    float new_angle = coll->player_angle + speed_func(coll->player_speed);
     struct coll_ring* r;
     int i;
     ARR_FOREACH_PTR_REV(coll->rings, r, i) {
@@ -217,13 +218,13 @@ void collider_update(struct collider_state* coll)
             float dist = vec2_len(diff);
             float radius = (9 - (r->power * 8)) * 0.5;
             if(dist < radius) {
-                coll->player_speed += r->power * 0.001;
+                coll->player_speed += r->power * 0.1;
                 coll->player_light_intensity += 20;
                 ARR_SWAPSPLICE(coll->rings, i, 1);
             }
         }
     }
-    coll->player_angle += coll->player_speed;
+    coll->player_angle += speed_func(coll->player_speed);
     coll->player_angle = fmod(coll->player_angle, M_PI * 2);
     coll->player_light_intensity *= 0.99;
 }
@@ -269,8 +270,11 @@ void collider_draw(struct collider_state* coll)
                 coll->player_light_intensity },
         (vec3){ 1, 1, 1 });
     /*  And finish directly to the screen, with a tiny bit of ambient light */
-    pg_gbuffer_finish(&coll->gbuf, NULL, (vec3){ 0.0, 0.0, 0.0 });
+    pg_screen_dst();
+    pg_gbuffer_finish(&coll->gbuf, (vec3){ 0.1, 0.1, 0.1 });
     pg_shader_begin(&coll->shader_text, &coll->view);
-    pg_shader_text_write(&coll->shader_text, "ABCDEFG",
-        (vec2){ 400, 0 }, (vec2){ 16, 16 }, 2);
+    char speed_str[10];
+    snprintf(speed_str, 10, "%.5f c", speed_func(coll->player_speed));
+    pg_shader_text_write(&coll->shader_text, speed_str,
+        (vec2){ 32, 500 }, (vec2){ 24, 24 }, 0.25);
 }
