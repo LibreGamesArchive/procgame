@@ -4,6 +4,8 @@
 
 void pg_gbuffer_init(struct pg_gbuffer* gbuf, int w, int h)
 {
+    gbuf->w = w;
+    gbuf->h = h;
     /*  Set up the G-buffer, light accumulation buffer, depth buffer,
         and the framebuffer that they are all attached to   */
     glGenTextures(1, &gbuf->color);
@@ -109,6 +111,7 @@ static GLenum drawbufs[4] =
 void pg_gbuffer_dst(struct pg_gbuffer* gbuf)
 {
     glBindFramebuffer(GL_FRAMEBUFFER, gbuf->frame);
+    glViewport(0, 0, gbuf->w, gbuf->h);
     glDrawBuffers(3, drawbufs);
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT | GL_STENCIL_BUFFER_BIT);
 }
@@ -144,16 +147,13 @@ void pg_gbuffer_draw_light(struct pg_gbuffer* gbuf, vec4 light, vec3 color)
     glDrawArrays(GL_TRIANGLES, 0, 60);
 }
 
-void pg_gbuffer_finish(struct pg_gbuffer* gbuf, struct pg_ppbuffer* ppbuf,
-                       vec3 ambient_light)
+void pg_gbuffer_finish(struct pg_gbuffer* gbuf, vec3 ambient_light)
 {
     /*  The lighting pass is done so we should stop blending    */
     glDisable(GL_BLEND);
-    /*  If no ppbuffer is specified then just draw to the screen    */
-    glBindFramebuffer(GL_FRAMEBUFFER, ppbuf ? ppbuf->frame[ppbuf->dst] : 0);
-    glUseProgram(gbuf->f_prog);
     /*  Passing the color buffer and the light accumulation buffer, and the
         desired ambient light level, to the shader  */
+    glUseProgram(gbuf->f_prog);
     glUniform1i(gbuf->f_color, gbuf->color_slot);
     glUniform1i(gbuf->f_light, gbuf->light_slot);
     glUniform3fv(gbuf->f_ambient, 1, ambient_light);

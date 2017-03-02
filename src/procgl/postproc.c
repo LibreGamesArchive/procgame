@@ -6,6 +6,8 @@
 void pg_ppbuffer_init(struct pg_ppbuffer* buf, int w, int h,
                       int color0, int color1, int depth0, int depth1)
 {
+    buf->w = w;
+    buf->h = h;
     buf->dst = 0;
     buf->color_unit[0] = color0;
     buf->color_unit[1] = color1;
@@ -98,6 +100,7 @@ void pg_ppbuffer_bind_active(struct pg_ppbuffer* buf)
 void pg_ppbuffer_dst(struct pg_ppbuffer* buf)
 {
     glBindFramebuffer(GL_FRAMEBUFFER, buf->frame[buf->dst]);
+    glViewport(0, 0, buf->w, buf->h);
 }
 
 void pg_ppbuffer_swap(struct pg_ppbuffer* buf)

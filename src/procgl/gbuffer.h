@@ -36,5 +36,4 @@ void pg_gbuffer_dst(struct pg_gbuffer* gbuf);
     to the screen directly if ppbuf is set to NULL  */
 void pg_gbuffer_begin_light(struct pg_gbuffer* gbuf, struct pg_viewer* view);
 void pg_gbuffer_draw_light(struct pg_gbuffer* gbuf, vec4 light, vec3 color);
-void pg_gbuffer_finish(struct pg_gbuffer* gbuf, struct pg_ppbuffer* ppbuf,
-                       vec3 ambient_light);
+void pg_gbuffer_finish(struct pg_gbuffer* gbuf, vec3 ambient_light);
