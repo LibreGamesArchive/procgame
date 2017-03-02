@@ -65,12 +65,12 @@ const vec3 light_verts[60] = vec3[](
 
 uniform mat4 projview_matrix;
 uniform vec4 light;
-out vec4 pos;
+out vec4 f_pos;
 
 void main()
 {
     gl_Position = projview_matrix *
         vec4((light_verts[gl_VertexID] * light.w) + light.xyz, 1.0);
-    pos = gl_Position;
+    f_pos = gl_Position;
 }
 
