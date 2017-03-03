@@ -1,10 +1,12 @@
 #include <stdio.h>
+#include <time.h>
 #include "procgl/procgl.h"
 #include "game/game.h"
 
 int main(int argc, char *argv[])
 {
     pg_init(800, 600, 0, "Ludum Hadron Collider");
+    srand(time(0));
     glEnable(GL_CULL_FACE);
     struct collider_state game;
     collider_init(&game);

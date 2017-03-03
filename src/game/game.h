@@ -20,6 +20,16 @@ struct collider_state {
     float player_speed;
     float player_light_intensity;
     vec2 player_pos;
+    enum {
+        RING_RANDOM,
+        RING_SERIES,
+        RING_LINEAR,
+        RING_SPIRAL
+    } ring_generator;
+    float ring_spiral_angle;
+    vec2 ring_linear_dir;
+    float ring_distance;
+    struct coll_ring last_ring;
     ARR_T(struct coll_ring) rings;
 };
 

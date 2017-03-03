@@ -174,11 +174,14 @@ void collider_init(struct collider_state* coll)
                    (vec2){ 800, 600 }, (vec2){ 0.1, 100 });
     ARR_INIT(coll->rings);
     int i;
-    for(i = 0; i < 12; ++i) {
+    for(i = 1; i < 6; ++i) {
         struct coll_ring r =
-            { 0.5, (M_PI * 2) / 12 * i, { (i - 6) * 0.25, (i - 6) * 0.25 } };
+            { 0.1, (M_PI) / 6 * i, { (i - 6) * 0.25, (i - 6) * 0.25 } };
         ARR_PUSH(coll->rings, r);
     }
+    coll->ring_generator = RING_RANDOM;
+    coll->ring_distance = 1;
+    coll->last_ring = coll->rings.data[coll->rings.len - 1];
 }
 
 void collider_deinit(struct collider_state* coll)
@@ -189,10 +192,42 @@ void collider_deinit(struct collider_state* coll)
     ARR_DEINIT(coll->rings);
 }
 
+static inline float randf(void)
+{
+    return rand() / (float)RAND_MAX;
+}
+
+static inline float ring_power_func(void)
+{
+    float n = randf();
+    return pow((n - 0.1), 3) + 0.1;
+}
+
+static void collider_generate_ring(struct collider_state* coll)
+{
+    float limit = GAME_WIDTH * 0.5;
+    switch(coll->ring_generator) {
+    default:
+    case RING_RANDOM: {
+        struct coll_ring r;
+        vec2_set(r.pos, randf() * limit - limit / 2,
+                        randf() * limit - limit / 2);
+        r.angle = coll->last_ring.angle + coll->ring_distance;
+        r.angle = fmod(r.angle, M_PI * 2);
+        r.power = ring_power_func();
+        ARR_PUSH(coll->rings, r);
+        coll->last_ring = r;
+        break;
+    }
+    }
+}
+
 /*  This function should approach 1 as x approaches infinity
     1 here represents the speed of light    */
 static float speed_func(float x)
 {
+    return (x / (x + 1)) * 0.03;
+}
     return (x / (x + 1.5)) * 0.1;
 }
 
@@ -216,12 +251,13 @@ void collider_update(struct collider_state* coll)
             vec2 diff;
             vec2_sub(diff, coll->player_pos, r->pos);
             float dist = vec2_len(diff);
-            float radius = (9 - (r->power * 8)) * 0.5;
+            float radius = ((1 - r->power) * 8) * 0.35;
             if(dist < radius) {
                 coll->player_speed += r->power * 0.1;
-                coll->player_light_intensity += 20;
-                ARR_SWAPSPLICE(coll->rings, i, 1);
+                coll->player_light_intensity = 50;
             }
+            ARR_SWAPSPLICE(coll->rings, i, 1);
+            collider_generate_ring(coll);
         }
     }
     coll->player_angle += speed_func(coll->player_speed);
@@ -247,7 +283,7 @@ void collider_draw(struct collider_state* coll)
     pg_model_begin(&coll->ring_model);
     struct coll_ring* r;
     ARR_FOREACH_PTR(coll->rings, r, i) {
-        float radius = (9 - (r->power * 8)) * 0.5;
+        float radius = (1 - r->power) * 8;
         mat4 model_transform;
         mat4_translate(model_transform,
             (GAME_RADIUS + r->pos[0]) * cos(r->angle),
@@ -255,15 +291,25 @@ void collider_draw(struct collider_state* coll)
         mat4_rotate_Z(model_transform, model_transform, r->angle);
         mat4_scale_aniso(model_transform, model_transform, radius, radius, radius);
         pg_model_draw(&coll->ring_model, &coll->shader_3d, model_transform);
+        #if 0
+        mat4 test_transform;
+        mat4_translate(test_transform,
+            (GAME_RADIUS + r->pos[0]) * cos(r->angle - 0.025),
+            (GAME_RADIUS + r->pos[0]) * sin(r->angle - 0.025), r->pos[1] + radius * 0.6);
+        mat4_rotate_Z(test_transform, test_transform, r->angle);
+        pg_model_draw(&coll->ring_model, &coll->shader_3d, test_transform);
+        #endif
     }
     /*  Now we start drawing all the lights */
     pg_gbuffer_begin_light(&coll->gbuf, &coll->view);
     ARR_FOREACH_PTR(coll->rings, r, i) {
-        float angle = r->angle - 0.1;
+        float angle = r->angle - 0.025;
+        float radius = (1 - r->power) * 8;
         pg_gbuffer_draw_light(&coll->gbuf,
             (vec4){ (GAME_RADIUS) * cos(angle),
-                    (GAME_RADIUS) * sin(angle), 3, 15 },
-            (vec3){ 1, 0.5, 0.5 });
+                    (GAME_RADIUS) * sin(angle),
+                    (GAME_WIDTH) / 2 - 0.25, 30 },
+            (vec3){ 1, 1, 1 });
     }
     pg_gbuffer_draw_light(&coll->gbuf,
         (vec4){ coll->view.pos[0], coll->view.pos[1], coll->view.pos[2],
