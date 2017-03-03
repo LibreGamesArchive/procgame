@@ -50,3 +50,29 @@ void pg_screen_dst(void)
     glBindFramebuffer(GL_FRAMEBUFFER, 0);
     glViewport(0, 0, screen_w, screen_h);
 }
+
+static float framerate_running_avg = 0;
+static float framerate = 0;
+static unsigned framerate_last_update = 0;
+static unsigned framerate_update_interval = 1000;
+static unsigned ticks = 0;
+float pg_delta_time(int dump)
+{
+    unsigned ticks_tmp = SDL_GetTicks();
+    unsigned ticks_diff = ticks_tmp - ticks;
+    float delta_time = (float)ticks_diff / 1000.0f;
+    if(!dump) {
+        ticks = ticks_tmp;
+        framerate_running_avg = (framerate_running_avg + 1 / delta_time) / 2;
+        if(ticks_tmp >= framerate_last_update + framerate_update_interval) {
+            framerate_last_update = ticks_tmp;
+            framerate = framerate_running_avg;
+        }
+    }
+    return delta_time;
+}
+
+float pg_framerate(void)
+{
+    return framerate;
+}
