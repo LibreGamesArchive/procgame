@@ -1,3 +1,4 @@
+#include <curl/curl.h>
 #include "../arr.h"
 
 struct coll_ring {
@@ -8,10 +9,14 @@ struct coll_ring {
 
 struct collider_state {
     enum {
+        LHC_EXIT,
         LHC_MENU,
         LHC_PLAY,
         LHC_GAMEOVER
     } state;
+    int lhc_fun_fact;
+    int playername_idx;
+    char playername[32];
     struct pg_shader shader_3d;
     struct pg_shader shader_text;
     struct pg_texture font;
@@ -40,6 +45,12 @@ struct collider_state {
     float ring_distance;
     struct coll_ring last_ring;
     ARR_T(struct coll_ring) rings;
+    CURL* curl;
+    enum {
+        LHC_NOT_UPLOADED,
+        LHC_UPLOADED_SCORE,
+        LHC_UPLOAD_FAILED
+    } score_upload_state;
 };
 
 void collider_init(struct collider_state* coll);

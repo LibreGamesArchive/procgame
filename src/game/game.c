@@ -106,9 +106,11 @@ static void collider_generate_env_texture(struct pg_texture* tex)
                 *p = (struct pg_texture_pixel){ s * 2, s * 2, s * 2, 255 };
                 n->h = 255 - (s * 2);
             } else {
-                float c = dist * 3;
-                *p = (struct pg_texture_pixel){ c * 0.25, c * 0.25, c, 255 };
-                n->h = dist * 10;
+                float angle = atan2(x - 64, y - 64) + M_PI;
+                float angle_s = fmod(angle, (M_PI * 2) / 8) / ((M_PI * 2) / 8);
+                float c = fabs((1 - angle_s) * 8 - 4) * 60;
+                *p = (struct pg_texture_pixel){ c, c, c < 100 ? c * 2 : c, 255 };
+                n->h = c * 230;
             }
         }
     }
@@ -199,7 +201,9 @@ static void collider_generate_env_model(struct pg_model* model,
 
 void collider_init(struct collider_state* coll)
 {
-    pg_gbuffer_init(&coll->gbuf, 800, 600);
+    int sw, sh;
+    pg_screen_size(&sw, &sh);
+    pg_gbuffer_init(&coll->gbuf, sw, sh);
     pg_gbuffer_bind(&coll->gbuf, 16, 17, 18, 19);
     collider_generate_ring_texture(&coll->ring_texture);
     collider_generate_env_texture(&coll->env_texture);
@@ -215,22 +219,10 @@ void collider_init(struct collider_state* coll)
     coll->player_speed = 0.1;
     coll->player_light_intensity = 10;
     vec2_set(coll->player_pos, 0, 0);
-    coll->lead_angle = 0;
-    coll->lead_speed = 0;
-    vec2_set(coll->lead_pos, 0, 0);
     pg_viewer_init(&coll->view, (vec3){ 0, 0, 0 }, (vec2){ 0, 0 },
-                   (vec2){ 800, 600 }, (vec2){ 0.1, 200 });
-    ARR_INIT(coll->rings);
-    int i;
-    for(i = 1; i < 6; ++i) {
-        struct coll_ring r =
-            { 0.1, (M_PI) / 6 * i, { (i - 6) * 0.25, (i - 6) * 0.25 } };
-        ARR_PUSH(coll->rings, r);
-    }
-    coll->ring_generator = RING_RANDOM;
-    coll->ring_distance = 1;
-    coll->last_ring = coll->rings.data[coll->rings.len - 1];
-    coll->state = LHC_PLAY;
+                   (vec2){ sw, sh }, (vec2){ 0.1, 200 });
+    coll->curl = curl_easy_init();
+    coll->state = LHC_MENU;
 }
 
 void collider_deinit(struct collider_state* coll)
@@ -285,6 +277,11 @@ static void collider_update_gameplay(struct collider_state* coll)
     SDL_GetRelativeMouseState(&mouse_x, &mouse_y);
     coll->player_pos[0] += mouse_x * 0.005;
     coll->player_pos[1] -= mouse_y * 0.005;
+    SDL_Event e;
+    while(SDL_PollEvent(&e))
+    {
+        if(e.type == SDL_QUIT) coll->state = LHC_EXIT;
+    }
     float pos_dist = vec2_len(coll->player_pos);
     if(pos_dist > GAME_WIDTH / 2 - 1.5) {
         vec2_normalize(coll->player_pos, coll->player_pos);
@@ -308,7 +305,7 @@ static void collider_update_gameplay(struct collider_state* coll)
             float radius = ((1 - r->power) * 8) * 0.35;
             if(dist < radius) {
                 coll->player_speed += r->power * 0.1;
-                coll->player_light_intensity = 50;
+                coll->player_light_intensity = 1;
             }
             ARR_SWAPSPLICE(coll->rings, i, 1);
             collider_generate_ring(coll);
@@ -321,6 +318,8 @@ static void collider_update_gameplay(struct collider_state* coll)
         vec2_sub(diff, coll->player_pos, coll->lead_pos);
         float dist = vec2_len(diff);
         if(dist <= 2.5) {
+            SDL_StartTextInput();
+            coll->lhc_fun_fact = rand() % 10;
             coll->state = LHC_GAMEOVER;
             coll->lead_angle = coll->player_angle;
         } else {
@@ -340,17 +339,126 @@ static void collider_update_gameplay(struct collider_state* coll)
     coll->lead_speed = coll->player_speed;
 }
 
+char upload_result[16];
+static size_t curl_cb(char* ptr, size_t size, size_t nmemb, void* udata)
+{
+    strncpy(upload_result, ptr, 16);
+}
+
+#include "elympics_key.h"
+static void collider_upload_score(struct collider_state* coll)
+{
+    char url[256] = {};
+    snprintf(url, 256, "https://dollarone.games/elympics/submitHighscore?key="
+             ELYMPICS_KEY "&name=%s&score=%.5f",
+             coll->playername_idx > 0 ? coll->playername : "CERN",
+             speed_func_display(coll->player_speed));
+    curl_easy_setopt(coll->curl, CURLOPT_URL, url);
+    curl_easy_setopt(coll->curl, CURLOPT_WRITEFUNCTION, curl_cb);
+    CURLcode res = curl_easy_perform(coll->curl);
+    if(res != CURLE_OK || strncmp(upload_result, "OK", 16) != 0) {
+        coll->score_upload_state = LHC_UPLOADED_SCORE;
+    } else {
+        coll->score_upload_state = LHC_UPLOAD_FAILED;
+    }
+}
+
+static void collider_reset_game(struct collider_state* coll)
+{
+    ARR_TRUNCATE(coll->rings, 0);
+    coll->player_angle = 0.3;
+    coll->player_speed = 0.1;
+    coll->player_light_intensity = 10;
+    vec2_set(coll->player_pos, 0, 0);
+}
+
 static void collider_update_gameover(struct collider_state* coll)
 {
+    SDL_Event e;
+    while(SDL_PollEvent(&e))
+    {
+        if(e.type == SDL_QUIT) coll->state = LHC_EXIT;
+        else if(e.type == SDL_KEYDOWN) {
+            if(coll->score_upload_state != LHC_UPLOADED_SCORE) {
+                if(e.key.keysym.sym == SDLK_BACKSPACE
+                && coll->playername_idx > 0) {
+                    coll->playername[--coll->playername_idx] = 0;
+                } else if(e.key.keysym.sym == SDLK_RETURN) {
+                    collider_upload_score(coll);
+                }
+            }
+            if(e.key.keysym.sym == SDLK_ESCAPE) {
+                coll->state = LHC_MENU;
+                collider_reset_game(coll);
+                return;
+            }
+        } else if(e.type == SDL_TEXTINPUT
+               && coll->score_upload_state != LHC_UPLOADED_SCORE) {
+            if(coll->playername_idx < 31 && e.text.text[0] < 0x80) {
+                coll->playername[coll->playername_idx++] = e.text.text[0];
+            }
+        }
+    }
     float angle = coll->player_angle - 0.2;
     pg_viewer_set(&coll->view,
         (vec3){ (GAME_RADIUS) * cos(angle), (GAME_RADIUS) * sin(angle), 0 },
         (vec2){ angle + M_PI / 2, 0 });
 }
 
+static void collider_setup_game(struct collider_state* coll)
+{
+    ARR_INIT(coll->rings);
+    int i;
+    for(i = 1; i < 6; ++i) {
+        struct coll_ring r =
+            { 0.1, (M_PI) / 6 * i, { (i - 6) * 0.25, (i - 6) * 0.25 } };
+        ARR_PUSH(coll->rings, r);
+    }
+    coll->ring_generator = RING_RANDOM;
+    coll->ring_distance = 1;
+    coll->last_ring = coll->rings.data[coll->rings.len - 1];
+    coll->player_angle = 0.3;
+    coll->player_speed = 0.1;
+    coll->player_light_intensity = 2;
+    vec2_set(coll->player_pos, 0, 0);
+    coll->lead_angle = 0;
+    coll->lead_speed = 0;
+    vec2_set(coll->lead_pos, 0, 0);
+    coll->score_upload_state = LHC_NOT_UPLOADED;
+    memset(coll->playername, 0, 32);
+    coll->playername_idx = 0;
+}
+
 static void collider_update_menu(struct collider_state* coll)
 {
-
+    SDL_Event e;
+    while(SDL_PollEvent(&e))
+    {
+        if(e.type == SDL_QUIT) coll->state = LHC_EXIT;
+        else if(e.type == SDL_KEYDOWN) {
+            if(e.key.keysym.sym == SDLK_SPACE) {
+                coll->state = LHC_PLAY;
+                collider_setup_game(coll);
+                return;
+            } else if(e.key.keysym.sym == SDLK_ESCAPE) {
+                coll->state = LHC_EXIT;
+            }
+        }
+    }
+    float pos_dist = vec2_len(coll->player_pos);
+    if(pos_dist > GAME_WIDTH / 2 - 1.5) {
+        vec2_normalize(coll->player_pos, coll->player_pos);
+        vec2_scale(coll->player_pos, coll->player_pos, GAME_WIDTH / 2 - 1.5);
+    }
+    pg_viewer_set(&coll->view,
+        (vec3){ (GAME_RADIUS + coll->player_pos[0]) * cos(coll->player_angle),
+                (GAME_RADIUS + coll->player_pos[0]) * sin(coll->player_angle),
+                coll->player_pos[1] },
+        (vec2){ coll->player_angle + M_PI / 2, 0 });
+    float delta_time = pg_delta_time(0);
+    float new_angle = coll->player_angle +
+        (speed_func(coll->player_speed) * 60 * delta_time);
+    coll->player_angle = fmod(new_angle, M_PI * 2);
 }
 
 void collider_update(struct collider_state* coll)
@@ -400,12 +508,14 @@ static void collider_draw_gameplay(struct collider_state* coll)
     pg_model_draw(&coll->ring_model, &coll->shader_3d, model_transform);
     /*  Now we start drawing all the lights */
     pg_gbuffer_begin_light(&coll->gbuf, &coll->view);
+    float l = fmod(pg_time() * 0.005, GAME_SEGMENTS);
     for(i = 0; i < GAME_SEGMENTS; ++i) {
         float angle = (M_PI * 2) / GAME_SEGMENTS * i;
         angle += (M_PI * 2) / GAME_SEGMENTS / 2;
+        float b = i - l > 3 ? 0 : (i - l < 0) ? 0 : (i - l) * 15;
         pg_gbuffer_draw_light(&coll->gbuf,
             (vec4){ (GAME_RADIUS) * cos(angle), (GAME_RADIUS) * sin(angle),
-                    GAME_WIDTH / 2 - 0.3, 20 },
+                    GAME_WIDTH / 2 - 0.3, 25 + b },
             (vec3){ 1, 1, 1 });
     }
     pg_gbuffer_draw_light(&coll->gbuf,
@@ -414,20 +524,51 @@ static void collider_draw_gameplay(struct collider_state* coll)
         (vec3){ 1, 0.25, 0.25 });
     pg_gbuffer_draw_light(&coll->gbuf,
         (vec4){ coll->view.pos[0], coll->view.pos[1], coll->view.pos[2],
-                coll->player_light_intensity },
-        (vec3){ 0.25, 0.25, 1 });
+                coll->player_light_intensity * 50 },
+        (vec3){ 0.5, 0.5, 1.5 });
     /*  And finish directly to the screen, with a tiny bit of ambient light */
     pg_screen_dst();
-    pg_gbuffer_finish(&coll->gbuf, (vec3){ 0.3, 0.3, 0.3 });
+    pg_gbuffer_finish(&coll->gbuf, (vec3){ 0.1, 0.1, 0.1 });
     pg_shader_begin(&coll->shader_text, &coll->view);
     char speed_str[10];
-    snprintf(speed_str, 10, "%.5f c", speed_func_display(coll->player_speed));
+    snprintf(speed_str, 10, "%.5fc", speed_func_display(coll->player_speed));
     pg_shader_text_write(&coll->shader_text, speed_str,
-        (vec2){  }, (vec2){ 24, 24 }, 0.25);
-    snprintf(speed_str, 10, "FPS: %d", (int)pg_framerate());
-    pg_shader_text_write(&coll->shader_text, speed_str,
-        (vec2){ 0, 0 }, (vec2){ 8, 8 }, 0.25);
+        (vec2){ 50, 50 }, (vec2){ 24, 24 }, 0.25);
+    char fps_str[10];
+    snprintf(fps_str, 10, "FPS: %d", (int)pg_framerate());
+    pg_shader_text_write(&coll->shader_text, fps_str,
+        (vec2){ 0, 0 }, (vec2){ 8, 8 }, 0.125);
 }
+
+char* LHC_facts[10][3] = {
+    {   "THE LARGE HADRON COLLIDER CAN ACCELERATE",
+        "PROTONS UP TO 0.99999999C, WITHIN WALKING",
+        "DISTANCE OF LIGHT SPEED!" },
+    {   "THE LARGE HADRON COLLIDER SITS INSIDE A",
+        "CIRCULAR TUNNEL WHICH IS ABOUT 27KM (~17MI)",
+        "LONG!" },
+    {   "THE LARGE HADRON COLLIDER IS THE LARGEST",
+        "MACHINE EVER BUILT BY HUMANS!" },
+    {   "TWO NOBEL PRIZES HAVE BEEN AWARDED TO",
+        "SCIENTISTS WHOSE EXPERIMENTS WERE CONDUCTED",
+        "AT CERN!" },
+    {   "ALL OF THE SUPER-CONDUCTING STRANDS IN THE",
+        "LARGE HADRON COLLIDER WOULD STRETCH AROUND",
+        "EARTH'S EQUATER NEARLY SEVEN TIMES!" },
+    {   "THE WORLDWIDE LHC COMPUTING GRID IS THE",
+        "WORLD'S LARGEST DISTRIBUTED COMPUTING GRID",
+        "WITH OVER 170 FACILITIES IN 36 COUNTRIES!" },
+    {   "THE LARGE HADRON COLLIDER PRODUCES OVER",
+        "15 PETABYTES OF SCIENTIFIC DATA PER YEAR!" },
+    {   "IN MAY 2011, QUARK-GLUON PLASMA, WHICH IS",
+        "THE DENSEST MATTER THOUGHT TO EXIST BESIDES",
+        "BLACK HOLES, WAS CREATED AT THE LHC!" },
+    {   "IT TAKES A PROTON LESS THAN 90 MICROSECONDS",
+        "TO PASS AROUND THE MAIN RING OF THE LARGE",
+        "HADRON COLLIDER!" },
+    {   "THE LARGE HADRON COLLIDER CAN DETECT ABOUT",
+        "FORTY MILLION COLLISIONS PER SECOND!" }
+};
 
 static void collider_draw_gameover(struct collider_state* coll)
 {
@@ -467,26 +608,99 @@ static void collider_draw_gameover(struct collider_state* coll)
     pg_model_draw(&coll->ring_model, &coll->shader_3d, model_transform);
     /*  Now we start drawing all the lights */
     pg_gbuffer_begin_light(&coll->gbuf, &coll->view);
+    pg_gbuffer_draw_light(&coll->gbuf,
+        (vec4){ GAME_RADIUS * cos(coll->lead_angle - 0.05),
+                GAME_RADIUS * sin(coll->lead_angle - 0.05), GAME_WIDTH / 2 - 1,
+                25 + sin(pg_time() * 0.025) * 2 },
+        (vec3){ 0.5, 1.5, 0.5 });
+    /*  And finish directly to the screen, with a tiny bit of ambient light */
+    pg_screen_dst();
+    pg_gbuffer_finish(&coll->gbuf, (vec3){ 0.1, 0.1, 0.1 });
+    pg_shader_begin(&coll->shader_text, &coll->view);
+    char speed_str[32];
+    snprintf(speed_str, 32, "YOU REACHED %.5fc!", speed_func_display(coll->player_speed));
+    pg_shader_text_write(&coll->shader_text, speed_str,
+        (vec2){ 50, 50 }, (vec2){ 24, 24 }, 0.25);
+    pg_shader_text_write(&coll->shader_text, "GIVE US YOUR NAME FOR THE NOBEL PRIZE:",
+        (vec2){ 100, 100 }, (vec2){ 16, 16 }, 0.1);
+    pg_shader_text_write(&coll->shader_text, coll->playername,
+        (vec2){ 140, 140 }, (vec2){ 24, 24 }, 0.25);
+    pg_shader_text_write(&coll->shader_text, "PRESS ESC TO RETURN TO THE MAIN MENU",
+        (vec2){ 100, 250 }, (vec2){ 16, 16 }, 0.1);
+    switch(coll->score_upload_state) {
+    case LHC_NOT_UPLOADED:
+        pg_shader_text_write(&coll->shader_text, "PRESS ENTER TO UPLOAD THE SCIENCE!",
+            (vec2){ 100, 200 }, (vec2){ 16, 16 }, 0.1);
+        break;
+    case LHC_UPLOADED_SCORE:
+        pg_shader_text_write(&coll->shader_text, "YOUR NOBEL PRIZE IS IN THE MAIL",
+            (vec2){ 100, 200 }, (vec2){ 16, 16 }, 0.1);
+        break;
+    case LHC_UPLOAD_FAILED:
+        pg_shader_text_write(&coll->shader_text, "NET DOWN DUE TO BLACK HOLE DISASTER?",
+            (vec2){ 50, 200 }, (vec2){ 16, 16 }, 0.1);
+        break;
+    }
+    pg_shader_text_write(&coll->shader_text, "DID YOU KNOW?",
+        (vec2){ 160, 360 }, (vec2){ 24, 24 }, 0.25);
+    for(i = 0; i < 3; ++i) {
+        if(LHC_facts[coll->lhc_fun_fact][i]) {
+            pg_shader_text_write(&coll->shader_text, LHC_facts[coll->lhc_fun_fact][i],
+                (vec2){ 50, 400 + i * 24 }, (vec2){ 16, 16 }, 0.0625);
+        }
+    }
+}
+
+static void collider_draw_menu(struct collider_state* coll)
+{
+    pg_gbuffer_dst(&coll->gbuf);
+    /*  All of this renders to the gbuffer, for lighting later  */
+    pg_shader_begin(&coll->shader_3d, &coll->view);
+    pg_shader_3d_set_texture(&coll->shader_3d, 2, 3);
+    pg_model_begin(&coll->env_model);
+    int i;
+    for(i = 0; i < GAME_SEGMENTS; ++i) {
+        mat4 model_transform;
+        mat4_identity(model_transform);
+        mat4_rotate_Z(model_transform, model_transform, (M_PI * 2) / GAME_SEGMENTS * i);
+        pg_model_draw(&coll->env_model, &coll->shader_3d, model_transform);
+    }
+    pg_gbuffer_begin_light(&coll->gbuf, &coll->view);
+    float l = fmod(pg_time() * 0.005, GAME_SEGMENTS);
     for(i = 0; i < GAME_SEGMENTS; ++i) {
         float angle = (M_PI * 2) / GAME_SEGMENTS * i;
         angle += (M_PI * 2) / GAME_SEGMENTS / 2;
+        float b = i - l > 3 ? 0 : (i - l < 0) ? 0 : (i - l) * 15;
         pg_gbuffer_draw_light(&coll->gbuf,
             (vec4){ (GAME_RADIUS) * cos(angle), (GAME_RADIUS) * sin(angle),
-                    GAME_WIDTH / 2 - 0.3, 20 },
+                    GAME_WIDTH / 2 - 0.3, 25 + b },
             (vec3){ 1, 1, 1 });
     }
     pg_gbuffer_draw_light(&coll->gbuf,
-        (vec4){ GAME_RADIUS * cos(coll->lead_angle - 0.1),
-                GAME_RADIUS * sin(coll->lead_angle - 0.1), GAME_WIDTH / 2 - 1, 30 },
-        (vec3){ 0.25, 2, 0.25 });
-    /*  And finish directly to the screen, with a tiny bit of ambient light */
+        (vec4){ coll->view.pos[0], coll->view.pos[1], coll->view.pos[2],
+                50 + sin(pg_time() * 0.025) * 2 },
+        (vec3){ 0.5, 0.5, 1.5 });
     pg_screen_dst();
-    pg_gbuffer_finish(&coll->gbuf, (vec3){ 0.3, 0.3, 0.3 });
+    pg_gbuffer_finish(&coll->gbuf, (vec3){ 0.1, 0.1, 0.1 });
+    pg_shader_begin(&coll->shader_text, &coll->view);
+    int sw, sh;
+    pg_screen_size(&sw, &sh);
+    pg_shader_text_write(&coll->shader_text, "LUDUM",
+        (vec2){ sw / 2 - 40 * 4.5, sh / 6}, (vec2){ 40, 40 }, 1);
+    pg_shader_text_write(&coll->shader_text, "HADRON",
+        (vec2){ sw / 2 - 40 * 5.5, sh / 6 * 2 }, (vec2){ 40, 40 }, 1);
+    pg_shader_text_write(&coll->shader_text, "COLLIDER",
+        (vec2){ sw / 2 - 40 * 7.5, sh / 6 * 3 }, (vec2){ 40, 40 }, 1);
+    pg_shader_text_write(&coll->shader_text, "PRESS SPACE TO START",
+        (vec2){ sw / 2 - 16 * 10, sh / 6 * 4 }, (vec2){ 16, 16 }, 0.1);
+    pg_shader_text_write(&coll->shader_text, "OR ESCAPE TO EXIT",
+        (vec2){ sw / 2 - 16 * 9 + 16, sh / 6 * 4 + 32 }, (vec2){ 16, 16 }, 0.1);
 }
 
 void collider_draw(struct collider_state* coll)
 {
     switch(coll->state) {
+    case LHC_MENU: collider_draw_menu(coll); break;
     case LHC_PLAY: collider_draw_gameplay(coll); break;
     case LHC_GAMEOVER: collider_draw_gameover(coll); break;
     }
