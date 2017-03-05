@@ -199,9 +199,10 @@ static void collider_generate_env_model(struct pg_model* model,
     pg_model_buffer(model, shader);
 }
 
-void collider_init(struct collider_state* coll)
+void collider_init(struct collider_state* coll, float mouse_sens)
 {
     int sw, sh;
+    coll->mouse_sens = mouse_sens;
     pg_screen_size(&sw, &sh);
     pg_gbuffer_init(&coll->gbuf, sw, sh);
     pg_gbuffer_bind(&coll->gbuf, 16, 17, 18, 19);
@@ -223,6 +224,7 @@ void collider_init(struct collider_state* coll)
                    (vec2){ sw, sh }, (vec2){ 0.1, 200 });
     coll->curl = curl_easy_init();
     coll->state = LHC_MENU;
+    ARR_INIT(coll->rings);
 }
 
 void collider_deinit(struct collider_state* coll)
@@ -275,8 +277,8 @@ static void collider_update_gameplay(struct collider_state* coll)
     int mouse_x, mouse_y;
     float delta_time = pg_delta_time(0);
     SDL_GetRelativeMouseState(&mouse_x, &mouse_y);
-    coll->player_pos[0] += mouse_x * 0.005;
-    coll->player_pos[1] -= mouse_y * 0.005;
+    coll->player_pos[0] += mouse_x * coll->mouse_sens;
+    coll->player_pos[1] -= mouse_y * coll->mouse_sens;
     SDL_Event e;
     while(SDL_PollEvent(&e))
     {
@@ -348,12 +350,13 @@ static size_t curl_cb(char* ptr, size_t size, size_t nmemb, void* udata)
 #include "elympics_key.h"
 static void collider_upload_score(struct collider_state* coll)
 {
-    char url[256] = {};
-    snprintf(url, 256, "https://dollarone.games/elympics/submitHighscore?key="
-             ELYMPICS_KEY "&name=%s&score=%.5f",
-             coll->playername_idx > 0 ? coll->playername : "CERN",
-             speed_func_display(coll->player_speed));
-    curl_easy_setopt(coll->curl, CURLOPT_URL, url);
+    char post[256] = {};
+    snprintf(post, 256, "key=" ELYMPICS_KEY "&name=%s&score=%.5f",
+        coll->playername_idx > 0 ? coll->playername : "CERN",
+        speed_func_display(coll->player_speed));
+    curl_easy_setopt(coll->curl, CURLOPT_URL,
+        "https://dollarone.games/elympics/submitHighscore");
+    curl_easy_setopt(coll->curl, CURLOPT_POSTFIELDS, post);
     curl_easy_setopt(coll->curl, CURLOPT_WRITEFUNCTION, curl_cb);
     CURLcode res = curl_easy_perform(coll->curl);
     if(res != CURLE_OK || strncmp(upload_result, "OK", 16) != 0) {

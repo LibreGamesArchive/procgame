@@ -38,8 +38,8 @@ static void begin(struct pg_shader* shader, struct pg_viewer* view)
 int pg_shader_2d(struct pg_shader* shader)
 {
     int load = pg_shader_load(shader,
-                              "src/shaders/2d_vert.glsl",
-                              "src/shaders/2d_frag.glsl");
+                              "shaders/2d_vert.glsl",
+                              "shaders/2d_frag.glsl");
     if(!load) return 0;
     struct data_2d* d = malloc(sizeof(struct data_2d));
     pg_shader_link_matrix(shader, PG_MODEL_MATRIX, "model_matrix");

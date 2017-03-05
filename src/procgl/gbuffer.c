@@ -54,7 +54,7 @@ void pg_gbuffer_init(struct pg_gbuffer* gbuf, int w, int h)
                               GL_RENDERBUFFER, gbuf->depth);
     /*  Load the shader to render the light volumes */
     pg_compile_glsl(&gbuf->l_vert, &gbuf->l_frag, &gbuf->l_prog,
-                    "src/shaders/deferred_vert.glsl", "src/shaders/deferred_frag.glsl");
+                    "shaders/deferred_vert.glsl", "shaders/deferred_frag.glsl");
     gbuf->uni_projview = glGetUniformLocation(gbuf->l_prog, "projview_matrix");
     gbuf->uni_normal = glGetUniformLocation(gbuf->l_prog, "g_normal");
     gbuf->uni_pos = glGetUniformLocation(gbuf->l_prog, "g_pos");
@@ -63,7 +63,7 @@ void pg_gbuffer_init(struct pg_gbuffer* gbuf, int w, int h)
     /*  Load the shader which combines the light accumulation buffer and the
         color buffer, and draws the final result    */
     pg_compile_glsl(&gbuf->f_vert, &gbuf->f_frag, &gbuf->f_prog,
-                    "src/shaders/screen_vert.glsl", "src/shaders/screen_frag.glsl");
+                    "shaders/screen_vert.glsl", "shaders/screen_frag.glsl");
     gbuf->f_color = glGetUniformLocation(gbuf->f_prog, "color");
     gbuf->f_light = glGetUniformLocation(gbuf->f_prog, "light");
     gbuf->f_ambient = glGetUniformLocation(gbuf->f_prog, "ambient_light");

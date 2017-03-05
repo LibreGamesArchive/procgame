@@ -5,11 +5,16 @@
 
 int main(int argc, char *argv[])
 {
-    pg_init(1024, 576, 0, "Ludum Hadron Collider");
+    FILE* config = fopen("./options.txt", "r");
+    int w, h, fullscreen;
+    float mouse_sens;
+    fscanf(config, "x:%d\ny:%d\nfullscreen:%d\nmouse:%f",
+           &w, &h, &fullscreen, &mouse_sens);
+    pg_init(w, h, fullscreen, "Ludum Hadron Collider");
     srand(time(0));
     glEnable(GL_CULL_FACE);
     struct collider_state game;
-    collider_init(&game);
+    collider_init(&game, mouse_sens);
     int user_exit = 0;
     while (game.state != LHC_EXIT)
     {

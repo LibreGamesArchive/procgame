@@ -82,8 +82,8 @@ static void begin(struct pg_shader* shader, struct pg_viewer* view)
 int pg_shader_3d(struct pg_shader* shader)
 {
     int load = pg_shader_load(shader,
-                              "src/shaders/3d_vert.glsl",
-                              "src/shaders/3d_frag.glsl");
+                              "shaders/3d_vert.glsl",
+                              "shaders/3d_frag.glsl");
     if(!load) return 0;
     struct data_3d* d = malloc(sizeof(struct data_3d));
     pg_shader_link_matrix(shader, PG_MODEL_MATRIX, "model_matrix");

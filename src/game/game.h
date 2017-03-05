@@ -1,4 +1,5 @@
-#include <curl/curl.h>
+#define CURL_STATICLIB
+#include "../libcurl/curl.h"
 #include "../arr.h"
 
 struct coll_ring {
@@ -8,6 +9,7 @@ struct coll_ring {
 };
 
 struct collider_state {
+    float mouse_sens;
     enum {
         LHC_EXIT,
         LHC_MENU,
@@ -53,7 +55,7 @@ struct collider_state {
     } score_upload_state;
 };
 
-void collider_init(struct collider_state* coll);
+void collider_init(struct collider_state* coll, float mouse_sens);
 void collider_deinit(struct collider_state* coll);
 void collider_update(struct collider_state* coll);
 void collider_draw(struct collider_state* coll);

@@ -1,17 +1,16 @@
 cmake_minimum_required(VERSION 2.8.9)
+#set(CMAKE_EXE_LINKER_FLAGS "-l:libcurl.a")
 set(CMAKE_MODULE_PATH "./cmake")
-set(CMAKE_C_FLAGS "-s -O2")
+set(CMAKE_C_FLAGS "-g")
 project(procgl)
 
 file(GLOB SOURCES src/*.c src/procgl/*.c src/shaders/*.c src/game/*.c)
 add_executable(procgl ${SOURCES})
-set_target_properties(procgl PROPERTIES OUTPUT_NAME "LudumHadronCollider")
+set_target_properties(procgl PROPERTIES OUTPUT_NAME "LHC/LudumHadronCollider")
 
-find_package(CURL REQUIRED)
-if(CURL_FOUND)
-    include_directories(${CURL_INCLUDE_DIRS})
-    target_link_libraries(procgl ${CURL_LIBRARIES})
-endif()
+target_link_libraries(procgl ":src/libcurl/libcurl.a")
+target_link_libraries(procgl "crypto")
+target_link_libraries(procgl "ssl")
 
 find_package(GLEW REQUIRED)
 if (GLEW_FOUND)

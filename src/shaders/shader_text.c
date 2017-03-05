@@ -28,8 +28,8 @@ static void begin(struct pg_shader* shader, struct pg_viewer* view)
 int pg_shader_text(struct pg_shader* shader)
 {
     int load = pg_shader_load(shader,
-                              "src/shaders/text_vert.glsl",
-                              "src/shaders/text_frag.glsl");
+                              "shaders/text_vert.glsl",
+                              "shaders/text_frag.glsl");
     if(!load) return 0;
     struct data* d = malloc(sizeof(struct data));
     d->font_uni = glGetUniformLocation(shader->prog, "font");
