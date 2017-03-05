@@ -7,15 +7,24 @@ struct coll_ring {
 };
 
 struct collider_state {
+    enum {
+        LHC_MENU,
+        LHC_PLAY,
+        LHC_GAMEOVER
+    } state;
     struct pg_shader shader_3d;
     struct pg_shader shader_text;
     struct pg_texture font;
     struct pg_texture ring_texture;
     struct pg_model ring_model;
+    struct pg_texture lead_texture;
     struct pg_texture env_texture;
     struct pg_model env_model;
     struct pg_viewer view;
     struct pg_gbuffer gbuf;
+    float lead_angle;
+    float lead_speed;
+    vec2 lead_pos;
     float player_angle;
     float player_speed;
     float player_light_intensity;

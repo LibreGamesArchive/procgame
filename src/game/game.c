@@ -6,6 +6,11 @@
 #define GAME_RADIUS 160
 #define GAME_SEGMENTS 30
 
+static inline float randf(void)
+{
+    return rand() / (float)RAND_MAX;
+}
+
 static void collider_generate_ring_texture(struct pg_texture* tex)
 {
     pg_texture_init(tex, 128, 128, 0, 1);
@@ -26,6 +31,45 @@ static void collider_generate_ring_texture(struct pg_texture* tex)
             tex->pixels[x + y * tex->w] =
                 (struct pg_texture_pixel) { c * 0.5, c * 0.5, c, 255 };
             tex->normals[x + y * tex->w].h = r_dist * 255;
+        }
+    }
+    pg_texture_generate_normals(tex);
+    pg_texture_buffer(tex);
+}
+
+static void collider_generate_lead_texture(struct pg_texture* tex)
+{
+    pg_texture_init(tex, 128, 128, 4, 5);
+    int i;
+    for(i = 0; i < 12; ++i) {
+        int neutron = (i % 2);
+        float angle, distance;
+        if(i >= 4) {
+            angle = (M_PI * 2) / 8 * (i - 4);
+            distance = 32;
+        } else {
+            angle = (M_PI * 2) / 4 * i + M_PI / 4;
+            distance = 16;
+        }
+        int nucleon_x = 64 + cos(angle) * distance;
+        int nucleon_y = 64 + sin(angle) * distance;
+        int x, y;
+        for(x = 0; x < 64; ++x) {
+            for(y = 0; y < 64; ++y) {
+                int pix_x = x + nucleon_x - 20;
+                int pix_y = y + nucleon_y - 20;
+                float dist = sqrt((x - 20) * (x - 20) + (y - 20) * (y - 20));
+                float r_dist = 1 - fabs(dist) / 20;
+                uint8_t c = r_dist * 62 + 150;
+                if(dist <= 20
+                && (pix_x >= 0 && pix_y >= 0 && pix_x < 128 && pix_y < 128)
+                && tex->normals[pix_x + pix_y * tex->w].h <= (r_dist * 255)) {
+                    tex->pixels[pix_x + pix_y * tex->w] = neutron ?
+                        (struct pg_texture_pixel){ c, c * 0.5, c * 0.5, 255 } :
+                        (struct pg_texture_pixel){ c * 0.5, c * 0.5, c, 255 };
+                    tex->normals[pix_x + pix_y * tex->w].h = r_dist * 255;
+                }
+            }
         }
     }
     pg_texture_generate_normals(tex);
@@ -159,6 +203,7 @@ void collider_init(struct collider_state* coll)
     pg_gbuffer_bind(&coll->gbuf, 16, 17, 18, 19);
     collider_generate_ring_texture(&coll->ring_texture);
     collider_generate_env_texture(&coll->env_texture);
+    collider_generate_lead_texture(&coll->lead_texture);
     pg_texture_init_from_file(&coll->font, "font_8x8.png", NULL, 8, -1);
     pg_texture_set_atlas(&coll->font, 8, 8);
     pg_shader_text(&coll->shader_text);
@@ -170,6 +215,9 @@ void collider_init(struct collider_state* coll)
     coll->player_speed = 0.1;
     coll->player_light_intensity = 10;
     vec2_set(coll->player_pos, 0, 0);
+    coll->lead_angle = 0;
+    coll->lead_speed = 0;
+    vec2_set(coll->lead_pos, 0, 0);
     pg_viewer_init(&coll->view, (vec3){ 0, 0, 0 }, (vec2){ 0, 0 },
                    (vec2){ 800, 600 }, (vec2){ 0.1, 200 });
     ARR_INIT(coll->rings);
@@ -182,6 +230,7 @@ void collider_init(struct collider_state* coll)
     coll->ring_generator = RING_RANDOM;
     coll->ring_distance = 1;
     coll->last_ring = coll->rings.data[coll->rings.len - 1];
+    coll->state = LHC_PLAY;
 }
 
 void collider_deinit(struct collider_state* coll)
@@ -190,11 +239,6 @@ void collider_deinit(struct collider_state* coll)
     pg_model_deinit(&coll->ring_model);
     pg_texture_deinit(&coll->ring_texture);
     ARR_DEINIT(coll->rings);
-}
-
-static inline float randf(void)
-{
-    return rand() / (float)RAND_MAX;
 }
 
 static inline float ring_power_func(void)
@@ -234,13 +278,18 @@ static float speed_func_display(float x)
     return (x / (x + 1));
 }
 
-void collider_update(struct collider_state* coll)
+static void collider_update_gameplay(struct collider_state* coll)
 {
     int mouse_x, mouse_y;
     float delta_time = pg_delta_time(0);
     SDL_GetRelativeMouseState(&mouse_x, &mouse_y);
     coll->player_pos[0] += mouse_x * 0.005;
     coll->player_pos[1] -= mouse_y * 0.005;
+    float pos_dist = vec2_len(coll->player_pos);
+    if(pos_dist > GAME_WIDTH / 2 - 1.5) {
+        vec2_normalize(coll->player_pos, coll->player_pos);
+        vec2_scale(coll->player_pos, coll->player_pos, GAME_WIDTH / 2 - 1.5);
+    }
     pg_viewer_set(&coll->view,
         (vec3){ (GAME_RADIUS + coll->player_pos[0]) * cos(coll->player_angle),
                 (GAME_RADIUS + coll->player_pos[0]) * sin(coll->player_angle),
@@ -265,12 +314,55 @@ void collider_update(struct collider_state* coll)
             collider_generate_ring(coll);
         }
     }
+    float new_lead_angle = coll->lead_angle -
+        (speed_func(coll->lead_speed) * 60 * delta_time);
+    if(coll->player_angle < coll->lead_angle && new_angle >= new_lead_angle) {
+        vec2 diff;
+        vec2_sub(diff, coll->player_pos, coll->lead_pos);
+        float dist = vec2_len(diff);
+        if(dist <= 2.5) {
+            coll->state = LHC_GAMEOVER;
+            coll->lead_angle = coll->player_angle;
+        } else {
+            float limit = GAME_WIDTH * 0.7;
+            coll->lead_angle = coll->player_angle;
+            vec2_set(coll->lead_pos,
+                randf() * limit - limit / 2, randf() * limit - limit / 2);
+        }
+    }
     coll->player_angle = fmod(new_angle, M_PI * 2);
     coll->player_light_intensity -=
         coll->player_light_intensity * (0.60 * delta_time);
+    new_angle = coll->lead_angle -
+        speed_func(coll->lead_speed) * 60 * delta_time;
+    if(new_angle < 0) new_angle = (M_PI * 2) - new_angle;
+    coll->lead_angle = new_angle;
+    coll->lead_speed = coll->player_speed;
 }
 
-void collider_draw(struct collider_state* coll)
+static void collider_update_gameover(struct collider_state* coll)
+{
+    float angle = coll->player_angle - 0.2;
+    pg_viewer_set(&coll->view,
+        (vec3){ (GAME_RADIUS) * cos(angle), (GAME_RADIUS) * sin(angle), 0 },
+        (vec2){ angle + M_PI / 2, 0 });
+}
+
+static void collider_update_menu(struct collider_state* coll)
+{
+
+}
+
+void collider_update(struct collider_state* coll)
+{
+    switch(coll->state) {
+    case LHC_MENU: collider_update_menu(coll); break;
+    case LHC_PLAY: collider_update_gameplay(coll); break;
+    case LHC_GAMEOVER: collider_update_gameover(coll); break;
+    }
+}
+
+static void collider_draw_gameplay(struct collider_state* coll)
 {
     pg_gbuffer_dst(&coll->gbuf);
     /*  All of this renders to the gbuffer, for lighting later  */
@@ -296,39 +388,106 @@ void collider_draw(struct collider_state* coll)
         mat4_rotate_Z(model_transform, model_transform, r->angle);
         mat4_scale_aniso(model_transform, model_transform, radius, radius, radius);
         pg_model_draw(&coll->ring_model, &coll->shader_3d, model_transform);
-        #if 0
-        mat4 test_transform;
-        mat4_translate(test_transform,
-            (GAME_RADIUS + r->pos[0]) * cos(r->angle - 0.025),
-            (GAME_RADIUS + r->pos[0]) * sin(r->angle - 0.025), r->pos[1] + radius * 0.6);
-        mat4_rotate_Z(test_transform, test_transform, r->angle);
-        pg_model_draw(&coll->ring_model, &coll->shader_3d, test_transform);
-        #endif
     }
+    mat4 model_transform;
+    mat4_translate(model_transform,
+        (GAME_RADIUS + coll->lead_pos[0]) * cos(coll->lead_angle),
+        (GAME_RADIUS + coll->lead_pos[0]) * sin(coll->lead_angle),
+        coll->lead_pos[1]);
+    mat4_rotate_Z(model_transform, model_transform, coll->lead_angle);
+    mat4_scale_aniso(model_transform, model_transform, 6, 6, 6);
+    pg_shader_3d_set_texture(&coll->shader_3d, 4, 5);
+    pg_model_draw(&coll->ring_model, &coll->shader_3d, model_transform);
     /*  Now we start drawing all the lights */
     pg_gbuffer_begin_light(&coll->gbuf, &coll->view);
-    ARR_FOREACH_PTR(coll->rings, r, i) {
-        float angle = r->angle - 0.025;
-        float radius = (1 - r->power) * 8;
+    for(i = 0; i < GAME_SEGMENTS; ++i) {
+        float angle = (M_PI * 2) / GAME_SEGMENTS * i;
+        angle += (M_PI * 2) / GAME_SEGMENTS / 2;
         pg_gbuffer_draw_light(&coll->gbuf,
-            (vec4){ (GAME_RADIUS) * cos(angle),
-                    (GAME_RADIUS) * sin(angle),
-                    (GAME_WIDTH) / 2 - 0.25, 30 },
+            (vec4){ (GAME_RADIUS) * cos(angle), (GAME_RADIUS) * sin(angle),
+                    GAME_WIDTH / 2 - 0.3, 20 },
             (vec3){ 1, 1, 1 });
     }
     pg_gbuffer_draw_light(&coll->gbuf,
+        (vec4){ GAME_RADIUS * cos(coll->lead_angle - 0.1),
+                GAME_RADIUS * sin(coll->lead_angle - 0.1), 0, 30 },
+        (vec3){ 1, 0.25, 0.25 });
+    pg_gbuffer_draw_light(&coll->gbuf,
         (vec4){ coll->view.pos[0], coll->view.pos[1], coll->view.pos[2],
                 coll->player_light_intensity },
-        (vec3){ 1, 1, 1 });
+        (vec3){ 0.25, 0.25, 1 });
     /*  And finish directly to the screen, with a tiny bit of ambient light */
     pg_screen_dst();
-    pg_gbuffer_finish(&coll->gbuf, (vec3){ 0.01, 0.01, 0.01 });
+    pg_gbuffer_finish(&coll->gbuf, (vec3){ 0.3, 0.3, 0.3 });
     pg_shader_begin(&coll->shader_text, &coll->view);
     char speed_str[10];
     snprintf(speed_str, 10, "%.5f c", speed_func_display(coll->player_speed));
     pg_shader_text_write(&coll->shader_text, speed_str,
-        (vec2){ 32, 500 }, (vec2){ 24, 24 }, 0.25);
+        (vec2){  }, (vec2){ 24, 24 }, 0.25);
     snprintf(speed_str, 10, "FPS: %d", (int)pg_framerate());
     pg_shader_text_write(&coll->shader_text, speed_str,
         (vec2){ 0, 0 }, (vec2){ 8, 8 }, 0.25);
+}
+
+static void collider_draw_gameover(struct collider_state* coll)
+{
+    pg_gbuffer_dst(&coll->gbuf);
+    /*  All of this renders to the gbuffer, for lighting later  */
+    pg_shader_begin(&coll->shader_3d, &coll->view);
+    pg_shader_3d_set_texture(&coll->shader_3d, 2, 3);
+    pg_model_begin(&coll->env_model);
+    int i;
+    for(i = 0; i < GAME_SEGMENTS; ++i) {
+        mat4 model_transform;
+        mat4_identity(model_transform);
+        mat4_rotate_Z(model_transform, model_transform, (M_PI * 2) / GAME_SEGMENTS * i);
+        pg_model_draw(&coll->env_model, &coll->shader_3d, model_transform);
+    }
+    pg_shader_3d_set_texture(&coll->shader_3d, 0, 1);
+    pg_model_begin(&coll->ring_model);
+    struct coll_ring* r;
+    ARR_FOREACH_PTR(coll->rings, r, i) {
+        float radius = (1 - r->power) * 8;
+        mat4 model_transform;
+        mat4_translate(model_transform,
+            (GAME_RADIUS + r->pos[0]) * cos(r->angle),
+            (GAME_RADIUS + r->pos[0]) * sin(r->angle), r->pos[1]);
+        mat4_rotate_Z(model_transform, model_transform, r->angle);
+        mat4_scale_aniso(model_transform, model_transform, radius, radius, radius);
+        pg_model_draw(&coll->ring_model, &coll->shader_3d, model_transform);
+    }
+    mat4 model_transform;
+    mat4_translate(model_transform,
+        (GAME_RADIUS + coll->lead_pos[0]) * cos(coll->lead_angle),
+        (GAME_RADIUS + coll->lead_pos[0]) * sin(coll->lead_angle),
+        coll->lead_pos[1]);
+    mat4_rotate_Z(model_transform, model_transform, coll->lead_angle);
+    mat4_scale_aniso(model_transform, model_transform, 6, 6, 6);
+    pg_shader_3d_set_texture(&coll->shader_3d, 4, 5);
+    pg_model_draw(&coll->ring_model, &coll->shader_3d, model_transform);
+    /*  Now we start drawing all the lights */
+    pg_gbuffer_begin_light(&coll->gbuf, &coll->view);
+    for(i = 0; i < GAME_SEGMENTS; ++i) {
+        float angle = (M_PI * 2) / GAME_SEGMENTS * i;
+        angle += (M_PI * 2) / GAME_SEGMENTS / 2;
+        pg_gbuffer_draw_light(&coll->gbuf,
+            (vec4){ (GAME_RADIUS) * cos(angle), (GAME_RADIUS) * sin(angle),
+                    GAME_WIDTH / 2 - 0.3, 20 },
+            (vec3){ 1, 1, 1 });
+    }
+    pg_gbuffer_draw_light(&coll->gbuf,
+        (vec4){ GAME_RADIUS * cos(coll->lead_angle - 0.1),
+                GAME_RADIUS * sin(coll->lead_angle - 0.1), GAME_WIDTH / 2 - 1, 30 },
+        (vec3){ 0.25, 2, 0.25 });
+    /*  And finish directly to the screen, with a tiny bit of ambient light */
+    pg_screen_dst();
+    pg_gbuffer_finish(&coll->gbuf, (vec3){ 0.3, 0.3, 0.3 });
+}
+
+void collider_draw(struct collider_state* coll)
+{
+    switch(coll->state) {
+    case LHC_PLAY: collider_draw_gameplay(coll); break;
+    case LHC_GAMEOVER: collider_draw_gameover(coll); break;
+    }
 }
