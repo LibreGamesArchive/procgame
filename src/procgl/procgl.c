@@ -40,6 +40,11 @@ void pg_deinit(void)
     SDL_Quit();
 }
 
+void pg_screen_size(int* w, int* h)
+{
+    if(w) *w = render_w;
+    if(h) *h = render_h;
+}
 void pg_screen_swap(void)
 {
     SDL_GL_SwapWindow(pg_window);
@@ -51,7 +56,6 @@ void pg_screen_dst(void)
     glViewport(0, 0, screen_w, screen_h);
 }
 
-static float framerate_running_avg = 0;
 static float framerate = 0;
 static unsigned framerate_last_update = 0;
 static unsigned framerate_update_interval = 1000;
@@ -60,13 +64,12 @@ float pg_delta_time(int dump)
 {
     unsigned ticks_tmp = SDL_GetTicks();
     unsigned ticks_diff = ticks_tmp - ticks;
-    float delta_time = (float)ticks_diff / 1000.0f;
+    float delta_time = (float)ticks_diff * 0.001;
     if(!dump) {
         ticks = ticks_tmp;
-        framerate_running_avg = (framerate_running_avg + 1 / delta_time) / 2;
         if(ticks_tmp >= framerate_last_update + framerate_update_interval) {
             framerate_last_update = ticks_tmp;
-            framerate = framerate_running_avg;
+            framerate = 1000 / ticks_diff;
         }
     }
     return delta_time;
@@ -76,3 +79,9 @@ float pg_framerate(void)
 {
     return framerate;
 }
+
+double pg_time(void)
+{
+    return (double)SDL_GetTicks() * 0.001;
+}
+

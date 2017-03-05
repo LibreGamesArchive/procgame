@@ -12,6 +12,7 @@
 
 int pg_init(int w, int h, int fullscreen, const char* window_title);
 void pg_deinit(void);
+void pg_screen_size(int* w, int* h);
 void pg_screen_swap(void);
 void pg_screen_dst(void);
 
