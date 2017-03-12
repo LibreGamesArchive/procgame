@@ -6,6 +6,7 @@
 #include "procgl/texture.h"
 #include "procgl/viewer.h"
 #include "procgl/shader.h"
+#include "procgl/procgl_base.h"
 
 #ifdef PROCGL_STATIC_SHADERS
 #include "procgl/shaders/text.glsl.h"

@@ -47,8 +47,7 @@ void pg_wave_composite(struct pg_wave* wave,
                     struct pg_wave* comp0, struct pg_wave* comp1,
                     float influence, float (*mix)(float, float, float));
 void pg_wave_init_sine(struct pg_wave* wave);
-void pg_wave_init_crater(struct pg_wave* wave);
-void pg_wave_crater_add(struct pg_wave* wave, float x, float y, float r);
+void pg_wave_init_perlin(struct pg_wave* wave);
 void pg_wave_deinit(struct pg_wave* wave);
 
 float pg_wave_mix_add(float a, float b, float x);

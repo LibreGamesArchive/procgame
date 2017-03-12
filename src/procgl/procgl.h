@@ -11,4 +11,6 @@
 #include "model.h"
 #include "shape.h"
 #include "gbuffer.h"
+#include "audio.h"
+#include "shaders/shaders.h"
 #include "../game/game_state.h"

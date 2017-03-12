@@ -91,19 +91,19 @@ void pg_wave_composite(struct pg_wave* wave,
 
 static float sin1(float x)
 {
-    return sin(x);
+    return sin(x * M_PI * 2);
 }
 static float sin2(float x, float y)
 {
-    return (sin(x) + sin(y)) / 2;
+    return (sin1(x) + sin1(y)) / 2;
 }
 static float sin3(float x, float y, float z)
 {
-    return (sin(x) + sin(y) + sin(z)) / 3;
+    return (sin1(x) + sin1(y) + sin1(z)) / 3;
 }
 static float sin4(float x, float y, float z, float w)
 {
-    return (sin(x) + sin(y) + sin(z) + sin(w)) / 4;
+    return (sin1(x) + sin1(y) + sin1(z) + sin1(w)) / 4;
 }
 
 void pg_wave_init_sine(struct pg_wave* wave)
@@ -115,6 +115,15 @@ void pg_wave_init_sine(struct pg_wave* wave)
     };
 }
 
+#include "ext/noise1234.h"
+void pg_wave_init_perlin(struct pg_wave* wave)
+{
+    *wave = (struct pg_wave) {
+        .dim = -1, .type = WAVE_FUNCTION,
+        .frequency = { 1, 1, 1, 1 }, .scale = 1,
+        .func1 = noise1, .func2 = noise2, .func3 = noise3, .func4 = noise4
+    };
+}
 float pg_wave_mix_add(float a, float b, float x)
 {
     return a + b;

@@ -28,11 +28,11 @@ int pg_init(int w, int h, int fullscreen, const char* window_title)
                                  (fullscreen ? SDL_WINDOW_FULLSCREEN : 0));
     pg_context = SDL_GL_CreateContext(pg_window);
     SDL_GL_SetSwapInterval(1);
-    SDL_SetRelativeMouseMode(SDL_TRUE);
-    SDL_ShowCursor(SDL_DISABLE);
     glewExperimental = GL_TRUE;
     glewInit();
     glGetError();
+    /*  Init audio system   */
+    pg_init_audio();
     return 1;
 }
 
