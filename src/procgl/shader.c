@@ -1,10 +1,71 @@
 #include <stdio.h>
 #include <GL/glew.h>
+#include "ext/linmath.h"
+#include "viewer.h"
 #include "shader.h"
 
 /*  Shadow state for the currently used OpenGL shader   */
 static struct pg_shader* pg_active_shader;
 
+/*  Code for loading shaders dumped to headers  */
+static GLuint compile_glsl_static(unsigned char* src, unsigned int len,
+                                  GLenum type)
+{
+    /*  Create a shader and give it the source  */
+    GLuint shader = glCreateShader(type);
+    glShaderSource(shader, 1, &src, &len);
+    glCompileShader(shader);
+    /*  Print the info log if there were any errors */
+    GLint status;
+    glGetShaderiv(shader, GL_COMPILE_STATUS, &status);
+    if(status != GL_TRUE) {
+        GLint log_len;
+        glGetShaderiv(shader, GL_INFO_LOG_LENGTH, &log_len);
+        char buffer[log_len + 1];
+        glGetShaderInfoLog(shader, log_len + 1, NULL, buffer);
+        printf("Error loading shader: (static)\nShader compilation log:\n%s",
+               buffer);
+        return 0;
+    }
+    return shader;
+}
+
+
+int pg_compile_glsl_static(GLuint* vert, GLuint* frag, GLuint* prog,
+                           unsigned char* vert_src, unsigned int vert_len,
+                           unsigned char* frag_src, unsigned int frag_len)
+{
+    *vert = compile_glsl_static(vert_src, vert_len, GL_VERTEX_SHADER);
+    *frag = compile_glsl_static(frag_src, frag_len, GL_FRAGMENT_SHADER);
+    if(!(*vert) || !(*frag)) return 0;
+    *prog = glCreateProgram();
+    glAttachShader(*prog, *vert);
+    glAttachShader(*prog, *frag);
+    glLinkProgram(*prog);
+    /*  Print the info log if there were any errors */
+    GLint link_status;
+    glGetProgramiv(*prog, GL_LINK_STATUS, &link_status);
+    if(!link_status) {
+        GLint log_length;
+        glGetProgramiv(*prog, GL_INFO_LOG_LENGTH, &log_length);
+        GLchar log[log_length];
+        glGetProgramInfoLog(*prog, log_length, &log_length, log);
+        printf("Shader program info log:\n%s\n", log);
+        return 0;
+    }
+    return 1;
+}
+
+int pg_shader_load_static(struct pg_shader* shader,
+                          unsigned char* vert, unsigned int vert_len,
+                          unsigned char* frag, unsigned int frag_len)
+{
+    *shader = (struct pg_shader){ .mat_idx = { -1, -1, -1, -1, -1, -1 } };
+    return pg_compile_glsl_static(&shader->vert, &shader->frag, &shader->prog,
+                                  vert, vert_len, frag, frag_len);
+}
+
+/*  Code for loading shaders from files dynamically */
 static GLuint compile_glsl(const char* filename, GLenum type)
 {
     /*  Read the file into a buffer */
@@ -69,7 +130,7 @@ int pg_shader_load(struct pg_shader* shader,
                            vert_filename, frag_filename);
 }
 
-
+/*  Code for managing created shaders   */
 void pg_shader_link_matrix(struct pg_shader* shader, enum pg_matrix type,
                            const char* name)
 {

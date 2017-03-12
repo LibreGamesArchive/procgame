@@ -1,5 +1,7 @@
 #include <GL/glew.h>
+#include "ext/linmath.h"
 #include "vertex.h"
+#include "viewer.h"
 #include "shader.h"
 #include "texture.h"
 #include "model.h"
@@ -72,6 +74,80 @@ void pg_model_split_tris(struct pg_model* model)
     }
     pg_model_reserve_verts(model, model->tris.len);
     memcpy(model->verts.data, new_v, sizeof(new_v));
+}
+
+void pg_model_precalc_normals(struct pg_model* model)
+{
+    struct pg_vert3d* v[3];
+    unsigned int t[3];
+    int i;
+    for(i = 0; i < model->tris.len; i += 3) {
+        t[0] = model->tris.data[i];
+        t[1] = model->tris.data[i + 1];
+        t[2] = model->tris.data[i + 2];
+        v[0] = &model->verts.data[t[0]];
+        v[1] = &model->verts.data[t[1]];
+        v[2] = &model->verts.data[t[2]];
+        /*  First we calculate the normal for each vertex   */
+        vec3 norm;
+        vec3 edge0, edge1;
+        vec3_sub(edge0, v[0]->pos, v[1]->pos);
+        vec3_sub(edge1, v[0]->pos, v[2]->pos);
+        vec3_mul_cross(norm, edge0, edge1);
+        vec3_normalize(norm, norm);
+        /*  Now we average the calculated values with any existing values,
+            so each vertex will have an average value for each associated
+            face    */
+        int j;
+        for(j = 0; j < 3; ++j) {
+            vec3_add(v[j]->normal, norm, v[j]->normal);
+            vec3_normalize(v[j]->normal, v[j]->normal);
+        }
+    }
+}
+
+void pg_model_precalc_tangents(struct pg_model* model)
+{
+    struct pg_vert3d* v[3];
+    unsigned int t[3];
+    int i;
+    for(i = 0; i < model->tris.len; i += 3) {
+        t[0] = model->tris.data[i];
+        t[1] = model->tris.data[i + 1];
+        t[2] = model->tris.data[i + 2];
+        v[0] = &model->verts.data[t[0]];
+        v[1] = &model->verts.data[t[1]];
+        v[2] = &model->verts.data[t[2]];
+        /*  First we calculate the normal for each vertex   */
+        vec3 edge0, edge1;
+        vec3_sub(edge0, v[0]->pos, v[1]->pos);
+        vec3_sub(edge1, v[0]->pos, v[2]->pos);
+        /*  Next we calculate the tangent and bitangent in alignment with the
+            tex_coords  */
+        vec2 tex_d0, tex_d1;
+        vec2_sub(tex_d0, v[1]->tex_coord, v[0]->tex_coord);
+        vec2_sub(tex_d1, v[2]->tex_coord, v[0]->tex_coord);
+        float r = 1.0f / (tex_d0[0] * tex_d1[1] - tex_d0[1] * tex_d1[0]);
+        vec3 tmp0, tmp1, tangent, bitangent;
+        vec3_scale(tmp0, edge0, tex_d1[1]);
+        vec3_scale(tmp1, edge1, tex_d0[1]);
+        vec3_sub(tangent, tmp0, tmp1);
+        vec3_scale(tangent, tangent, r);
+        vec3_scale(tmp0, edge1, tex_d0[0]);
+        vec3_scale(tmp1, edge0, tex_d1[0]);
+        vec3_sub(bitangent, tmp0, tmp1);
+        vec3_scale(bitangent, bitangent, r);
+        /*  Now we average the calculated values with any existing values,
+            so each vertex will have an average value for each associated
+            face    */
+        int j;
+        for(j = 0; j < 3; ++j) {
+            vec3_add(v[j]->tangent, tangent, v[j]->tangent);
+            vec3_normalize(v[j]->tangent, v[j]->tangent);
+            vec3_add(v[j]->bitangent, bitangent, v[j]->bitangent);
+            vec3_normalize(v[j]->bitangent, v[j]->bitangent);
+        }
+    }
 }
 
 void pg_model_precalc_verts(struct pg_model* model)

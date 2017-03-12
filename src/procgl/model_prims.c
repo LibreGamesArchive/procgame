@@ -1,6 +1,8 @@
 #include <GL/glew.h>
+#include "ext/linmath.h"
 #include "vertex.h"
 #include "texture.h"
+#include "viewer.h"
 #include "shader.h"
 #include "model.h"
 

@@ -12,6 +12,8 @@ void pg_model_split_tris(struct pg_model* model);
 void pg_model_generate_texture(struct pg_model* model,
                                    struct pg_texture* texture,
                                    unsigned w, unsigned h);
+void pg_model_precalc_normals(struct pg_model* model);
+void pg_model_precalc_tangents(struct pg_model* model);
 void pg_model_precalc_verts(struct pg_model* model);
 void pg_model_buffer(struct pg_model* model, struct pg_shader* shader);
 void pg_model_begin(struct pg_model* model);

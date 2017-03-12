@@ -1,12 +1,13 @@
 #include <math.h>
 #include <stdlib.h>
 #include <stdio.h>
-#include "GL/glew.h"
+#include <GL/glew.h>
 
-#include "../linmath.h"
+#include "ext/noise1234.h"
+#include "ext/lodepng.h"
+#include "ext/linmath.h"
 #include "texture.h"
-#include "noise1234.h"
-#include "lodepng.h"
+
 
 
 
@@ -161,18 +162,18 @@ static unsigned pg_texture_height(struct pg_texture* tex, int x, int y)
     return tex->normals[x + y * tex->w].h;
 }
 
-void pg_texture_generate_normals(struct pg_texture* tex)
+void pg_texture_generate_normals(struct pg_texture* tex, float intensity)
 {
     if(!tex->normals) return;
     int x, y;
     for(x = 0; x < tex->w; ++x) {
         for(y = 0; y < tex->h; ++y) {
             float u, d, r, l;
-            u = (float)pg_texture_height(tex, x, y - 1) / 256;
-            d = (float)pg_texture_height(tex, x, y + 1) / 256;
-            l = (float)pg_texture_height(tex, x - 1, y) / 256;
-            r = (float)pg_texture_height(tex, x + 1, y) / 256;
-            vec3 normal = { l - r, d - u, 2.0f };
+            u = (float)pg_texture_height(tex, x, y - 1) / 256 * intensity;
+            d = (float)pg_texture_height(tex, x, y + 1) / 256 * intensity;
+            l = (float)pg_texture_height(tex, x - 1, y) / 256 * intensity;
+            r = (float)pg_texture_height(tex, x + 1, y) / 256 * intensity;
+            vec3 normal = { r - l, d - u, 2.0f };
             vec3_normalize(normal, normal);
             tex->normals[x + y * tex->w] = (struct pg_texture_normal) {
                 (normal[0] + 1) / 2 * 256,

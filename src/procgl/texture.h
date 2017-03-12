@@ -27,7 +27,7 @@ void pg_texture_buffer(struct pg_texture* tex);
 void pg_texture_perlin(struct pg_texture* tex,
                            float x1, float y1, float x2, float y2);
 void pg_texture_shitty(struct pg_texture* tex);
-void pg_texture_generate_normals(struct pg_texture* tex);
+void pg_texture_generate_normals(struct pg_texture* tex, float intensity);
 void pg_texture_set_atlas(struct pg_texture* tex, int frame_w, int frame_h);
 void pg_texture_get_frame(struct pg_texture* tex, int frame,
                           vec2 start, vec2 end);

@@ -1,6 +1,6 @@
 *.swp
 *.swo
-Makefile
-CMakeFiles
-CMakeCache.txt
-cmake_install.cmake
+old/*
+release/*
+*.o
+*.glsl.h

@@ -1,6 +1,6 @@
 #include <stdint.h>
-#include "../linmath.h"
-#include "../arr.h"
+#include "ext/linmath.h"
+#include "arr.h"
 
 struct pg_vert3d {
     vec3 pos, normal, tangent, bitangent;

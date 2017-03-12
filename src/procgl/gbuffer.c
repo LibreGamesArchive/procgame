@@ -1,6 +1,14 @@
 #include <stdio.h>
 #include <GL/glew.h>
-#include "procgl.h"
+#include "ext/linmath.h"
+#include "texture.h"
+#include "viewer.h"
+#include "shader.h"
+#include "gbuffer.h"
+
+#ifdef PROCGL_STATIC_SHADERS
+#include "procgl/shaders/deferred.glsl.h"
+#endif
 
 void pg_gbuffer_init(struct pg_gbuffer* gbuf, int w, int h)
 {
@@ -53,8 +61,15 @@ void pg_gbuffer_init(struct pg_gbuffer* gbuf, int w, int h)
     glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_DEPTH_STENCIL_ATTACHMENT,
                               GL_RENDERBUFFER, gbuf->depth);
     /*  Load the shader to render the light volumes */
+#ifdef PROCGL_STATIC_SHADERS
+    pg_compile_glsl_static(&gbuf->l_vert, &gbuf->l_frag, &gbuf->l_prog,
+        deferred_vert_glsl, deferred_vert_glsl_len,
+        deferred_frag_glsl, deferred_frag_glsl_len);
+#else
     pg_compile_glsl(&gbuf->l_vert, &gbuf->l_frag, &gbuf->l_prog,
-                    "shaders/deferred_vert.glsl", "shaders/deferred_frag.glsl");
+                    "src/procgl/shaders/deferred_vert.glsl",
+                    "src/procgl/shaders/deferred_frag.glsl");
+#endif
     gbuf->uni_projview = glGetUniformLocation(gbuf->l_prog, "projview_matrix");
     gbuf->uni_normal = glGetUniformLocation(gbuf->l_prog, "g_normal");
     gbuf->uni_pos = glGetUniformLocation(gbuf->l_prog, "g_pos");
@@ -62,8 +77,15 @@ void pg_gbuffer_init(struct pg_gbuffer* gbuf, int w, int h)
     gbuf->uni_color = glGetUniformLocation(gbuf->l_prog, "color");
     /*  Load the shader which combines the light accumulation buffer and the
         color buffer, and draws the final result    */
+#ifdef PROCGL_STATIC_SHADERS
+    pg_compile_glsl_static(&gbuf->f_vert, &gbuf->f_frag, &gbuf->f_prog,
+        screen_vert_glsl, screen_vert_glsl_len,
+        screen_frag_glsl, screen_frag_glsl_len);
+#else
     pg_compile_glsl(&gbuf->f_vert, &gbuf->f_frag, &gbuf->f_prog,
-                    "shaders/screen_vert.glsl", "shaders/screen_frag.glsl");
+                    "src/procgl/shaders/screen_vert.glsl",
+                    "src/procgl/shaders/screen_frag.glsl");
+#endif
     gbuf->f_color = glGetUniformLocation(gbuf->f_prog, "color");
     gbuf->f_light = glGetUniformLocation(gbuf->f_prog, "light");
     gbuf->f_ambient = glGetUniformLocation(gbuf->f_prog, "ambient_light");

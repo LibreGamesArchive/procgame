@@ -1,4 +1,4 @@
-#include "../linmath.h"
+#include "ext/linmath.h"
 #include "viewer.h"
 
 
