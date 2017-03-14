@@ -1,7 +1,7 @@
 #include <stdio.h>
 #include <time.h>
 #include "procgl/procgl.h"
-#include "game/game_example.h"
+#include "game/game_fps.h"
 
 int main(int argc, char *argv[])
 {
@@ -17,7 +17,7 @@ int main(int argc, char *argv[])
     srand(time(0));
     /*  Init example game   */
     struct pg_game_state game;
-    example_game_start(&game);
+    fps_game_start(&game);
     /*  Main loop   */
     while(game.tick) {
         glEnable(GL_DEPTH_TEST);
