@@ -6,21 +6,18 @@
 #include "shader.h"
 #include "model.h"
 
-void pg_model_quad(struct pg_model* model)
+void pg_model_quad(struct pg_model* model,
+                   float tex_scale_x, float tex_scale_y)
 {
     pg_model_init(model);
     pg_model_add_vertex(model, &(struct pg_vert3d) {
-        .pos = { -0.5, 0, -0.5 }, .tex_coord = { 0, 0 }
-    });
+        .pos = { -0.5, 0, -0.5 }, .tex_coord = { 0, 0 } });
     pg_model_add_vertex(model, &(struct pg_vert3d) {
-        .pos = { -0.5, 0, 0.5 }, .tex_coord = { 0, 1 }
-    });
+        .pos = { -0.5, 0, 0.5 }, .tex_coord = { 0, tex_scale_y } });
     pg_model_add_vertex(model, &(struct pg_vert3d) {
-        .pos = { 0.5, 0, -0.5 }, .tex_coord = { 1, 0 }
-    });
+        .pos = { 0.5, 0, -0.5 }, .tex_coord = { tex_scale_x, 0 } });
     pg_model_add_vertex(model, &(struct pg_vert3d) {
-        .pos = { 0.5, 0, 0.5 }, .tex_coord = { 1, 1 }
-    });
+        .pos = { 0.5, 0, 0.5 }, .tex_coord = { tex_scale_x, tex_scale_y } });
     pg_model_add_triangle(model, 1, 0, 2);
     pg_model_add_triangle(model, 1, 2, 3);
 }
