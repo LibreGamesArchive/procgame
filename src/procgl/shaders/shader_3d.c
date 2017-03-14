@@ -105,6 +105,7 @@ int pg_shader_3d(struct pg_shader* shader)
     if(!load) return 0;
     struct data_3d* d = malloc(sizeof(struct data_3d));
     pg_shader_link_matrix(shader, PG_MODEL_MATRIX, "model_matrix");
+    pg_shader_link_matrix(shader, PG_NORMAL_MATRIX, "normal_matrix");
     pg_shader_link_matrix(shader, PG_VIEW_MATRIX, "view_matrix");
     pg_shader_link_matrix(shader, PG_PROJECTION_MATRIX, "proj_matrix");
     pg_shader_link_matrix(shader, PG_PROJECTIONVIEW_MATRIX, "projview_matrix");
@@ -123,15 +124,14 @@ int pg_shader_3d(struct pg_shader* shader)
     return 1;
 }
 
-void pg_shader_3d_set_texture(struct pg_shader* shader,
-                              int color_slot, int normal_slot)
+void pg_shader_3d_set_texture(struct pg_shader* shader, struct pg_texture* tex)
 {
     struct data_3d* d = shader->data;
-    d->state.tex_unit = color_slot;
-    d->state.norm_unit = normal_slot;
+    d->state.tex_unit = tex->color_slot;
+    d->state.norm_unit = tex->normal_slot;
     if(pg_shader_is_active(shader)) {
-        glUniform1i(d->unis.tex_unit, color_slot);
-        glUniform1i(d->unis.norm_unit, normal_slot);
+        glUniform1i(d->unis.tex_unit, tex->color_slot);
+        glUniform1i(d->unis.norm_unit, tex->normal_slot);
         d->tex_dirty = 0;
     } else d->tex_dirty = 1;
 }

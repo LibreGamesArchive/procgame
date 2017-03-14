@@ -1,5 +1,6 @@
 enum pg_matrix {
     PG_MODEL_MATRIX,
+    PG_NORMAL_MATRIX,
     PG_VIEW_MATRIX,
     PG_PROJECTION_MATRIX,
     PG_MODELVIEW_MATRIX,
@@ -10,8 +11,8 @@ enum pg_matrix {
 struct pg_shader {
     GLuint vert, frag, prog;
     /*  Basically every shader will have some or all of these   */
-    GLint mat_idx[6];
-    mat4 matrix[6];
+    GLint mat_idx[7];
+    mat4 matrix[7];
     void* data;
     void (*deinit)(void* data);
     void (*buffer_attribs)(struct pg_shader* shader);

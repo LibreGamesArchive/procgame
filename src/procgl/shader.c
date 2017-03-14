@@ -125,7 +125,7 @@ int pg_compile_glsl(GLuint* vert, GLuint* frag, GLuint* prog,
 int pg_shader_load(struct pg_shader* shader,
                    const char* vert_filename, const char* frag_filename)
 {
-    *shader = (struct pg_shader){ .mat_idx = { -1, -1, -1, -1, -1, -1 } };
+    *shader = (struct pg_shader){ .mat_idx = { -1, -1, -1, -1, -1, -1, -1 } };
     return pg_compile_glsl(&shader->vert, &shader->frag, &shader->prog,
                            vert_filename, frag_filename);
 }
@@ -148,6 +148,12 @@ void pg_shader_set_matrix(struct pg_shader* shader, enum pg_matrix type,
 
 void pg_shader_rebuild_matrices(struct pg_shader* shader)
 {
+    if(shader->mat_idx[PG_NORMAL_MATRIX] != -1) {
+        mat4_invert(shader->matrix[PG_NORMAL_MATRIX],
+                    shader->matrix[PG_MODEL_MATRIX]);
+        glUniformMatrix4fv(shader->mat_idx[PG_NORMAL_MATRIX], 1, GL_TRUE,
+                           *shader->matrix[PG_NORMAL_MATRIX]);
+    }
     if(shader->mat_idx[PG_MODELVIEW_MATRIX] != -1) {
         mat4_mul(shader->matrix[PG_MODELVIEW_MATRIX],
                  shader->matrix[PG_MODEL_MATRIX],
