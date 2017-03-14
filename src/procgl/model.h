@@ -30,7 +30,8 @@ void pg_model_transform(struct pg_model* model, mat4 transform);
 
 /*  PRIMITIVES  */
 /*  A unit quad centered on the origin, facing +y   */
-void pg_model_quad(struct pg_model* model);
+void pg_model_quad(struct pg_model* model,
+                   float tex_scale_x, float tex_scale_y);
 /*  A unit cube centered on the origin   */
 void pg_model_cube(struct pg_model* model);
 /*  An icosahedron with n subdivisions, positioned on a unit sphere */
