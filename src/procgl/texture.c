@@ -67,13 +67,13 @@ void pg_texture_init(struct pg_texture* tex, int w, int h,
     glBindTexture(GL_TEXTURE_2D, tex->pixels_gl);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
     glActiveTexture(GL_TEXTURE0 + normal_slot);
     glBindTexture(GL_TEXTURE_2D, tex->normals_gl);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
 }
 
@@ -106,12 +106,14 @@ void pg_texture_buffer(struct pg_texture* tex)
         glBindTexture(GL_TEXTURE_2D, tex->pixels_gl);
         glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, tex->w, tex->h, 0, GL_RGBA,
                      GL_UNSIGNED_BYTE, tex->pixels);
+        glGenerateMipmap(GL_TEXTURE_2D);
     }
     if(tex->normals && tex->normal_slot >= 0) {
         glActiveTexture(GL_TEXTURE0 + tex->normal_slot);
         glBindTexture(GL_TEXTURE_2D, tex->normals_gl);
         glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, tex->w, tex->h, 0, GL_RGBA,
                      GL_UNSIGNED_BYTE, tex->normals);
+        glGenerateMipmap(GL_TEXTURE_2D);
     }
 }
 
