@@ -71,6 +71,7 @@ void pg_gbuffer_init(struct pg_gbuffer* gbuf, int w, int h)
                     "src/procgl/shaders/deferred_frag.glsl");
 #endif
     gbuf->uni_projview = glGetUniformLocation(gbuf->l_prog, "projview_matrix");
+    gbuf->uni_eye_pos = glGetUniformLocation(gbuf->l_prog, "eye_pos");
     gbuf->uni_normal = glGetUniformLocation(gbuf->l_prog, "g_normal");
     gbuf->uni_pos = glGetUniformLocation(gbuf->l_prog, "g_pos");
     gbuf->uni_light = glGetUniformLocation(gbuf->l_prog, "light");
@@ -156,6 +157,7 @@ void pg_gbuffer_begin_light(struct pg_gbuffer* gbuf, struct pg_viewer* view)
     mat4 projview;
     mat4_mul(projview, view->proj_matrix, view->view_matrix);
     glUniformMatrix4fv(gbuf->uni_projview, 1, GL_FALSE, *projview);
+    glUniform3f(gbuf->uni_eye_pos, view->pos[0], view->pos[1], view->pos[2]);
     /*  A dummy VAO because the light volume mesh is defined in the shader  */
     glBindVertexArray(gbuf->dummy_vao);
 }

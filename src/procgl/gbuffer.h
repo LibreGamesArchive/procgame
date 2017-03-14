@@ -4,7 +4,7 @@ struct pg_gbuffer {
     /*  The shader program for rendering light volumes  */
     GLuint l_vert, l_frag, l_prog;
     GLuint dummy_vao;
-    GLint uni_projview;
+    GLint uni_projview, uni_eye_pos;
     GLint uni_normal, uni_pos, uni_light, uni_color;
     /*  The shader program for rendering the final image    */
     GLuint f_vert, f_frag, f_prog;
