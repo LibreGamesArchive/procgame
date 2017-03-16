@@ -45,14 +45,16 @@ static void pg_buffer_audio(void* udata, Uint8* stream, int len)
 
 int pg_init_audio(void)
 {
-    SDL_memset(&pg_audio_spec, 0, sizeof(pg_audio_spec));
-    pg_audio_spec.freq = 48000;
-    pg_audio_spec.format = AUDIO_F32;
-    pg_audio_spec.channels = 1;
-    pg_audio_spec.samples = 1024;
-    pg_audio_spec.callback = pg_buffer_audio;
+    SDL_AudioSpec spec;
+    memset(&spec, 0, sizeof(spec));
+    memset(&pg_audio_spec, 0, sizeof(pg_audio_spec));
+    spec.freq = 48000;
+    spec.format = AUDIO_F32;
+    spec.channels = 1;
+    spec.samples = 1024;
+    spec.callback = pg_buffer_audio;
     SDL_ClearError();
-    int audio_success = SDL_OpenAudio(&pg_audio_spec, NULL);
+    int audio_success = SDL_OpenAudio(&spec, &pg_audio_spec);
     if(audio_success != 0) {
         printf("Failed to init SDL audio: %s\n", SDL_GetError());
         pg_have_audio = 0;
