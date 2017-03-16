@@ -6,6 +6,7 @@ struct pg_game_state {
     float tick_over;    /*  Time since last tick (fraction of a tick)   */
     float time;         /*  Time in seconds */
     void* data;         /*  User data   */
+    void (*update)(struct pg_game_state*);
     void (*tick)(struct pg_game_state*);
     void (*draw)(struct pg_game_state*);
     void (*deinit)(void*);

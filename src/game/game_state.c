@@ -11,6 +11,7 @@ void pg_game_state_init(struct pg_game_state* state, float start_time,
     state->tick_over = 0;
     state->time = start_time;
     state->data = NULL;
+    state->update = NULL;
     state->tick = NULL;
     state->draw = NULL;
 }
@@ -22,17 +23,24 @@ void pg_game_state_deinit(struct pg_game_state* state)
 
 void pg_game_state_update(struct pg_game_state* state, float new_time)
 {
+    if(state->update) state->update(state);
     float time_elapsed = new_time - state->last_tick;
     float tick_time = 1.0f / state->tick_rate;
     float acc = 0;
     unsigned ticks_done = 0;
-    while(acc + tick_time < time_elapsed && ticks_done < state->tick_max) {
+    while(acc + tick_time < time_elapsed
+    && ticks_done < state->tick_max && state->tick) {
         ++ticks_done;
         acc += tick_time;
         state->time = state->last_tick + acc;
         state->tick(state);
     }
-    state->last_tick = state->last_tick + acc;
+    if(ticks_done == state->tick_max) {
+        state->last_tick = new_time;
+        printf("Timestep falling behind!\n");
+    } else {
+        state->last_tick = state->last_tick + acc;
+    }
     state->tick_over = (time_elapsed - acc) / tick_time;
     state->time = new_time;
 }
