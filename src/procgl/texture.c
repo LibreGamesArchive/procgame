@@ -6,6 +6,8 @@
 #include "ext/noise1234.h"
 #include "ext/lodepng.h"
 #include "ext/linmath.h"
+#include "wave.h"
+#include "heightmap.h"
 #include "texture.h"
 
 

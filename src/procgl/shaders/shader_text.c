@@ -3,6 +3,8 @@
 #include <string.h>
 #include <GL/glew.h>
 #include "procgl/ext/linmath.h"
+#include "procgl/wave.h"
+#include "procgl/heightmap.h"
 #include "procgl/texture.h"
 #include "procgl/viewer.h"
 #include "procgl/shader.h"

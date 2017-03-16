@@ -3,6 +3,7 @@
 #include "vertex.h"
 #include "viewer.h"
 #include "shader.h"
+#include "heightmap.h"
 #include "texture.h"
 #include "model.h"
 

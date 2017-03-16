@@ -19,9 +19,9 @@ TARGET := procgame
 GAME := obj/game_state.o obj/game_fps.o
 PROCGL := obj/procgl_base.o \
  obj/viewer.o obj/postproc.o obj/shader.o obj/gbuffer.o \
- obj/model.o obj/model_prims.o obj/shape.o obj/shape_prims.o obj/texture.o \
+ obj/model.o obj/model_prims.o obj/shape.o obj/shape_prims.o \
  obj/shader_2d.o obj/shader_3d.o obj/shader_text.o \
- obj/wave.o obj/audio.o
+ obj/wave.o obj/heightmap.o obj/texture.o obj/audio.o
 PROCGL_LIBS := obj/lodepng.o obj/noise1234.o obj/wavfile.o
 
 debug_linux: INCLUDES += -Isrc/libs/linux
@@ -72,12 +72,12 @@ obj/gbuffer.o: src/procgl/gbuffer.c src/procgl/ext/linmath.h \
  src/procgl/gbuffer.h
 	$(CC) $(CFLAGS) -o obj/gbuffer.o -c src/procgl/gbuffer.c $(INCLUDES)
 obj/model.o: src/procgl/model.c src/procgl/ext/linmath.h src/procgl/vertex.h \
- src/procgl/arr.h src/procgl/viewer.h src/procgl/shader.h \
- src/procgl/texture.h src/procgl/model.h
+ src/procgl/arr.h src/procgl/viewer.h src/procgl/shader.h src/procgl/model.h \
+ src/procgl/wave.h src/procgl/heightmap.h src/procgl/texture.h
 	$(CC) $(CFLAGS) -o obj/model.o -c src/procgl/model.c $(INCLUDES)
 obj/model_prims.o: src/procgl/model_prims.c src/procgl/ext/linmath.h \
- src/procgl/vertex.h src/procgl/arr.h src/procgl/texture.h \
- src/procgl/viewer.h src/procgl/shader.h src/procgl/model.h
+ src/procgl/vertex.h src/procgl/arr.h src/procgl/viewer.h src/procgl/shader.h \
+ src/procgl/model.h src/procgl/wave.h src/procgl/heightmap.h src/procgl/texture.h
 	$(CC) $(CFLAGS) -o obj/model_prims.o -c src/procgl/model_prims.c $(INCLUDES)
 obj/shape.o: src/procgl/shape.c src/procgl/ext/linmath.h src/procgl/vertex.h \
  src/procgl/arr.h src/procgl/viewer.h src/procgl/shader.h \
@@ -87,20 +87,24 @@ obj/shape_prims.o: src/procgl/shape_prims.c src/procgl/ext/linmath.h \
  src/procgl/vertex.h src/procgl/arr.h src/procgl/viewer.h \
  src/procgl/shader.h src/procgl/texture.h src/procgl/shape.h
 	$(CC) $(CFLAGS) -o obj/shape_prims.o -c src/procgl/shape_prims.c $(INCLUDES)
+obj/heightmap.o: src/procgl/heightmap.c src/procgl/heightmap.h \
+ src/procgl/wave.h
+	$(CC) $(CFLAGS) -o obj/heightmap.o -c src/procgl/heightmap.c $(INCLUDES)
 obj/texture.o: src/procgl/texture.c src/procgl/ext/noise1234.h \
- src/procgl/ext/lodepng.h src/procgl/ext/linmath.h src/procgl/texture.h
+ src/procgl/ext/lodepng.h src/procgl/ext/linmath.h src/procgl/texture.h \
+ src/procgl/heightmap.h src/procgl/wave.h
 	$(CC) $(CFLAGS) -o obj/texture.o -c src/procgl/texture.c $(INCLUDES)
 obj/shader_2d.o: src/procgl/shaders/shader_2d.c src/procgl/ext/linmath.h \
- src/procgl/vertex.h src/procgl/texture.h \
- src/procgl/viewer.h src/procgl/shader.h 
+ src/procgl/vertex.h src/procgl/viewer.h src/procgl/shader.h \
+ src/procgl/wave.h src/procgl/heightmap.h src/procgl/texture.h
 	$(CC) $(CFLAGS) -o obj/shader_2d.o -c src/procgl/shaders/shader_2d.c $(INCLUDES)
 obj/shader_3d.o: src/procgl/shaders/shader_3d.c src/procgl/ext/linmath.h \
- src/procgl/vertex.h src/procgl/texture.h \
- src/procgl/viewer.h src/procgl/shader.h
+ src/procgl/vertex.h src/procgl/viewer.h src/procgl/shader.h \
+ src/procgl/wave.h src/procgl/heightmap.h src/procgl/texture.h
 	$(CC) $(CFLAGS) -o obj/shader_3d.o -c src/procgl/shaders/shader_3d.c $(INCLUDES)
 obj/shader_text.o: src/procgl/shaders/shader_text.c src/procgl/ext/linmath.h \
- src/procgl/texture.h src/procgl/viewer.h src/procgl/shader.h \
- src/procgl/procgl_base.h
+ src/procgl/viewer.h src/procgl/shader.h src/procgl/procgl_base.h \
+ src/procgl/wave.h src/procgl/heightmap.h src/procgl/texture.h
 	$(CC) $(CFLAGS) -o obj/shader_text.o -c src/procgl/shaders/shader_text.c $(INCLUDES)
 obj/wave.o: src/procgl/wave.c src/procgl/wave.h
 	$(CC) $(CFLAGS) -o obj/wave.o -c src/procgl/wave.c $(INCLUDES)

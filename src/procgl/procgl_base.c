@@ -1,5 +1,7 @@
 #include <GL/glew.h>
 #include <SDL2/SDL.h>
+#include "wave.h"
+#include "audio.h"
 #include "procgl_base.h"
 
 SDL_GLContext pg_context;
