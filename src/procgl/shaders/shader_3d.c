@@ -13,22 +13,16 @@
 #endif
 
 struct data_3d {
+    int tex_dirty;
     struct {
         GLint tex_unit, norm_unit;
-        GLint ambient_color, sun_dir, sun_color;
-        GLint fog_plane, fog_color;
+    } state;
+    struct {
+        GLint tex_unit, norm_unit;
     } unis;
     struct {
         GLint pos, normal, tangent, bitangent, tex_coord;
     } attribs;
-    struct {
-        GLint tex_unit, norm_unit;
-        vec3 ambient_color, fog_color, sun_color, sun_dir;
-        vec2 fog_plane;
-    } state;
-    int tex_dirty;
-    int sun_dirty;
-    int fog_dirty;
 };
 
 static void buffer_attribs(struct pg_shader* shader)
@@ -69,22 +63,6 @@ static void begin(struct pg_shader* shader, struct pg_viewer* view)
         glUniform1i(d->unis.tex_unit, d->state.tex_unit);
         glUniform1i(d->unis.norm_unit, d->state.norm_unit);
         d->tex_dirty = 0;
-    }
-    if(d->fog_dirty) {
-        glUniform2f(d->unis.fog_plane, d->state.fog_plane[0],
-                    d->state.fog_plane[1]);
-        glUniform3f(d->unis.fog_color, d->state.fog_color[0],
-                    d->state.fog_color[1], d->state.fog_color[2]);
-        d->fog_dirty = 0;
-    }
-    if(d->sun_dirty) {
-        glUniform3f(d->unis.ambient_color, d->state.ambient_color[0],
-                    d->state.ambient_color[1], d->state.ambient_color[2]);
-        glUniform3f(d->unis.sun_dir, d->state.sun_dir[0], d->state.sun_dir[1],
-                    d->state.sun_dir[2]);
-        glUniform3f(d->unis.sun_color, d->state.sun_color[0],
-                    d->state.sun_color[1], d->state.sun_color[2]);
-        d->sun_dirty = 0;
     }
     /*  Enable depth testing    */
     glEnable(GL_DEPTH_TEST);
@@ -129,11 +107,11 @@ int pg_shader_3d(struct pg_shader* shader)
 void pg_shader_3d_set_texture(struct pg_shader* shader, struct pg_texture* tex)
 {
     struct data_3d* d = shader->data;
-    d->state.tex_unit = tex->color_slot;
-    d->state.norm_unit = tex->normal_slot;
+    d->state.tex_unit = tex->diffuse_slot;
+    d->state.norm_unit = tex->light_slot;
     if(pg_shader_is_active(shader)) {
-        glUniform1i(d->unis.tex_unit, tex->color_slot);
-        glUniform1i(d->unis.norm_unit, tex->normal_slot);
+        glUniform1i(d->unis.tex_unit, tex->diffuse_slot);
+        glUniform1i(d->unis.norm_unit, tex->light_slot);
         d->tex_dirty = 0;
     } else d->tex_dirty = 1;
 }

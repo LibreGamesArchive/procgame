@@ -26,8 +26,9 @@ void main()
                     f_tangent.z, f_bitangent.z, f_normal.z);
     vec4 tex_color = texture(tex, f_tex_coord);
     if(tex_color.a < 0.5) discard;
-    vec4 tex_norm = vec4(texture(norm, f_tex_coord).rgb * 2 - 1, 1);
+    vec4 light_tex = texture(norm, f_tex_coord);
+    vec4 tex_norm = vec4(light_tex.xyz * 2 - 1, light_tex.w);
     g_albedo = tex_color;
-    g_normal = vec4(tex_norm.xyz * tbn * 0.5 + 0.5, 1);
+    g_normal = vec4(tex_norm.xyz * tbn * 0.5 + 0.5, tex_norm.w);
     g_pos = vec4(f_pos.xyz, f_depth);
 }

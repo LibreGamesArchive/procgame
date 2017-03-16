@@ -27,7 +27,7 @@ static void begin(struct pg_shader* shader, struct pg_viewer* view)
     struct data* d = shader->data;
     glDisable(GL_DEPTH_TEST);
     glDepthMask(0);
-    glUniform1i(d->font_uni, d->font->color_slot);
+    glUniform1i(d->font_uni, d->font->diffuse_slot);
     glUniform1ui(d->font_pitch, d->font->w / d->font->frame_w);
     glUniform2f(d->glyph_size,
                 (float)d->font->frame_w / (float)d->font->w,
@@ -73,7 +73,7 @@ void pg_shader_text_set_font(struct pg_shader* shader, struct pg_texture* tex)
     struct data* d = shader->data;
     d->font = tex;
     if(pg_shader_is_active(shader)) {
-        glUniform1i(d->font_uni, d->font->color_slot);
+        glUniform1i(d->font_uni, d->font->diffuse_slot);
         glUniform1i(d->font_pitch, d->font->w / d->font->frame_w);
         glUniform2f(d->glyph_size,
                     d->font->frame_w / d->font->w,
