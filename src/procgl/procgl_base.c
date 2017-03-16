@@ -61,32 +61,25 @@ void pg_screen_dst(void)
     glViewport(0, 0, screen_w, screen_h);
 }
 
-static float framerate = 0;
-static unsigned framerate_last_update = 0;
-static unsigned framerate_update_interval = 1000;
-static unsigned ticks = 0;
-float pg_delta_time(int dump)
+float pg_time(void)
 {
-    unsigned ticks_tmp = SDL_GetTicks();
-    unsigned ticks_diff = ticks_tmp - ticks;
-    float delta_time = (float)ticks_diff * 0.001;
-    if(!dump) {
-        ticks = ticks_tmp;
-        if(ticks_tmp >= framerate_last_update + framerate_update_interval) {
-            framerate_last_update = ticks_tmp;
-            framerate = 1000 / ticks_diff;
-        }
+    return (float)SDL_GetTicks() * 0.001;
+}
+
+static float last_time = 0;
+static float framerate = 0;
+static float framerate_last_update = 0;
+static float framerate_update_interval = 0.2;
+void pg_calc_framerate(float new_time)
+{
+    if(new_time >= framerate_last_update + framerate_update_interval) {
+        framerate_last_update = new_time;
+        framerate = 1.0f / (new_time - last_time);
     }
-    return delta_time;
+    last_time = new_time;
 }
 
 float pg_framerate(void)
 {
     return framerate;
 }
-
-float pg_time(void)
-{
-    return (double)SDL_GetTicks() * 0.001;
-}
-

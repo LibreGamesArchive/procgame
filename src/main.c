@@ -24,6 +24,7 @@ int main(int argc, char *argv[])
         glDepthMask(1);
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
         float time = pg_time();
+        pg_calc_framerate(time);
         pg_game_state_update(&game, time);
         pg_game_state_draw(&game);
         pg_screen_swap();
