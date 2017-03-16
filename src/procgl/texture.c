@@ -14,65 +14,63 @@
 
 
 void pg_texture_init_from_file(struct pg_texture* tex,
-                               const char* color_file, const char* normal_file,
-                               int color_slot, int normal_slot)
+                               const char* diffuse_file, const char* light_file)
 {
     unsigned w0, h0, w1, h1;
-    lodepng_decode32_file(&tex->pixels, &w0, &h0, color_file);
+    lodepng_decode32_file(&tex->diffuse, &w0, &h0, diffuse_file);
     tex->w = w0;
     tex->h = h0;
-    tex->color_slot = color_slot;
-    glGenTextures(1, &tex->pixels_gl);
-    glActiveTexture(GL_TEXTURE0 + color_slot);
-    glBindTexture(GL_TEXTURE_2D, tex->pixels_gl);
+    tex->diffuse_slot = 0;
+    tex->light_slot = 0;
+    glGenTextures(1, &tex->diffuse_gl);
+    glActiveTexture(GL_TEXTURE0);
+    glBindTexture(GL_TEXTURE_2D, tex->diffuse_gl);
     glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, tex->w, tex->h, 0, GL_RGBA,
-                 GL_UNSIGNED_BYTE, tex->pixels);
+                 GL_UNSIGNED_BYTE, tex->diffuse);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
-    if(normal_file) {
-        tex->normal_slot = normal_slot;
-        lodepng_decode32_file(&tex->normals, &w1, &h1, normal_file);
+    if(light_file) {
+        lodepng_decode32_file(&tex->light, &w1, &h1, light_file);
         if(w0 != w1 || h0 != h1) {
             printf("Warning: colormap and normalmap size mismatch:\n"
                    "    colormap: %s\n    normalmap: %s\n",
-                   color_file, normal_file);
+                   diffuse_file, light_file);
         }
-        glGenTextures(1, &tex->normals_gl);
-        glActiveTexture(GL_TEXTURE0 + normal_slot);
-        glBindTexture(GL_TEXTURE_2D, tex->normals_gl);
+        glGenTextures(1, &tex->light_gl);
+        glActiveTexture(GL_TEXTURE0);
+        glBindTexture(GL_TEXTURE_2D, tex->light_gl);
         glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, tex->w, tex->h, 0, GL_RGBA,
-                     GL_UNSIGNED_BYTE, tex->normals);
+                     GL_UNSIGNED_BYTE, tex->light);
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
     } else {
-        tex->normals = NULL;
-        tex->normal_slot = -1;
+        tex->light = NULL;
+        tex->light_slot = -1;
     }
 }
 
-void pg_texture_init(struct pg_texture* tex, int w, int h,
-                     int color_slot, int normal_slot)
+void pg_texture_init(struct pg_texture* tex, int w, int h)
 {
-    tex->pixels = calloc(w * h, sizeof(*tex->pixels));
-    tex->normals = calloc(w * h, sizeof(*tex->normals));
+    tex->diffuse = calloc(w * h, sizeof(*tex->diffuse));
+    tex->light = calloc(w * h, sizeof(*tex->light));
     tex->w = w;
     tex->h = h;
-    tex->color_slot = color_slot;
-    tex->normal_slot = normal_slot;
-    glGenTextures(1, &tex->pixels_gl);
-    glGenTextures(1, &tex->normals_gl);
-    glActiveTexture(GL_TEXTURE0 + color_slot);
-    glBindTexture(GL_TEXTURE_2D, tex->pixels_gl);
+    tex->diffuse_slot = 0;
+    tex->light_slot = 0;
+    glGenTextures(1, &tex->diffuse_gl);
+    glGenTextures(1, &tex->light_gl);
+    glActiveTexture(GL_TEXTURE0);
+    glBindTexture(GL_TEXTURE_2D, tex->diffuse_gl);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-    glActiveTexture(GL_TEXTURE0 + normal_slot);
-    glBindTexture(GL_TEXTURE_2D, tex->normals_gl);
+    glActiveTexture(GL_TEXTURE0);
+    glBindTexture(GL_TEXTURE_2D, tex->light_gl);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
@@ -81,109 +79,65 @@ void pg_texture_init(struct pg_texture* tex, int w, int h,
 
 void pg_texture_deinit(struct pg_texture* tex)
 {
-    glDeleteTextures(1, &tex->pixels_gl);
-    free(tex->pixels);
-    if(tex->normals) {
-        glDeleteTextures(1, &tex->normals_gl);
-        free(tex->normals);
+    glDeleteTextures(1, &tex->diffuse_gl);
+    free(tex->diffuse);
+    if(tex->light) {
+        glDeleteTextures(1, &tex->light_gl);
+        free(tex->light);
     }
 }
 
-void pg_texture_bind(struct pg_texture* tex, int color_slot, int normal_slot)
+void pg_texture_bind(struct pg_texture* tex, int diffuse_slot, int light_slot)
 {
-    if(color_slot >= 0) {
-        glActiveTexture(GL_TEXTURE0 + color_slot);
-        glBindTexture(GL_TEXTURE_2D, tex->pixels_gl);
+    tex->diffuse_slot = diffuse_slot;
+    tex->light_slot = light_slot;
+    if(diffuse_slot >= 0) {
+        glActiveTexture(GL_TEXTURE0 + diffuse_slot);
+        glBindTexture(GL_TEXTURE_2D, tex->diffuse_gl);
     }
-    if(tex->normals && normal_slot >= 0) {
-        glActiveTexture(GL_TEXTURE0 + normal_slot);
-        glBindTexture(GL_TEXTURE_2D, tex->normals_gl);
+    if(tex->light && light_slot >= 0) {
+        glActiveTexture(GL_TEXTURE0 + light_slot);
+        glBindTexture(GL_TEXTURE_2D, tex->light_gl);
     }
 }
 
 void pg_texture_buffer(struct pg_texture* tex)
 {
-    if(tex->color_slot >= 0) {
-        glActiveTexture(GL_TEXTURE0 + tex->color_slot);
-        glBindTexture(GL_TEXTURE_2D, tex->pixels_gl);
+    if(tex->diffuse_slot >= 0) {
+        glActiveTexture(GL_TEXTURE0 + tex->diffuse_slot);
+        glBindTexture(GL_TEXTURE_2D, tex->diffuse_gl);
         glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, tex->w, tex->h, 0, GL_RGBA,
-                     GL_UNSIGNED_BYTE, tex->pixels);
+                     GL_UNSIGNED_BYTE, tex->diffuse);
         glGenerateMipmap(GL_TEXTURE_2D);
     }
-    if(tex->normals && tex->normal_slot >= 0) {
-        glActiveTexture(GL_TEXTURE0 + tex->normal_slot);
-        glBindTexture(GL_TEXTURE_2D, tex->normals_gl);
+    if(tex->light && tex->light_slot >= 0) {
+        glActiveTexture(GL_TEXTURE0 + tex->light_slot);
+        glBindTexture(GL_TEXTURE_2D, tex->light_gl);
         glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, tex->w, tex->h, 0, GL_RGBA,
-                     GL_UNSIGNED_BYTE, tex->normals);
+                     GL_UNSIGNED_BYTE, tex->light);
         glGenerateMipmap(GL_TEXTURE_2D);
     }
 }
 
-void pg_texture_perlin(struct pg_texture* tex,
-                           float x1, float y1, float x2, float y2)
+void pg_texture_generate_normals(struct pg_texture* tex,
+                                 struct pg_heightmap* hmap, float intensity)
 {
-    if(!tex->normals) return;
-    int x, y;
-    for(x = 0; x < tex->w; ++x) {
-        for(y = 0; y < tex->h; ++y) {
-            float x_ = (float)x / tex->w;
-            float y_ = (float)y / tex->h;
-            float dx = x2 - x1;
-            float dy = y2 - y1;
-            float nx = x1 + cos(x_ * 2 * M_PI) * dx / (2 * M_PI);
-            float ny = y1 + cos(y_ * 2 * M_PI) * dy / (2 * M_PI);
-            float nz = x1 + sin(x_ * 2 * M_PI) * dx / (2 * M_PI);
-            float nw = y1 + sin(y_ * 2 * M_PI) * dy / (2 * M_PI);
-            float noise = noise4(nx, ny, nz, nw) * 0.5 + 0.5;
-            tex->normals[x + y * tex->w].h = (unsigned char)(noise * 256);
-        }
-    }
-}
-
-void pg_texture_shitty(struct pg_texture* tex)
-{
-    if(!tex->normals) return;
-    int x, y;
-    for(x = 0; x < tex->w; ++x) {
-        for(y = 0; y < tex->h; ++y) {
-            vec2 xy = {x, y};
-            vec2 wh = {(float)tex->w / 2, (float)tex->h / 2};
-            vec2 diff;
-            vec2_sub(diff, wh, xy);
-            int dist = abs((int)vec2_len(diff)) * 20;
-            if(dist > 255) dist = 255;
-            tex->normals[x + y * tex->w].h = 255 - dist;
-        }
-    }
-}
-
-static unsigned pg_texture_height(struct pg_texture* tex, int x, int y)
-{
-    if(x < 0) x = tex->w - (-x) % tex->w;
-    else if(x >= tex->w) x = x % tex->w;
-    if(y < 0) y = tex->h - (-y) % tex->h;
-    else if(y >= tex->h) y = y % tex->h;
-    return tex->normals[x + y * tex->w].h;
-}
-
-void pg_texture_generate_normals(struct pg_texture* tex, float intensity)
-{
-    if(!tex->normals) return;
+    if(!tex->light) return;
     int x, y;
     for(x = 0; x < tex->w; ++x) {
         for(y = 0; y < tex->h; ++y) {
             float u, d, r, l;
-            u = (float)pg_texture_height(tex, x, y - 1) / 256 * intensity;
-            d = (float)pg_texture_height(tex, x, y + 1) / 256 * intensity;
-            l = (float)pg_texture_height(tex, x - 1, y) / 256 * intensity;
-            r = (float)pg_texture_height(tex, x + 1, y) / 256 * intensity;
+            u = pg_heightmap_get_height(hmap, x, y - 1) * intensity;
+            d = pg_heightmap_get_height(hmap, x, y + 1) * intensity;
+            l = pg_heightmap_get_height(hmap, x - 1, y) * intensity;
+            r = pg_heightmap_get_height(hmap, x + 1, y) * intensity;
             vec3 normal = { r - l, d - u, 2.0f };
             vec3_normalize(normal, normal);
-            tex->normals[x + y * tex->w] = (struct pg_texture_normal) {
-                (normal[0] + 1) / 2 * 256,
-                (normal[1] + 1) / 2 * 256,
+            pg_texel_set(tex->light[x + y * tex->w],
+                (normal[0] + 1) / 2 * 255,
+                (normal[1] + 1) / 2 * 255,
                 (normal[2] + 1) / 2 * 128 + 127,
-                tex->normals[x + y * tex->w].h };
+                tex->light[x + y * tex->w][3]);
         }
     }
 }
