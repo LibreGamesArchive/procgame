@@ -3,6 +3,7 @@
 #include "vertex.h"
 #include "viewer.h"
 #include "shader.h"
+#include "wave.h"
 #include "heightmap.h"
 #include "texture.h"
 #include "model.h"
@@ -309,11 +310,21 @@ void pg_model_transform(struct pg_model* model, mat4 transform)
         mat4 norm;
         mat4_transpose(norm, inv);
         vec4 old_norm = { v->normal[0], v->normal[1], v->normal[2], 0.0f };
-        vec4 new_norm;
+        vec4 old_tan = { v->tangent[0], v->tangent[1], v->tangent[2], 0.0f };
+        vec4 old_bitan = { v->bitangent[0], v->bitangent[1], v->bitangent[2], 0.0f };
+        vec4 new_norm, new_tan, new_bitan;
         mat4_mul_vec4(new_norm, norm, old_norm);
-        *v = (struct pg_vert3d){ .pos = { new[0], new[1], new[2] },
-                              .normal = { new_norm[0], new_norm[1], new_norm[2] },
-                              .tex_coord = { v->tex_coord[0], v->tex_coord[1] } };
+        mat4_mul_vec4(new_tan, norm, old_tan);
+        mat4_mul_vec4(new_bitan, norm, old_bitan);
+        vec4_normalize(new_norm, new_norm);
+        vec4_normalize(new_tan, new_tan);
+        vec4_normalize(new_bitan, new_bitan);
+        *v = (struct pg_vert3d){
+            .pos = { new[0], new[1], new[2] },
+            .tex_coord = { v->tex_coord[0], v->tex_coord[1] },
+            .normal = { new_norm[0], new_norm[1], new_norm[2] },
+            .tangent = { new_tan[0], new_tan[1], new_tan[2] },
+            .bitangent = { new_bitan[0], new_bitan[1], new_bitan[2] }};
     }
 }
 

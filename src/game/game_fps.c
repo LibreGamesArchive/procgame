@@ -12,6 +12,7 @@ struct fps_game_renderer {
 
 struct fps_game_assets {
     struct pg_model floor_model;
+    struct pg_model test_cyl;
     struct pg_texture floor_tex;
     struct pg_texture font;
 };
@@ -116,9 +117,13 @@ static void fps_game_draw(struct pg_game_state* state)
     mat4 model_transform;
     mat4_identity(model_transform);
     pg_model_draw(&d->assets.floor_model, &d->rend.shader_3d, model_transform);
+    pg_model_begin(&d->assets.test_cyl);
+    mat4_translate(model_transform, 4, 0, 0);
+    mat4_rotate_Z(model_transform, model_transform, (float)state->ticks * 0.01);
+    pg_model_draw(&d->assets.test_cyl, &d->rend.shader_3d, model_transform);
     pg_gbuffer_begin_light(&d->rend.gbuf, &d->rend.view);
     pg_gbuffer_draw_light(&d->rend.gbuf,
-        (vec4){ 0, 0, 0.25, 20 },
+        (vec4){ 0, 0, 0.25, 10 },
         (vec3){ 1, 0.25, 0.25 });
     pg_screen_dst();
     pg_gbuffer_finish(&d->rend.gbuf, (vec3){ 0.1, 0.1, 0.1 });
@@ -174,14 +179,19 @@ static void fps_game_generate_floor_texture(struct pg_texture* tex)
 static void fps_game_generate_assets(struct fps_game_data* d)
 {
     /*  Generating the floor model  */
-    pg_model_quad(&d->assets.floor_model, 10, 10);
+    pg_model_quad(&d->assets.floor_model, (vec2){ 10, 10 });
     mat4 transform;
     mat4_identity(transform);
     mat4_rotate_X(transform, transform, -M_PI / 2);
-    mat4_scale_aniso(transform, transform, 10, 10, 10);
+    mat4_scale_aniso(transform, transform, 10, 1, 10);
     pg_model_transform(&d->assets.floor_model, transform);
-    pg_model_precalc_verts(&d->assets.floor_model);
     pg_model_buffer(&d->assets.floor_model, &d->rend.shader_3d);
+    pg_model_cylinder(&d->assets.test_cyl, 16, (vec2){ 6, 6 });
+    mat4_identity(transform);
+    mat4_scale_aniso(transform, transform, 1, 1, 4);
+    mat4_translate_in_place(transform, 0, 0, 0.5);
+    pg_model_transform(&d->assets.test_cyl, transform);
+    pg_model_buffer(&d->assets.test_cyl, &d->rend.shader_3d);
     /*  Generating the floor texture    */
     fps_game_generate_floor_texture(&d->assets.floor_tex);
     pg_texture_init_from_file(&d->assets.font, "font_8x8.png", NULL);
