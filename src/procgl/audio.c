@@ -23,7 +23,7 @@ static void pg_buffer_audio(void* udata, Uint8* stream, int len)
 {
     memset(stream, pg_audio_spec.silence, len);
     int s_len = len / sizeof(float);
-    float* s_stream = stream;
+    float* s_stream = (float*)stream;
     struct pg_audio_chunk_ref* ref;
     int i;
     ARR_FOREACH_PTR_REV(pg_audio_play_queue, ref, i) {
