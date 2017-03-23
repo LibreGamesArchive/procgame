@@ -19,11 +19,11 @@ void main()
     vec3 light_to_pos = light.xyz - pos;
     float dist = length(light_to_pos);
     if(dist > light.w) discard;
-    float attenuation = 1 - dist / light.w;
     vec3 light_dir = normalize(light_to_pos);
     vec3 frag_to_eye = normalize(eye_pos - pos);
-    vec3 half = normalize(frag_to_eye + light_to_pos);
-    vec3 specular = shininess * attenuation * color * pow(max(dot(normal, half), 0), 32);
-    vec3 diffuse = attenuation * color * max(dot(normal, light_dir), 0);
-    frag_color = vec4(diffuse + specular, 0);
+    vec3 half = normalize(frag_to_eye + light_dir);
+    vec3 specular = color * shininess * pow(max(dot(normal, half), 0), 32);
+    vec3 diffuse = color * max(dot(normal, light_dir), 0);
+    float attenuation = 1 - dist / light.w;
+    frag_color = vec4(attenuation * (diffuse + specular), 0);
 }
