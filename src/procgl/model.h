@@ -8,13 +8,6 @@ struct pg_model {
 
 void pg_model_init(struct pg_model* model);
 void pg_model_deinit(struct pg_model* model);
-void pg_model_split_tris(struct pg_model* model);
-void pg_model_generate_texture(struct pg_model* model,
-                                   struct pg_texture* texture,
-                                   unsigned w, unsigned h);
-void pg_model_precalc_normals(struct pg_model* model);
-void pg_model_precalc_tangents(struct pg_model* model);
-void pg_model_precalc_verts(struct pg_model* model);
 void pg_model_buffer(struct pg_model* model, struct pg_shader* shader);
 void pg_model_begin(struct pg_model* model);
 void pg_model_draw(struct pg_model* model, struct pg_shader* shader,
@@ -27,9 +20,21 @@ void pg_model_add_triangle(struct pg_model* model, unsigned v0,
 void pg_model_append(struct pg_model* dst, struct pg_model* src,
                          mat4 transform);
 void pg_model_transform(struct pg_model* model, mat4 transform);
+void pg_model_generate_texture(struct pg_model* model,
+                               struct pg_texture* texture,
+                               unsigned w, unsigned h);
+
+void pg_model_split_tris(struct pg_model* model);
+void pg_model_precalc_normals(struct pg_model* model);
+void pg_model_precalc_tangents(struct pg_model* model);
+void pg_model_precalc_verts(struct pg_model* model);
+void pg_model_precalc_duplicates(struct pg_model* model, float tolerance);
 
 /*  PRIMITIVES  */
 void pg_model_quad(struct pg_model* model, vec2 tex_scale);
 void pg_model_cube(struct pg_model* model, vec2 tex_scale);
 void pg_model_cylinder(struct pg_model* model, int n, vec2 tex_scale);
+void pg_model_cone(struct pg_model* model, int n, vec3 warp, vec2 tex_scale);
+void pg_model_conic_section(struct pg_model* model, int n, vec3 warp,
+                            vec2 tex_scale, int tex_style);
 void pg_model_icosphere(struct pg_model* model, int n);

@@ -83,6 +83,9 @@ void pg_model_precalc_normals(struct pg_model* model)
     struct pg_vert3d* v[3];
     unsigned int t[3];
     int i;
+    for(i = 0; i < model->verts.len; ++i) {
+        vec3_set(model->verts.data[i].normal, 0, 0, 0);
+    }
     for(i = 0; i < model->tris.len; i += 3) {
         t[0] = model->tris.data[i];
         t[1] = model->tris.data[i + 1];
@@ -113,6 +116,10 @@ void pg_model_precalc_tangents(struct pg_model* model)
     struct pg_vert3d* v[3];
     unsigned int t[3];
     int i;
+    for(i = 0; i < model->verts.len; ++i) {
+        vec3_set(model->verts.data[i].tangent, 0, 0, 0);
+        vec3_set(model->verts.data[i].bitangent, 0, 0, 0);
+    }
     for(i = 0; i < model->tris.len; i += 3) {
         t[0] = model->tris.data[i];
         t[1] = model->tris.data[i + 1];
@@ -197,6 +204,41 @@ void pg_model_precalc_verts(struct pg_model* model)
             vec3_normalize(v[j]->tangent, v[j]->tangent);
             vec3_add(v[j]->bitangent, bitangent, v[j]->bitangent);
             vec3_normalize(v[j]->bitangent, v[j]->bitangent);
+        }
+    }
+}
+
+void pg_model_precalc_duplicates(struct pg_model* model, float tolerance)
+{
+    int i;
+    for(i = 0; i < model->verts.len; ++i) {
+        int j;
+        for(j = 0; j < model->verts.len; ++j) {
+            if(i == j) continue;
+            struct pg_vert3d* v0 = &model->verts.data[i];
+            struct pg_vert3d* v1 = &model->verts.data[j];
+            if(v0->pos[0] != v1->pos[0]
+            || v0->pos[1] != v1->pos[1]
+            || v0->pos[2] != v1->pos[2]) continue;
+            if(v0->normal[0] == v1->normal[0]
+            && v0->normal[1] == v1->normal[1]
+            && v0->normal[2] == v1->normal[2]) continue;
+            float angle = acosf(vec3_mul_inner(v0->normal, v1->normal));
+            if(angle < tolerance) {
+                vec3 norm, tan, bitan;
+                vec3_add(norm, v0->normal, v1->normal);
+                vec3_add(tan, v0->tangent, v1->tangent);
+                vec3_add(bitan, v0->bitangent, v1->bitangent);
+                vec3_normalize(norm, norm);
+                vec3_normalize(tan, tan);
+                vec3_normalize(bitan, bitan);
+                vec3_dup(v0->normal, norm);
+                vec3_dup(v1->normal, norm);
+                vec3_dup(v0->tangent, tan);
+                vec3_dup(v1->tangent, tan);
+                vec3_dup(v0->bitangent, bitan);
+                vec3_dup(v1->bitangent, bitan);
+            }
         }
     }
 }
