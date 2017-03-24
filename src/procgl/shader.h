@@ -23,15 +23,15 @@ struct pg_shader {
 int pg_compile_glsl(GLuint* vert, GLuint* frag, GLuint* prog,
                     const char* vert_filename, const char* frag_filename);
 int pg_compile_glsl_static(GLuint* vert, GLuint* frag, GLuint* prog,
-                           unsigned char* vert_src, unsigned int vert_len,
-                           unsigned char* frag_src, unsigned int frag_len);
+                           const char* vert_src, int vert_len,
+                           const char* frag_src, int frag_len);
 
 /*  Read/compile a shader program and store it in the given shader object   */
 int pg_shader_load(struct pg_shader* shader,
                    const char* vert_filename, const char* frag_filename);
 int pg_shader_load_static(struct pg_shader* shader,
-                          unsigned char* vert, unsigned int vert_len,
-                          unsigned char* frag, unsigned int frag_len);
+                          const char* vert, int vert_len,
+                          const char* frag, int frag_len);
 /*  Associate a shader's matrix to the name of a shader program uniform */
 void pg_shader_link_matrix(struct pg_shader* shader, enum pg_matrix type,
                            const char* name);

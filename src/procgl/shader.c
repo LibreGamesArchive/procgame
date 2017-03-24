@@ -8,8 +8,7 @@
 static struct pg_shader* pg_active_shader;
 
 /*  Code for loading shaders dumped to headers  */
-static GLuint compile_glsl_static(unsigned char* src, unsigned int len,
-                                  GLenum type)
+static GLuint compile_glsl_static(const char* src, int len, GLenum type)
 {
     /*  Create a shader and give it the source  */
     GLuint shader = glCreateShader(type);
@@ -32,8 +31,8 @@ static GLuint compile_glsl_static(unsigned char* src, unsigned int len,
 
 
 int pg_compile_glsl_static(GLuint* vert, GLuint* frag, GLuint* prog,
-                           unsigned char* vert_src, unsigned int vert_len,
-                           unsigned char* frag_src, unsigned int frag_len)
+                           const char* vert_src, int vert_len,
+                           const char* frag_src, int frag_len)
 {
     *vert = compile_glsl_static(vert_src, vert_len, GL_VERTEX_SHADER);
     *frag = compile_glsl_static(frag_src, frag_len, GL_FRAGMENT_SHADER);
@@ -57,8 +56,8 @@ int pg_compile_glsl_static(GLuint* vert, GLuint* frag, GLuint* prog,
 }
 
 int pg_shader_load_static(struct pg_shader* shader,
-                          unsigned char* vert, unsigned int vert_len,
-                          unsigned char* frag, unsigned int frag_len)
+                          const char* vert, int vert_len,
+                          const char* frag, int frag_len)
 {
     *shader = (struct pg_shader){ .mat_idx = { -1, -1, -1, -1, -1, -1 } };
     return pg_compile_glsl_static(&shader->vert, &shader->frag, &shader->prog,
