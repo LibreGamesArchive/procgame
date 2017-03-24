@@ -1,4 +1,5 @@
 #include <stdlib.h>
+#include <stdio.h>
 #include "game_state.h"
 
 void pg_game_state_init(struct pg_game_state* state, float start_time,
@@ -41,6 +42,7 @@ void pg_game_state_update(struct pg_game_state* state, float new_time)
     } else {
         state->last_tick = state->last_tick + acc;
     }
+    state->ticks += ticks_done;
     state->tick_over = (time_elapsed - acc) / tick_time;
     state->time = new_time;
 }
