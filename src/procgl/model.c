@@ -217,12 +217,9 @@ void pg_model_precalc_duplicates(struct pg_model* model, float tolerance)
             if(i == j) continue;
             struct pg_vert3d* v0 = &model->verts.data[i];
             struct pg_vert3d* v1 = &model->verts.data[j];
-            if(v0->pos[0] != v1->pos[0]
-            || v0->pos[1] != v1->pos[1]
-            || v0->pos[2] != v1->pos[2]) continue;
-            if(v0->normal[0] == v1->normal[0]
-            && v0->normal[1] == v1->normal[1]
-            && v0->normal[2] == v1->normal[2]) continue;
+            if(fabs(v0->pos[0] - v1->pos[0]) > 0.00001
+            || fabs(v0->pos[1] - v1->pos[1]) > 0.00001
+            || fabs(v0->pos[2] - v1->pos[2]) > 0.00001) continue;
             float angle = acosf(vec3_mul_inner(v0->normal, v1->normal));
             if(angle < tolerance) {
                 vec3 norm, tan, bitan;
