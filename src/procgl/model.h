@@ -34,7 +34,8 @@ void pg_model_precalc_duplicates(struct pg_model* model, float tolerance);
 void pg_model_quad(struct pg_model* model, vec2 tex_scale);
 void pg_model_cube(struct pg_model* model, vec2 tex_scale);
 void pg_model_cylinder(struct pg_model* model, int n, vec2 tex_scale);
-void pg_model_cone(struct pg_model* model, int n, vec3 warp, vec2 tex_scale);
-void pg_model_conic_section(struct pg_model* model, int n, vec3 warp,
-                            vec2 tex_scale, int tex_style);
+void pg_model_cone(struct pg_model* model, int n, float base,
+                   vec3 warp, vec2 tex_scale);
+void pg_model_cone_trunc(struct pg_model* model, int n, float t, vec3 warp,
+                         vec2 tex_scale, int tex_style);
 void pg_model_icosphere(struct pg_model* model, int n);
