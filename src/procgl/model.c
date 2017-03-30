@@ -320,18 +320,27 @@ void pg_model_append(struct pg_model* dst, struct pg_model* src,
         mat4 norm;
         mat4_transpose(norm, inv);
         vec4 old_norm = { v->normal[0], v->normal[1], v->normal[2], 0.0f };
-        vec4 new_norm;
+        vec4 old_tan = { v->tangent[0], v->tangent[1], v->tangent[2], 0.0f };
+        vec4 old_bitan = { v->bitangent[0], v->bitangent[1], v->bitangent[2], 0.0f };
+        vec4 new_norm, new_tan, new_bitan;
         mat4_mul_vec4(new_norm, norm, old_norm);
-        dst->verts.data[dst_vert_len + i] =
-            (struct pg_vert3d){ .pos = { new[0], new[1], new[2] },
-                             .normal = { new_norm[0], new_norm[1], new_norm[2] },
-                             .tex_coord = { v->tex_coord[0], v->tex_coord[1] } };
+        mat4_mul_vec4(new_tan, norm, old_tan);
+        mat4_mul_vec4(new_bitan, norm, old_bitan);
+        vec4_normalize(new_norm, new_norm);
+        vec4_normalize(new_tan, new_tan);
+        vec4_normalize(new_bitan, new_bitan);
+        dst->verts.data[dst_vert_len + i] = (struct pg_vert3d){
+            .pos = { new[0], new[1], new[2] },
+            .tex_coord = { v->tex_coord[0], v->tex_coord[1] },
+            .normal = { new_norm[0], new_norm[1], new_norm[2] },
+            .tangent = { new_tan[0], new_tan[1], new_tan[2] },
+            .bitangent = { new_bitan[0], new_bitan[1], new_bitan[2] }};
     }
     dst->verts.len += src->verts.len;
     ARR_RESERVE(dst->tris, dst_tri_len + src->tris.len);
     unsigned t;
     ARR_FOREACH(src->tris, t, i) {
-        dst->tris.data[dst->tris.len + i] = t + dst_tri_len;
+        dst->tris.data[dst->tris.len + i] = t + dst_vert_len;
     }
     dst->tris.len += src->tris.len;
 }
