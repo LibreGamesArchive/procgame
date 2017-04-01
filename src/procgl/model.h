@@ -7,6 +7,7 @@ struct pg_model {
 };
 
 void pg_model_init(struct pg_model* model);
+void pg_model_reset(struct pg_model* model);
 void pg_model_deinit(struct pg_model* model);
 void pg_model_buffer(struct pg_model* model, struct pg_shader* shader);
 void pg_model_begin(struct pg_model* model);

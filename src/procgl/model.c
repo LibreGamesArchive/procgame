@@ -17,6 +17,12 @@ void pg_model_init(struct pg_model* model)
     glGenVertexArrays(1, &model->vao);
 }
 
+void pg_model_reset(struct pg_model* model)
+{
+    ARR_TRUNCATE(model->verts, 0);
+    ARR_TRUNCATE(model->tris, 0);
+}
+
 void pg_model_deinit(struct pg_model* model)
 {
     ARR_DEINIT(model->verts);

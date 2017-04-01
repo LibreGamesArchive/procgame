@@ -10,7 +10,7 @@
 
 void pg_model_quad(struct pg_model* model, vec2 tex_scale)
 {
-    pg_model_init(model);
+    pg_model_reset(model);
     pg_model_add_vertex(model, &(struct pg_vert3d) {
         .pos = { -0.5, 0, -0.5 }, .tex_coord = { 0, 0 } });
     pg_model_add_vertex(model, &(struct pg_vert3d) {
@@ -26,7 +26,7 @@ void pg_model_quad(struct pg_model* model, vec2 tex_scale)
 
 void pg_model_cube(struct pg_model* model, vec2 tex_scale)
 {
-    pg_model_init(model);
+    pg_model_reset(model);
     vec3 face = { 0, 0.5, 0 };
     vec3 point[4] = { { -0.5, 0, -0.5 },
                       { -0.5, 0, 0.5 },
@@ -79,7 +79,7 @@ void pg_model_cube(struct pg_model* model, vec2 tex_scale)
 
 void pg_model_cylinder(struct pg_model* model, int n, vec2 tex_scale)
 {
-    pg_model_init(model);
+    pg_model_reset(model);
     int i;
     for(i = 0; i < n; ++i) {
         float angle = (M_PI * 2) / n * i;
@@ -118,7 +118,7 @@ void pg_model_cylinder(struct pg_model* model, int n, vec2 tex_scale)
 void pg_model_cone(struct pg_model* model, int n, float base,
                    vec3 warp, vec2 tex_scale)
 {
-    pg_model_init(model);
+    pg_model_reset(model);
     pg_model_add_vertex(model, &(struct pg_vert3d) {
         .pos = { warp[0], warp[1], warp[2] },
         .tex_coord = { 0.5, 0.5 } });
@@ -149,7 +149,7 @@ void pg_model_cone(struct pg_model* model, int n, float base,
 void pg_model_cone_trunc(struct pg_model* model, int n, float t, vec3 warp,
                          vec2 tex_scale, int tex_repeat)
 {
-    pg_model_init(model);
+    pg_model_reset(model);
     float a = (M_PI * 2) / n;
     float outer_chord = 2 * sin(a / 2);
     float inner_chord = t * outer_chord;
