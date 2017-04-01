@@ -80,28 +80,29 @@ void pg_model_cube(struct pg_model* model, vec2 tex_scale)
 void pg_model_cylinder(struct pg_model* model, int n, vec2 tex_scale)
 {
     pg_model_reset(model);
+    float half = (M_PI * 2) / n * 0.5;
     int i;
     for(i = 0; i < n; ++i) {
-        float angle = (M_PI * 2) / n * i;
-        float angle_next = (M_PI * 2) / n * (i + 1);
-        float angle_f = angle / (M_PI * 2);
-        float angle_next_f = angle_next / (M_PI * 2);
+        float angle = (M_PI * 2) / n * i - half;
+        float angle_next = (M_PI * 2) / n * (i + 1) - half;
+        float angle_f = (angle + half) / (M_PI * 2);
+        float angle_next_f = (angle_next + half) / (M_PI * 2);
         if(i == 0) {
             pg_model_add_vertex(model, &(struct pg_vert3d) {
-                .pos = { cos(angle), sin(angle), -0.5 },
+                .pos = { cos(angle), sin(angle), 0 },
                 .tex_coord = { angle_f * tex_scale[0], 0 },
                 .normal = { cos(angle), sin(angle), 0 } });
             pg_model_add_vertex(model, &(struct pg_vert3d) {
-                .pos = { cos(angle), sin(angle), 0.5 },
+                .pos = { cos(angle), sin(angle), 1 },
                 .tex_coord = { angle_f * tex_scale[0], tex_scale[1] },
                 .normal = { cos(angle), sin(angle), 0 } });
         }
         pg_model_add_vertex(model, &(struct pg_vert3d) {
-            .pos = { cos(angle_next), sin(angle_next), -0.5 },
+            .pos = { cos(angle_next), sin(angle_next), 0 },
             .tex_coord = { angle_next_f * tex_scale[0], 0 },
             .normal = { cos(angle_next), sin(angle_next), 0 } });
         pg_model_add_vertex(model, &(struct pg_vert3d) {
-            .pos = { cos(angle_next), sin(angle_next), 0.5 },
+            .pos = { cos(angle_next), sin(angle_next), 1 },
             .tex_coord = { angle_next_f * tex_scale[0], tex_scale[1] },
             .normal = { cos(angle_next), sin(angle_next), 0 } });
         if(i == 0) {
@@ -112,7 +113,6 @@ void pg_model_cylinder(struct pg_model* model, int n, vec2 tex_scale)
             pg_model_add_triangle(model, i * 2 + 1, i * 2 + 2, i * 2 + 3);
         }
     }
-    pg_model_precalc_tangents(model);
 }
 
 void pg_model_cone(struct pg_model* model, int n, float base,
@@ -122,10 +122,11 @@ void pg_model_cone(struct pg_model* model, int n, float base,
     pg_model_add_vertex(model, &(struct pg_vert3d) {
         .pos = { warp[0], warp[1], warp[2] },
         .tex_coord = { 0.5, 0.5 } });
+    float half = (M_PI * 2) / n * 0.5;
     int i;
     for(i = 0; i < n; ++i) {
-        float angle = (M_PI * 2) / n * i;
-        float angle_next = (M_PI * 2) / n * (i + 1);
+        float angle = (M_PI * 2) / n * i - half;
+        float angle_next = (M_PI * 2) / n * (i + 1) - half;
         if(i == 0) {
             pg_model_add_vertex(model, &(struct pg_vert3d) {
                 .pos = { 0.5 * cos(angle), 0.5 * sin(angle), base },
@@ -151,6 +152,7 @@ void pg_model_cone_trunc(struct pg_model* model, int n, float t, vec3 warp,
 {
     pg_model_reset(model);
     float a = (M_PI * 2) / n;
+    float half = a * 0.5;
     float outer_chord = 2 * sin(a / 2);
     float inner_chord = t * outer_chord;
     float top_tex_len = inner_chord / outer_chord;
@@ -165,8 +167,8 @@ void pg_model_cone_trunc(struct pg_model* model, int n, float t, vec3 warp,
     int i;
     vec2 t0, t1, t2, t3;
     for(i = 0; i < n; ++i) {
-        float angle = (M_PI * 2) / n * i;
-        float angle_next = (M_PI * 2) / n * (i + 1);
+        float angle = (M_PI * 2) / n * i - half;
+        float angle_next = (M_PI * 2) / n * (i + 1) - half;
         if(!tex_repeat) {
             vec2_set(t0, 0.5 + cos(angle) * tex_scale[0] * 0.5,
                          0.5 + sin(angle) * tex_scale[1] * 0.5);
