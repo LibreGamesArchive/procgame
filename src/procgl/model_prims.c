@@ -89,22 +89,18 @@ void pg_model_cylinder(struct pg_model* model, int n, vec2 tex_scale)
         float angle_next_f = (angle_next + half) / (M_PI * 2);
         if(i == 0) {
             pg_model_add_vertex(model, &(struct pg_vert3d) {
-                .pos = { cos(angle), sin(angle), 0 },
-                .tex_coord = { angle_f * tex_scale[0], 0 },
-                .normal = { cos(angle), sin(angle), 0 } });
+                .pos = { 0.5 * cos(angle), 0.5 * sin(angle), 0 },
+                .tex_coord = { angle_f * tex_scale[0], 0 } });
             pg_model_add_vertex(model, &(struct pg_vert3d) {
-                .pos = { cos(angle), sin(angle), 1 },
-                .tex_coord = { angle_f * tex_scale[0], tex_scale[1] },
-                .normal = { cos(angle), sin(angle), 0 } });
+                .pos = { 0.5 * cos(angle), 0.5 * sin(angle), 1 },
+                .tex_coord = { angle_f * tex_scale[0], tex_scale[1] } });
         }
         pg_model_add_vertex(model, &(struct pg_vert3d) {
-            .pos = { cos(angle_next), sin(angle_next), 0 },
-            .tex_coord = { angle_next_f * tex_scale[0], 0 },
-            .normal = { cos(angle_next), sin(angle_next), 0 } });
+            .pos = { 0.5 * cos(angle_next), 0.5 * sin(angle_next), 0 },
+            .tex_coord = { angle_next_f * tex_scale[0], 0 } });
         pg_model_add_vertex(model, &(struct pg_vert3d) {
-            .pos = { cos(angle_next), sin(angle_next), 1 },
-            .tex_coord = { angle_next_f * tex_scale[0], tex_scale[1] },
-            .normal = { cos(angle_next), sin(angle_next), 0 } });
+            .pos = { 0.5 * cos(angle_next), 0.5 * sin(angle_next), 1 },
+            .tex_coord = { angle_next_f * tex_scale[0], tex_scale[1] } });
         if(i == 0) {
             pg_model_add_triangle(model, 0, 2, 1);
             pg_model_add_triangle(model, 1, 2, 3);
