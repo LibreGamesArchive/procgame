@@ -21,7 +21,8 @@ PROCGL := obj/procgl_base.o \
  obj/viewer.o obj/postproc.o obj/shader.o obj/gbuffer.o \
  obj/model.o obj/model_prims.o obj/shape.o obj/shape_prims.o \
  obj/shader_2d.o obj/shader_3d.o obj/shader_text.o \
- obj/wave.o obj/heightmap.o obj/texture.o obj/audio.o
+ obj/wave.o obj/heightmap.o obj/texture.o obj/audio.o \
+ obj/sdf.o obj/sdf_functions.o
 PROCGL_LIBS := obj/lodepng.o obj/noise1234.o obj/wavfile.o
 
 debug_linux: INCLUDES += -Isrc/libs/linux
@@ -111,6 +112,15 @@ obj/wave.o: src/procgl/wave.c src/procgl/wave.h
 obj/audio.o: src/procgl/audio.c src/procgl/audio.h \
  src/procgl/wave.h src/procgl/arr.h src/procgl/ext/wavfile.h
 	$(CC) $(CFLAGS) -o obj/audio.o -c src/procgl/audio.c $(INCLUDES)
+obj/sdf.o: src/procgl/sdf.c src/procgl/sdf.h \
+ src/procgl/wave.h src/procgl/arr.h
+	gperf src/procgl/sdf_keywords.gperf \
+        -H pg_sdf_keyword_hash -N pg_sdf_keyword_read -t --omit-struct-type \
+        > src/procgl/sdf_keywords.gperf.c &
+	$(CC) $(CFLAGS) -o obj/sdf.o -c src/procgl/sdf.c $(INCLUDES)
+obj/sdf_functions.o: src/procgl/sdf_functions.c src/procgl/sdf.h \
+ src/procgl/wave.h src/procgl/arr.h
+	$(CC) $(CFLAGS) -o obj/sdf_functions.o -c src/procgl/sdf_functions.c $(INCLUDES)
 
 obj/lodepng.o: src/procgl/ext/lodepng.c src/procgl/ext/lodepng.h
 	$(CC) $(CFLAGS) -o obj/lodepng.o -c src/procgl/ext/lodepng.c $(INCLUDES)

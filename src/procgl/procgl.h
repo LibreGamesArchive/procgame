@@ -1,9 +1,11 @@
 #include <GL/glew.h>
 #include <SDL2/SDL.h>
 #include "ext/linmath.h"
+#include "arr.h"
 #include "procgl_base.h"
 #include "wave.h"
 #include "heightmap.h"
+#include "sdf.h"
 #include "texture.h"
 #include "viewer.h"
 #include "shader.h"

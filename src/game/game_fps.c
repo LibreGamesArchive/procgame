@@ -17,6 +17,7 @@ struct fps_game_assets {
     struct pg_model test_cone_trunc;
     struct pg_texture floor_tex;
     struct pg_texture font;
+    struct pg_sdf_tree test_sdf;
 };
 
 struct fps_game_data {
@@ -150,6 +151,32 @@ static void fps_game_deinit(void* data)
     free(d);
 }
 
+static void fps_game_floor_texture_sdf(struct pg_texture* tex,
+                                       struct pg_sdf_tree* tree,
+                                       mat4 transform)
+{
+    float h[512 * 512];
+    struct pg_heightmap hmap = { .map = h, .w = 512, .h = 512 };
+    pg_texture_init(tex, 512, 512);
+    pg_texture_bind(tex, 1, 2);
+    int x, y;
+    for(x = 0; x < 512; ++x) {
+        for(y = 0; y < 512; ++y) {
+            vec4 p = { (float)x / 512 * 2 - 1,
+                       (float)y / 512 * 2 - 1, 0 , 1 };
+            //mat4_mul_vec4(p, transform, p);
+            float s = pg_sdf_tree_sample(tree, p);
+            float d_mod = fmod(s * 2, 1);
+            float line = powf(MAX(d_mod, 1 - d_mod), 2);
+            pg_texel_set(tex->diffuse[x + y * 512],
+                line * 250.0f, line * 250.0f, line * 250.0f, 250);
+            hmap.map[x + y * 512] = line;
+        }
+    }
+    pg_texture_generate_normals(tex, &hmap, 2);
+    pg_texture_buffer(tex);
+}
+
 static void fps_game_generate_floor_texture(struct pg_texture* tex)
 {
     float h[128 * 128];
@@ -186,7 +213,7 @@ static void fps_game_generate_assets(struct fps_game_data* d)
 {
     /*  Generating the floor model  */
     pg_model_init(&d->assets.floor_model);
-    pg_model_quad(&d->assets.floor_model, (vec2){ 10, 10 });
+    pg_model_quad(&d->assets.floor_model, (vec2){ 1, 1 });
     mat4 transform;
     mat4_identity(transform);
     mat4_rotate_X(transform, transform, -M_PI / 2);
@@ -203,8 +230,15 @@ static void fps_game_generate_assets(struct fps_game_data* d)
     mat4_translate_in_place(transform, 0, 0, 0);
     pg_model_transform(&d->assets.test_cyl, transform);
     pg_model_buffer(&d->assets.test_cyl, &d->rend.shader_3d);
+    /*  Generating the SDF tree */
+    char sdf_src[] = "(union (BOX 0.5 1 1) (BOX 1 0.5 0.5))";
+    pg_sdf_tree_init(&d->assets.test_sdf);
+    pg_sdf_tree_parse(&d->assets.test_sdf, sdf_src, sizeof(sdf_src));
     /*  Generating the floor texture    */
-    fps_game_generate_floor_texture(&d->assets.floor_tex);
+    //fps_game_generate_floor_texture(&d->assets.floor_tex);
+    mat4_identity(transform);
+    fps_game_floor_texture_sdf(&d->assets.floor_tex, &d->assets.test_sdf, transform);
+    /*  Loading the font texture    */
     pg_texture_init_from_file(&d->assets.font, "font_8x8.png", NULL);
     pg_texture_set_atlas(&d->assets.font, 8, 8);
     pg_texture_bind(&d->assets.font, 3, 4);
