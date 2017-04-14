@@ -5,6 +5,27 @@
 #ifndef M_PI
 #define M_PI (3.14159265359)
 #endif
+#ifndef MAX
+#define MAX(a, b)   ((a) > (b) ? (a) : (b))
+#endif
+#ifndef MIN
+#define MIN(a, b)   ((a) < (b) ? (a) : (b))
+#endif
+
+#define SATURATE(x) clamp(x, 0, 1)
+static inline float clamp(float f, float a, float b)
+{
+    return f < a ? a : (f > b ? b : f);
+}
+static inline float lerp(float a, float b, float t)
+{
+    return (1 - t) * a + t * b;
+}
+static inline float smin(float a, float b, float k)
+{
+    float h = clamp(0.5 + 0.5 * (b - a) / k, 0.0, 1.0);
+    return lerp(b, a, h) - k * h * (1.0 - h);
+}
 
 #define LINMATH_H_DEFINE_VEC(n) \
 typedef float vec##n[n]; \
@@ -25,6 +46,12 @@ static inline void vec##n##_sub(vec##n r, vec##n const a, vec##n const b) \
     int i; \
     for(i=0; i<n; ++i) \
         r[i] = a[i] - b[i]; \
+} \
+static inline void vec##n##_mul(vec##n r, vec##n const a, vec##n const b) \
+{ \
+    int i; \
+    for(i=0; i<n; ++i) \
+        r[i] = a[i] * b[i]; \
 } \
 static inline void vec##n##_scale(vec##n r, vec##n const v, float const s) \
 { \
@@ -49,17 +76,59 @@ static inline void vec##n##_normalize(vec##n r, vec##n const v) \
     float k = 1.0 / vec##n##_len(v); \
     vec##n##_scale(r, v, k); \
 } \
-static inline void vec##n##_min(vec##n r, vec##n a, vec##n b) \
+static inline void vec##n##_min(vec##n r, vec##n const a, vec##n const b) \
 { \
     int i; \
     for(i=0; i<n; ++i) \
         r[i] = a[i]<b[i] ? a[i] : b[i]; \
 } \
-static inline void vec##n##_max(vec##n r, vec##n a, vec##n b) \
+static inline void vec##n##_max(vec##n r, vec##n const a, vec##n const b) \
 { \
     int i; \
     for(i=0; i<n; ++i) \
         r[i] = a[i]>b[i] ? a[i] : b[i]; \
+} \
+static inline void vec##n##_abs(vec##n r, vec##n const v) \
+{ \
+    int i; \
+    for(i=0; i<n; ++i) \
+        r[i] = fabsf(v[i]); \
+} \
+static inline float vec##n##_vmax(vec##n const v) \
+{ \
+    int i; \
+    float r = v[0]; \
+    for(i=1; i<n; ++i) \
+        r = MAX(r, v[i]); \
+    return r; \
+} \
+static inline float vec##n##_vmin(vec##n const v) \
+{ \
+    int i; \
+    float r = v[0]; \
+    for(i=1; i<n; ++i) \
+        r = MIN(r, v[i]); \
+    return r; \
+} \
+static inline void vec##n##_lerp(vec##n r, vec##n const a, vec##n const b, \
+                                 float t) \
+{ \
+    int i; \
+    for(i=0; i<n; ++i) \
+        r[i] = (1 - t) * a[i] + t * b[i]; \
+} \
+static inline void vec##n##_saturate(vec##n r, vec##n const v) \
+{ \
+    int i; \
+    for(i=0; i<n; ++i) \
+        r[i] = SATURATE(v[i]); \
+} \
+static inline void vec##n##_clamp(vec##n r, vec##n const v, \
+                                  vec##n const a, vec##n const b) \
+{ \
+    int i; \
+    for(i=0; i<n; ++i) \
+        r[i] = v[i] < a[i] ? a[i] : (v[i] > b[i] ? b[i] : v[i]); \
 }
 
 LINMATH_H_DEFINE_VEC(2)
