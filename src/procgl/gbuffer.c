@@ -1,8 +1,10 @@
 #include <stdio.h>
 #include <GL/glew.h>
 #include "ext/linmath.h"
+#include "arr.h"
 #include "wave.h"
 #include "heightmap.h"
+#include "model.h"
 #include "texture.h"
 #include "viewer.h"
 #include "shader.h"

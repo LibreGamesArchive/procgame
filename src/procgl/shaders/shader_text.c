@@ -3,10 +3,12 @@
 #include <string.h>
 #include <GL/glew.h>
 #include "procgl/ext/linmath.h"
+#include "procgl/arr.h"
 #include "procgl/wave.h"
 #include "procgl/heightmap.h"
 #include "procgl/texture.h"
 #include "procgl/viewer.h"
+#include "procgl/model.h"
 #include "procgl/shader.h"
 #include "procgl/procgl_base.h"
 
@@ -63,7 +65,6 @@ int pg_shader_text(struct pg_shader* shader)
     glGenVertexArrays(1, &d->dummy_vao);
     shader->data = d;
     shader->deinit = free;
-    shader->buffer_attribs = NULL;
     shader->begin = begin;
     return 1;
 }

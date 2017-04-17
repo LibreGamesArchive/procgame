@@ -19,7 +19,7 @@ TARGET := procgame
 GAME := obj/game_state.o obj/game_fps.o
 PROCGL := obj/procgl_base.o \
  obj/viewer.o obj/postproc.o obj/shader.o obj/gbuffer.o \
- obj/model.o obj/model_prims.o obj/shape.o obj/shape_prims.o \
+ obj/model.o obj/model_prims.o \
  obj/shader_2d.o obj/shader_3d.o obj/shader_text.o \
  obj/wave.o obj/heightmap.o obj/texture.o obj/audio.o \
  obj/sdf.o obj/sdf_functions.o
@@ -80,14 +80,6 @@ obj/model_prims.o: src/procgl/model_prims.c src/procgl/ext/linmath.h \
  src/procgl/vertex.h src/procgl/arr.h src/procgl/viewer.h src/procgl/shader.h \
  src/procgl/model.h src/procgl/wave.h src/procgl/heightmap.h src/procgl/texture.h
 	$(CC) $(CFLAGS) -o obj/model_prims.o -c src/procgl/model_prims.c $(INCLUDES)
-obj/shape.o: src/procgl/shape.c src/procgl/ext/linmath.h src/procgl/vertex.h \
- src/procgl/arr.h src/procgl/viewer.h src/procgl/shader.h \
- src/procgl/shape.h
-	$(CC) $(CFLAGS) -o obj/shape.o -c src/procgl/shape.c $(INCLUDES)
-obj/shape_prims.o: src/procgl/shape_prims.c src/procgl/ext/linmath.h \
- src/procgl/vertex.h src/procgl/arr.h src/procgl/viewer.h \
- src/procgl/shader.h src/procgl/texture.h src/procgl/shape.h
-	$(CC) $(CFLAGS) -o obj/shape_prims.o -c src/procgl/shape_prims.c $(INCLUDES)
 obj/heightmap.o: src/procgl/heightmap.c src/procgl/heightmap.h \
  src/procgl/wave.h
 	$(CC) $(CFLAGS) -o obj/heightmap.o -c src/procgl/heightmap.c $(INCLUDES)

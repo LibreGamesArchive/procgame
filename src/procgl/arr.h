@@ -67,6 +67,12 @@ typedef ARR_T(char*)    arr_str_t;
 #define ARR_TRUNCATE(arr, count) \
     ( ((arr).len > (count)) ? (arr).len = (count) : (arr).len )
 
+#define ARR_TRUNCATE_CLEAR(arr, count) \
+    ( ((arr).cap > (count)) \
+        ? (memset((arr).data + (count), 0, sizeof(*(arr).data) * ((arr).cap - (count))), \
+            (arr).len = (count)) \
+        : (arr).len )
+
 #define ARR_SPLICE(arr, idx, count) \
     ( memmove((arr).data + (idx),   (arr).data + (idx) + (count),\
              ((arr).len - (idx) - (count)) * sizeof(*(arr).data)), \

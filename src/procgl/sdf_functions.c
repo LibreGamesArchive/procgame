@@ -81,7 +81,7 @@ SDF_DEFINE_FUNC(func_capsule)
     vec3 cap = { p[0], fabsf(p[2]) - node->capsule[1], p[1] };
     vec4_set(out, p[0] / node->capsule[0],
                   p[1] / node->capsule[0],
-                  p[2] / node->capsule[2],
+                  p[2] / node->capsule[1],
         fabsf(p[2]) > node->capsule[1]
             ? vec2_len(p) - node->capsule[0]
             : vec3_len(cap) - node->capsule[0]);
@@ -192,7 +192,7 @@ SDF_DEFINE_FUNC(func_threshold)
         pg_sdf_node_child(tree, node, 1) };
     pg_sdf_node_sample(tree, child[0], p, in);
     pg_sdf_node_sample(tree, child[1], p, out);
-    out[4] += in[4];
+    out[3] += in[3];
 }
 
 /*  ----------------------------------------------

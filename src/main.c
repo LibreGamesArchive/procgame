@@ -5,14 +5,6 @@
 
 int main(int argc, char *argv[])
 {
-    //static const char tree[] = "(union (union (CUBE 1 1 1) (CUBE 0.5 2 0.5)) (CYLINDER 0.25 2))";
-    static const char tree[] = "(union (BOX 1 1 1) (CYLINDER 0.5 2))";
-    struct pg_sdf_tree sdf;
-    pg_sdf_tree_init(&sdf);
-    pg_sdf_tree_parse(&sdf, tree, sizeof(tree));
-    char printout[128] = {};
-    pg_sdf_tree_print(&sdf, printout, 128);
-    printf("%s\n", printout);
     /*  Read the options file   */
     FILE* config = fopen("./options.txt", "r");
     int w, h, fullscreen;

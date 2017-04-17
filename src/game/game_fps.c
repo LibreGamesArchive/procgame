@@ -118,21 +118,21 @@ static void fps_game_draw(struct pg_game_state* state)
     /*  Drawing */
     pg_gbuffer_dst(&d->rend.gbuf);
     pg_shader_begin(&d->rend.shader_3d, &d->rend.view);
-    pg_model_begin(&d->assets.floor_model);
+    pg_model_begin(&d->assets.floor_model, &d->rend.shader_3d);
     mat4 model_transform;
     mat4_identity(model_transform);
-    pg_model_draw(&d->assets.floor_model, &d->rend.shader_3d, model_transform);
-    pg_model_begin(&d->assets.test_cyl);
+    pg_model_draw(&d->assets.floor_model, model_transform);
+    pg_model_begin(&d->assets.test_cyl, &d->rend.shader_3d);
     mat4_translate(model_transform, 4, 0, 0);
     mat4_rotate_Z(model_transform, model_transform, (float)state->ticks * 0.01);
-    pg_model_draw(&d->assets.test_cyl, &d->rend.shader_3d, model_transform);
+    pg_model_draw(&d->assets.test_cyl, model_transform);
     /*  Lighting    */
     pg_gbuffer_begin_light(&d->rend.gbuf, &d->rend.view);
     pg_gbuffer_draw_light(&d->rend.gbuf,
         (vec4){ 0, 0, 0.25, 5 },
         (vec3){ 1, 0.25, 0.25 });
     pg_screen_dst();
-    pg_gbuffer_finish(&d->rend.gbuf, (vec3){ 0.1, 0.1, 0.1 });
+    pg_gbuffer_finish(&d->rend.gbuf, (vec3){ 0.3, 0.3, 0.3 });
     /*  Overlay */
     pg_shader_begin(&d->rend.shader_text, NULL);
     char fps_str[10];
@@ -155,22 +155,22 @@ static void fps_game_floor_texture_sdf(struct pg_texture* tex,
                                        struct pg_sdf_tree* tree,
                                        mat4 transform)
 {
-    float h[512 * 512];
-    struct pg_heightmap hmap = { .map = h, .w = 512, .h = 512 };
-    pg_texture_init(tex, 512, 512);
+    float h[128 * 128];
+    struct pg_heightmap hmap = { .map = h, .w = 128, .h = 128 };
+    pg_texture_init(tex, 128, 128);
     pg_texture_bind(tex, 1, 2);
     int x, y;
-    for(x = 0; x < 512; ++x) {
-        for(y = 0; y < 512; ++y) {
-            vec4 p = { (float)x / 512 * 2 - 1,
-                       (float)y / 512 * 2 - 1, 0 , 1 };
+    for(x = 0; x < 128; ++x) {
+        for(y = 0; y < 128; ++y) {
+            vec4 p = { (float)x / 128 * 2 - 1,
+                       (float)y / 128 * 2 - 1, 0 , 1 };
             //mat4_mul_vec4(p, transform, p);
             float s = pg_sdf_tree_sample(tree, p);
             float d_mod = fmod(s * 2, 1);
             float line = powf(MAX(d_mod, 1 - d_mod), 2);
-            pg_texel_set(tex->diffuse[x + y * 512],
+            pg_texel_set(tex->diffuse[x + y * 128],
                 line * 250.0f, line * 250.0f, line * 250.0f, 250);
-            hmap.map[x + y * 512] = line;
+            hmap.map[x + y * 128] = line;
         }
     }
     pg_texture_generate_normals(tex, &hmap, 2);
@@ -213,31 +213,32 @@ static void fps_game_generate_assets(struct fps_game_data* d)
 {
     /*  Generating the floor model  */
     pg_model_init(&d->assets.floor_model);
-    pg_model_quad(&d->assets.floor_model, (vec2){ 1, 1 });
-    mat4 transform;
+    pg_model_quad(&d->assets.floor_model, (vec2){ 10, 10 });
+    pg_model_precalc_ntb(&d->assets.floor_model);
+    mat4 transform; 
     mat4_identity(transform);
     mat4_rotate_X(transform, transform, -M_PI / 2);
-    mat4_scale_aniso(transform, transform, 10, 1, 10);
+    mat4_scale(transform, transform, 10);
     pg_model_transform(&d->assets.floor_model, transform);
-    pg_model_buffer(&d->assets.floor_model, &d->rend.shader_3d);
+    pg_shader_buffer_model(&d->rend.shader_3d, &d->assets.floor_model);
     // Test cylinder
     pg_model_init(&d->assets.test_cyl);
     pg_model_cylinder(&d->assets.test_cyl, 16, (vec2){ 6, 6 });
-    pg_model_precalc_verts(&d->assets.test_cyl);
-    pg_model_precalc_duplicates(&d->assets.test_cyl, 0.8);
+    pg_model_precalc_ntb(&d->assets.test_cyl);
+    pg_model_blend_duplicates(&d->assets.test_cyl, 0.8);
     mat4_identity(transform);
     mat4_scale_aniso(transform, transform, 1, 1, 4);
     mat4_translate_in_place(transform, 0, 0, 0);
     pg_model_transform(&d->assets.test_cyl, transform);
-    pg_model_buffer(&d->assets.test_cyl, &d->rend.shader_3d);
+    pg_shader_buffer_model(&d->rend.shader_3d, &d->assets.test_cyl);
     /*  Generating the SDF tree */
     char sdf_src[] = "(union (BOX 0.5 1 1) (BOX 1 0.5 0.5))";
     pg_sdf_tree_init(&d->assets.test_sdf);
     pg_sdf_tree_parse(&d->assets.test_sdf, sdf_src, sizeof(sdf_src));
     /*  Generating the floor texture    */
-    //fps_game_generate_floor_texture(&d->assets.floor_tex);
+    fps_game_generate_floor_texture(&d->assets.floor_tex);
     mat4_identity(transform);
-    fps_game_floor_texture_sdf(&d->assets.floor_tex, &d->assets.test_sdf, transform);
+    //fps_game_floor_texture_sdf(&d->assets.floor_tex, &d->assets.test_sdf, transform);
     /*  Loading the font texture    */
     pg_texture_init_from_file(&d->assets.font, "font_8x8.png", NULL);
     pg_texture_set_atlas(&d->assets.font, 8, 8);

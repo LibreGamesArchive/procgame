@@ -6,6 +6,7 @@
 #include "procgl/heightmap.h"
 #include "procgl/texture.h"
 #include "procgl/viewer.h"
+#include "procgl/model.h"
 #include "procgl/shader.h"
 
 #ifdef PROCGL_STATIC_SHADERS
@@ -24,30 +25,6 @@ struct data_3d {
         GLint pos, normal, tangent, bitangent, tex_coord;
     } attribs;
 };
-
-static void buffer_attribs(struct pg_shader* shader)
-{
-    struct data_3d* d = shader->data;
-    glVertexAttribPointer(d->attribs.pos, 3, GL_FLOAT, GL_FALSE,
-                          sizeof(struct pg_vert3d), 0);
-    glVertexAttribPointer(d->attribs.normal, 3, GL_FLOAT, GL_FALSE,
-                          sizeof(struct pg_vert3d),
-                          (void*)(3 * sizeof(float)));
-    glVertexAttribPointer(d->attribs.tangent, 3, GL_FLOAT, GL_FALSE,
-                          sizeof(struct pg_vert3d),
-                          (void*)(6 * sizeof(float)));
-    glVertexAttribPointer(d->attribs.bitangent, 3, GL_FLOAT, GL_FALSE,
-                          sizeof(struct pg_vert3d),
-                          (void*)(9 * sizeof(float)));
-    glVertexAttribPointer(d->attribs.tex_coord, 2, GL_FLOAT, GL_FALSE,
-                          sizeof(struct pg_vert3d),
-                          (void*)(12 * sizeof(float)));
-    glEnableVertexAttribArray(d->attribs.pos);
-    glEnableVertexAttribArray(d->attribs.normal);
-    glEnableVertexAttribArray(d->attribs.tangent);
-    glEnableVertexAttribArray(d->attribs.bitangent);
-    glEnableVertexAttribArray(d->attribs.tex_coord);
-}
 
 static void begin(struct pg_shader* shader, struct pg_viewer* view)
 {
@@ -89,18 +66,20 @@ int pg_shader_3d(struct pg_shader* shader)
     pg_shader_link_matrix(shader, PG_VIEW_MATRIX, "view_matrix");
     pg_shader_link_matrix(shader, PG_PROJECTION_MATRIX, "proj_matrix");
     pg_shader_link_matrix(shader, PG_PROJECTIONVIEW_MATRIX, "projview_matrix");
+    pg_shader_link_component(shader, PG_MODEL_COMPONENT_POSITION, "v_position");
+    pg_shader_link_component(shader, PG_MODEL_COMPONENT_NORMAL, "v_normal");
+    pg_shader_link_component(shader, PG_MODEL_COMPONENT_TANGENT, "v_tangent");
+    pg_shader_link_component(shader, PG_MODEL_COMPONENT_BITANGENT, "v_bitangent");
+    pg_shader_link_component(shader, PG_MODEL_COMPONENT_UV, "v_tex_coord");
     d->unis.tex_unit = glGetUniformLocation(shader->prog, "tex");
     d->unis.norm_unit = glGetUniformLocation(shader->prog, "norm");
-    d->attribs.pos = glGetAttribLocation(shader->prog, "v_position");
-    d->attribs.normal = glGetAttribLocation(shader->prog, "v_normal");
-    d->attribs.tangent = glGetAttribLocation(shader->prog, "v_tangent");
-    d->attribs.bitangent = glGetAttribLocation(shader->prog, "v_bitangent");
-    d->attribs.tex_coord = glGetAttribLocation(shader->prog, "v_tex_coord");
     d->tex_dirty = 1;
     shader->data = d;
     shader->deinit = free;
-    shader->buffer_attribs = buffer_attribs;
     shader->begin = begin;
+    shader->components =
+        (PG_MODEL_COMPONENT_POSITION | PG_MODEL_COMPONENT_NORMAL |
+         PG_MODEL_COMPONENT_TAN_BITAN | PG_MODEL_COMPONENT_UV);
     return 1;
 }
 

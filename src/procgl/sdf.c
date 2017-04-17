@@ -33,18 +33,15 @@ struct pg_sdf_node* pg_sdf_tree_add_arg(struct pg_sdf_tree* sdf, int arg)
 }
 
 /*  Add a child node    */
-static struct pg_sdf_node* tree_add_child(struct pg_sdf_tree* sdf,
-                                          struct pg_sdf_node* node,
-                                          int side)
+static int tree_add_child(struct pg_sdf_tree* sdf, int node_i, int side)
 {
-    if(!sdf) return NULL;
-    int idx = node - sdf->op_tree.data;
-    int child = 2 * idx + 1 + (!!side);
+    if(!sdf) return 0;
+    int child = 2 * node_i + 1 + (!!side);
     if(child >= sdf->op_tree.cap) {
         ARR_RESERVE(sdf->op_tree, child + 1);
         sdf->op_tree.len = child + 1;
     }
-    return &sdf->op_tree.data[child];
+    return child;
 }
 
 /*  Public interface    */
@@ -118,20 +115,20 @@ struct pg_sdf_node* pg_sdf_node_child(const struct pg_sdf_tree* sdf,
         return src_i; \
     } while(0)
 #define RECURSE do { \
-        struct pg_sdf_node* child[2]  = { tree_add_child(sdf, node, 0), \
-                                          tree_add_child(sdf, node, 1) }; \
+        int child[2]  = { tree_add_child(sdf, node_i, 0), \
+                          tree_add_child(sdf, node_i, 1) }; \
         src_i = parse_node_recursive(sdf, child[0], src_i, end); \
         src_i = parse_node_recursive(sdf, child[1], src_i, end); \
         return src_i; \
     } while(0)
 
-static const char* parse_node_recursive(struct pg_sdf_tree* sdf,
-                                        struct pg_sdf_node* node,
+static const char* parse_node_recursive(struct pg_sdf_tree* sdf, int node_i,
                                         const char* src, const char* end)
 {
     int i = 0;
     char tmp[32] = {};
     const char* src_i = src;
+    struct pg_sdf_node* node = &sdf->op_tree.data[node_i];
     EAT_SPACES;
     if(*src_i == '(') {
         ++src_i;
@@ -203,6 +200,7 @@ static const char* parse_node_recursive(struct pg_sdf_tree* sdf,
             return ++src_i;
         } else if(kw->type < PG_SDF_NODE_BOOLEANS__) {
             RECURSE;
+            return src_i;
         } else if(kw->type < PG_SDF_NODE_TRANSFORMS__) {
             if(kw->type == PG_SDF_NODE_WARP) {
                 EAT_SPACES;
@@ -212,6 +210,7 @@ static const char* parse_node_recursive(struct pg_sdf_tree* sdf,
                 READ_FLOAT(node->blend);
             }
             RECURSE;
+            return src_i;
         }
         EAT_SPACES;
         if(*src_i != ')') {
@@ -239,7 +238,7 @@ void pg_sdf_tree_parse(struct pg_sdf_tree* sdf, const char* src, unsigned len)
     struct pg_sdf_node root = { PG_SDF_NODE_NULL };
     ARR_PUSH(sdf->op_tree, root);
     const char* end = src + len;
-    const char* src_i = parse_node_recursive(sdf, sdf->op_tree.data, src, end);
+    const char* src_i = parse_node_recursive(sdf, 0, src, end);
 }
 
 static const char* printouts[] = {
@@ -331,7 +330,7 @@ static char* print_node_recursive(const struct pg_sdf_tree* sdf,
         case PG_SDF_NODE_VECTOR:
             out_i += snprintf(out, end - out, "(%s %f %f %f) ",
                 printouts[node->type],
-                node->vector[0], node->vector[1], node->vector[3]);
+                node->vector[0], node->vector[1], node->vector[2]);
             break;
         default: break;
         }

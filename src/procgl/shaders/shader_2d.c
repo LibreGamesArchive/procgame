@@ -6,6 +6,7 @@
 #include "procgl/heightmap.h"
 #include "procgl/texture.h"
 #include "procgl/viewer.h"
+#include "procgl/model.h"
 #include "procgl/shader.h"
 
 #ifdef PROCGL_STATIC_SHADERS
@@ -20,23 +21,6 @@ struct data_2d {
         GLint pos, color, tex_coord, tex_weight;
     } attribs;
 };
-
-static void buffer_attribs(struct pg_shader* shader)
-{
-    struct data_2d* d = shader->data;
-    glVertexAttribPointer(d->attribs.pos, 2, GL_FLOAT, GL_FALSE,
-                          sizeof(struct pg_vert2d), 0);
-    glVertexAttribPointer(d->attribs.tex_coord, 2, GL_FLOAT, GL_FALSE,
-                          sizeof(struct pg_vert2d), (void*)(2 * sizeof(float)));
-    glVertexAttribPointer(d->attribs.color, 4, GL_UNSIGNED_BYTE, GL_TRUE,
-                          sizeof(struct pg_vert2d), (void*)(4 * sizeof(float)));
-    glVertexAttribPointer(d->attribs.tex_weight, 1, GL_FLOAT, GL_FALSE,
-                          sizeof(struct pg_vert2d), (void*)(4 * sizeof(float) + 4 * sizeof(uint8_t)));
-    glEnableVertexAttribArray(d->attribs.pos);
-    glEnableVertexAttribArray(d->attribs.tex_coord);
-    glEnableVertexAttribArray(d->attribs.color);
-    glEnableVertexAttribArray(d->attribs.tex_weight);
-}
 
 static void begin(struct pg_shader* shader, struct pg_viewer* view)
 {
@@ -66,7 +50,6 @@ int pg_shader_2d(struct pg_shader* shader)
     d->attribs.tex_weight = glGetAttribLocation(shader->prog, "v_tex_weight");
     shader->data = d;
     shader->deinit = free;
-    shader->buffer_attribs = buffer_attribs;
     shader->begin = begin;
     return 1;
 }
