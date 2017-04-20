@@ -1,3 +1,7 @@
+#include <GL/glew.h>
+
+struct pg_sdf_tree;
+
 enum pg_model_component {
     PG_MODEL_COMPONENT_POSITION =   (1 << 0),
     PG_MODEL_COMPONENT_COLOR =      (1 << 1),
@@ -25,7 +29,7 @@ enum pg_model_component_i {
 struct pg_vertex_full {
     uint32_t components;
     vec3 pos;
-    vec3 color;
+    vec4 color;
     vec2 uv;
     vec3 normal;
     vec3 tangent, bitangent;
@@ -102,3 +106,5 @@ void pg_model_cone(struct pg_model* model, int n, float base,
 void pg_model_cone_trunc(struct pg_model* model, int n, float t, vec3 warp,
                          vec2 tex_scale, int tex_style);
 void pg_model_icosphere(struct pg_model* model, int n);
+/*  Generate a model from an SDF tree   marching_cubes.c    */
+void pg_model_sdf(struct pg_model* model, struct pg_sdf_tree* sdf, float p);
