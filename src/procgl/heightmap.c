@@ -1,5 +1,6 @@
 #include <stdlib.h>
 #include <math.h>
+#include "ext/linmath.h"
 #include "wave.h"
 #include "heightmap.h"
 
@@ -27,16 +28,24 @@ void pg_heightmap_from_wave(struct pg_heightmap* hmap, struct pg_wave* wave,
     }
 }
 
-float pg_heightmap_get_height(struct pg_heightmap* hmap, float x, float y)
+float pg_heightmap_get_height(struct pg_heightmap* hmap, int x, int y)
+{
+    if(x < 0 || x >= hmap->w) x = MOD(x, hmap->w);
+    if(y < 0 || y >= hmap->h) y = MOD(y, hmap->h);
+    return hmap->map[x + y * hmap->w];
+}
+
+float pg_heightmap_get_height_lerp(struct pg_heightmap* hmap, float x, float y)
 {
     if(x < 0 || x >= hmap->w || y < 0 || y >= hmap->h) return 0;
+
     float xf, yf, xi, yi;
     xf = modff(x, &xi);
     yf = modff(y, &yi);
-    float tl = hmap->map[(int)xi + (int)yi * hmap->w];
-    float tr = hmap->map[(int)(xi + 1) + (int)yi * hmap->w];
-    float bl = hmap->map[(int)xi + (int)(yi + 1) * hmap->w];
-    float br = hmap->map[(int)(xi + 1) + (int)(yi + 1) * hmap->w];
+    float tl = pg_heightmap_get_height(hmap, xi, yi);
+    float tr = pg_heightmap_get_height(hmap, xi + 1, yi);
+    float bl = pg_heightmap_get_height(hmap, xi, yi + 1);
+    float br = pg_heightmap_get_height(hmap, xi + 1, yi + 1);
     float l0 = tl + xf * (tr - tl);
     float l1 = bl + xf * (br - bl);
     return l0 + yf * (l1 - l0);
