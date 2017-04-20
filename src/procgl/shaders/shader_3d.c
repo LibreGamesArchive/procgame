@@ -22,9 +22,6 @@ struct data_3d {
     struct {
         GLint tex_unit, norm_unit;
     } unis;
-    struct {
-        GLint pos, normal, tangent, bitangent, tex_coord;
-    } attribs;
 };
 
 static void begin(struct pg_shader* shader, struct pg_viewer* view)
