@@ -1,7 +1,8 @@
 #include <stdio.h>
+#include <stdlib.h>
 #include <GL/glew.h>
 #include "procgl/ext/linmath.h"
-#include "procgl/vertex.h"
+#include "procgl/arr.h"
 #include "procgl/wave.h"
 #include "procgl/heightmap.h"
 #include "procgl/texture.h"

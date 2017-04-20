@@ -8,7 +8,6 @@
 #include "sdf.h"
 #include "texture.h"
 #include "viewer.h"
-#include "vertex.h"
 #include "model.h"
 #include "shader.h"
 #include "postproc.h"

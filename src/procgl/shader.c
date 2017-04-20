@@ -62,7 +62,9 @@ int pg_shader_load_static(struct pg_shader* shader,
                           const char* vert, int vert_len,
                           const char* frag, int frag_len)
 {
-    *shader = (struct pg_shader){ .mat_idx = { -1, -1, -1, -1, -1, -1 } };
+    *shader = (struct pg_shader){
+        .mat_idx = { -1, -1, -1, -1, -1, -1, -1 },
+        .component_idx = { -1, -1, -1, -1, -1, -1, -1, -1 } };
     return pg_compile_glsl_static(&shader->vert, &shader->frag, &shader->prog,
                                   vert, vert_len, frag, frag_len);
 }
