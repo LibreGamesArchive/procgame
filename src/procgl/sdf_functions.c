@@ -43,7 +43,7 @@ SDF_DEFINE_FUNC(func_ellipsoid)
 
 SDF_DEFINE_FUNC(func_sphere)
 {
-    vec4_set(out, p[0], p[1], p[2], vec3_len(p) - 1.0);
+    vec4_set(out, p[0], p[1], p[2], vec3_len(p) - (node->sphere));
 }
 
 SDF_DEFINE_FUNC(func_cylinder)
@@ -118,9 +118,14 @@ SDF_DEFINE_FUNC(func_matrix)
 SDF_DEFINE_FUNC(func_vector)
 {
     vec3 d;
-    vec3_sub(d, p, node->vector);
+    vec3_add(d, p, node->vector);
     vec4_set(out, node->vector[0], node->vector[1], node->vector[2],
         vec3_len(d) - 1.0);
+}
+
+SDF_DEFINE_FUNC(func_scalar)
+{
+    vec4_set(out, p[0], p[1], p[2], node->scalar);
 }
 
 /*  ----------------------------------------------
@@ -282,6 +287,7 @@ static void (*sample_func[PG_SDF_NODE_NULL])(const struct pg_sdf_tree* tree,
     [PG_SDF_NODE_WAVE] = func_wave,
     [PG_SDF_NODE_MATRIX] = func_matrix,
     [PG_SDF_NODE_VECTOR] = func_vector,
+    [PG_SDF_NODE_SCALAR] = func_scalar,
     [PG_SDF_NODE_TRANSFORM_MATRIX] = func_transform,
     [PG_SDF_NODE_ROTATE] = func_rotate,
     [PG_SDF_NODE_TRANSLATE] = func_translate,

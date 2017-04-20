@@ -1,3 +1,4 @@
+/src/procgl/sdf_keywords.gperf.c
 *.swp
 *.swo
 *.trace

@@ -15,6 +15,7 @@ enum pg_sdf_type {
     /*  Math structures */
     PG_SDF_NODE_MATRIX,
     PG_SDF_NODE_VECTOR,
+    PG_SDF_NODE_SCALAR,
     PG_SDF_NODE_STRUCTURES__,
     /*  Transformations */
     PG_SDF_NODE_TRANSFORM_MATRIX,
@@ -49,6 +50,7 @@ struct pg_sdf_node {
         /*  Math structures */
         mat4 matrix;
         vec3 vector;
+        float scalar;
         /*  Domain transformation function pointer  */
         void (*warp)(vec3, vec3);
         /*  Index of argument in arg list   */

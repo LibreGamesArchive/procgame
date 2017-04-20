@@ -84,8 +84,8 @@ struct pg_sdf_node* pg_sdf_node_child(const struct pg_sdf_tree* sdf,
 #define EAT_SPACES while(src_i < end && *src_i && isspace(*src_i)) ++src_i;
 #define READ_WORD do { \
         EAT_SPACES; \
-        for(i = 0; i < 32 && src_i < end && *src_i \
-                   && (isalnum(*src_i) || *src_i == '.') ; ++i) \
+        for(i = 0; i < 32 && src_i < end && *src_i && \
+            (isalnum(*src_i) || *src_i == '.' || *src_i == '-'); ++i) \
             tmp[i] = *(src_i++); \
         tmp[i] = '\0'; \
         if(src_i >= end) return end; \
@@ -119,7 +119,11 @@ struct pg_sdf_node* pg_sdf_node_child(const struct pg_sdf_tree* sdf,
                           tree_add_child(sdf, node_i, 1) }; \
         src_i = parse_node_recursive(sdf, child[0], src_i, end); \
         src_i = parse_node_recursive(sdf, child[1], src_i, end); \
-        return src_i; \
+        EAT_SPACES; \
+        if(*src_i != ')') { \
+            printf("procgl SDF parse error: unterminated node definition\n"); \
+        } \
+        return ++src_i; \
     } while(0)
 
 static const char* parse_node_recursive(struct pg_sdf_tree* sdf, int node_i,
@@ -142,18 +146,7 @@ static const char* parse_node_recursive(struct pg_sdf_tree* sdf, int node_i,
             return src_i;
         }
         *node = (struct pg_sdf_node){ .type = kw->type };
-        if(kw->type == PG_SDF_NODE_VECTOR) {
-            READ_FLOAT(node->vector[0]);
-            READ_FLOAT(node->vector[1]);
-            READ_FLOAT(node->vector[2]);
-            return src_i;
-        } else if(kw->type == PG_SDF_NODE_MATRIX) {
-            int j, k;
-            for(j = 0; j < 4; ++j) for(k = 0; k < 4; ++j) {
-                READ_FLOAT(node->matrix[j][k]);
-            }
-            return src_i;
-        } else if(kw->type < PG_SDF_NODE_PRIMITIVES__) {
+        if(kw->type < PG_SDF_NODE_PRIMITIVES__) {
             switch(kw->type) {
             case PG_SDF_NODE_PLANE:
                 READ_FLOAT(node->plane[0]);
@@ -198,9 +191,24 @@ static const char* parse_node_recursive(struct pg_sdf_tree* sdf, int node_i,
                 printf("procgl SDF parse error: unterminated node definition\n");
             }
             return ++src_i;
-        } else if(kw->type < PG_SDF_NODE_BOOLEANS__) {
-            RECURSE;
-            return src_i;
+        } else if(kw->type < PG_SDF_NODE_STRUCTURES__) {
+            if(kw->type == PG_SDF_NODE_SCALAR) {
+                READ_FLOAT(node->scalar);
+            } else if(kw->type == PG_SDF_NODE_VECTOR) {
+                READ_FLOAT(node->vector[0]);
+                READ_FLOAT(node->vector[1]);
+                READ_FLOAT(node->vector[2]);
+            } else if(kw->type == PG_SDF_NODE_MATRIX) {
+                int j, k;
+                for(j = 0; j < 4; ++j) for(k = 0; k < 4; ++j) {
+                    READ_FLOAT(node->matrix[j][k]);
+                }
+            }
+            EAT_SPACES;
+            if(*src_i != ')') {
+                printf("procgl SDF parse error: unterminated node definition\n");
+            }
+            return ++src_i;
         } else if(kw->type < PG_SDF_NODE_TRANSFORMS__) {
             if(kw->type == PG_SDF_NODE_WARP) {
                 EAT_SPACES;
@@ -210,7 +218,8 @@ static const char* parse_node_recursive(struct pg_sdf_tree* sdf, int node_i,
                 READ_FLOAT(node->blend);
             }
             RECURSE;
-            return src_i;
+        } else if(kw->type < PG_SDF_NODE_BOOLEANS__) {
+            RECURSE;
         }
         EAT_SPACES;
         if(*src_i != ')') {
