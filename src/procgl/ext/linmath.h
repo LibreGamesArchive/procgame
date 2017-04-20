@@ -1,3 +1,8 @@
+/*  Linear math library originally by github user datenwolf, under the
+    Do What The Fuck You Want To Public License.A
+
+    I have also added some more functions myself for procgame   */
+
 #ifndef LINMATH_H
 #define LINMATH_H
 
@@ -10,6 +15,9 @@
 #endif
 #ifndef MIN
 #define MIN(a, b)   ((a) < (b) ? (a) : (b))
+#endif
+#ifndef MOD
+#define MOD(a, b) ((a) % (b) < 0 ? ((a) % (b)) + b : (a) % (b))
 #endif
 
 #define SATURATE(x) clamp(x, 0, 1)
