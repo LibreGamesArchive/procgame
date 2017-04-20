@@ -16,6 +16,10 @@ struct pg_texture {
     int frame_h, frame_w;
 };
 
+struct pg_texture_cube {
+    struct pg_texture* tex[6];
+};
+
 void pg_texture_init_from_file(struct pg_texture* tex, const char* diffuse_file,
                                const char* light_file);
 void pg_texture_init(struct pg_texture* tex, int w, int h);

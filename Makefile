@@ -19,8 +19,8 @@ TARGET := procgame
 GAME := obj/game_state.o obj/game_fps.o
 PROCGL := obj/procgl_base.o \
  obj/viewer.o obj/postproc.o obj/shader.o obj/gbuffer.o \
- obj/model.o obj/model_prims.o \
- obj/shader_2d.o obj/shader_3d.o obj/shader_text.o \
+ obj/model.o obj/model_prims.o obj/marching_cubes.o \
+ obj/shader_2d.o obj/shader_3d.o obj/shader_cubetex.o obj/shader_text.o \
  obj/wave.o obj/heightmap.o obj/texture.o obj/audio.o \
  obj/sdf.o obj/sdf_functions.o
 PROCGL_LIBS := obj/lodepng.o obj/noise1234.o obj/wavfile.o
@@ -72,12 +72,12 @@ obj/gbuffer.o: src/procgl/gbuffer.c src/procgl/ext/linmath.h \
  src/procgl/texture.h src/procgl/viewer.h src/procgl/shader.h \
  src/procgl/gbuffer.h
 	$(CC) $(CFLAGS) -o obj/gbuffer.o -c src/procgl/gbuffer.c $(INCLUDES)
-obj/model.o: src/procgl/model.c src/procgl/ext/linmath.h src/procgl/vertex.h \
+obj/model.o: src/procgl/model.c src/procgl/ext/linmath.h  \
  src/procgl/arr.h src/procgl/viewer.h src/procgl/shader.h src/procgl/model.h \
  src/procgl/wave.h src/procgl/heightmap.h src/procgl/texture.h
 	$(CC) $(CFLAGS) -o obj/model.o -c src/procgl/model.c $(INCLUDES)
 obj/model_prims.o: src/procgl/model_prims.c src/procgl/ext/linmath.h \
- src/procgl/vertex.h src/procgl/arr.h src/procgl/viewer.h src/procgl/shader.h \
+  src/procgl/arr.h src/procgl/viewer.h src/procgl/shader.h \
  src/procgl/model.h src/procgl/wave.h src/procgl/heightmap.h src/procgl/texture.h
 	$(CC) $(CFLAGS) -o obj/model_prims.o -c src/procgl/model_prims.c $(INCLUDES)
 obj/heightmap.o: src/procgl/heightmap.c src/procgl/heightmap.h \
@@ -88,13 +88,17 @@ obj/texture.o: src/procgl/texture.c src/procgl/ext/noise1234.h \
  src/procgl/heightmap.h src/procgl/wave.h
 	$(CC) $(CFLAGS) -o obj/texture.o -c src/procgl/texture.c $(INCLUDES)
 obj/shader_2d.o: src/procgl/shaders/shader_2d.c src/procgl/ext/linmath.h \
- src/procgl/vertex.h src/procgl/viewer.h src/procgl/shader.h \
+ src/procgl/viewer.h src/procgl/shader.h \
  src/procgl/wave.h src/procgl/heightmap.h src/procgl/texture.h
 	$(CC) $(CFLAGS) -o obj/shader_2d.o -c src/procgl/shaders/shader_2d.c $(INCLUDES)
 obj/shader_3d.o: src/procgl/shaders/shader_3d.c src/procgl/ext/linmath.h \
- src/procgl/vertex.h src/procgl/viewer.h src/procgl/shader.h \
+ src/procgl/viewer.h src/procgl/shader.h \
  src/procgl/wave.h src/procgl/heightmap.h src/procgl/texture.h
 	$(CC) $(CFLAGS) -o obj/shader_3d.o -c src/procgl/shaders/shader_3d.c $(INCLUDES)
+obj/shader_cubetex.o: src/procgl/shaders/shader_cubetex.c \
+ src/procgl/ext/linmath.h src/procgl/viewer.h src/procgl/shader.h \
+ src/procgl/wave.h src/procgl/heightmap.h src/procgl/texture.h
+	$(CC) $(CFLAGS) -o obj/shader_cubetex.o -c src/procgl/shaders/shader_cubetex.c $(INCLUDES)
 obj/shader_text.o: src/procgl/shaders/shader_text.c src/procgl/ext/linmath.h \
  src/procgl/viewer.h src/procgl/shader.h src/procgl/procgl_base.h \
  src/procgl/wave.h src/procgl/heightmap.h src/procgl/texture.h
@@ -113,6 +117,9 @@ obj/sdf.o: src/procgl/sdf.c src/procgl/sdf.h \
 obj/sdf_functions.o: src/procgl/sdf_functions.c src/procgl/sdf.h \
  src/procgl/wave.h src/procgl/arr.h
 	$(CC) $(CFLAGS) -o obj/sdf_functions.o -c src/procgl/sdf_functions.c $(INCLUDES)
+obj/marching_cubes.o: src/procgl/marching_cubes.c src/procgl/sdf.h \
+ src/procgl/arr.h src/procgl/ext/linmath.h src/procgl/model.h
+	$(CC) $(CFLAGS) -o obj/marching_cubes.o -c src/procgl/marching_cubes.c $(INCLUDES)
 
 obj/lodepng.o: src/procgl/ext/lodepng.c src/procgl/ext/lodepng.h
 	$(CC) $(CFLAGS) -o obj/lodepng.o -c src/procgl/ext/lodepng.c $(INCLUDES)
@@ -129,6 +136,8 @@ dump_shaders: src/procgl/shaders/*.glsl
     xxd -i 2d_frag.glsl >> 2d.glsl.h && \
     xxd -i 3d_vert.glsl >> 3d.glsl.h && \
     xxd -i 3d_frag.glsl >> 3d.glsl.h && \
+    xxd -i cubetex_vert.glsl >> cubetex.glsl.h && \
+    xxd -i cubetex_frag.glsl >> cubetex.glsl.h && \
     xxd -i deferred_vert.glsl >> deferred.glsl.h && \
     xxd -i deferred_frag.glsl >> deferred.glsl.h && \
     xxd -i screen_vert.glsl >> deferred.glsl.h && \
