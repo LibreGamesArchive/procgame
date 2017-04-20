@@ -2,7 +2,6 @@
 #include <GL/glew.h>
 #include "ext/linmath.h"
 #include "arr.h"
-#include "vertex.h"
 #include "viewer.h"
 #include "model.h"
 #include "shader.h"
@@ -111,32 +110,40 @@ void pg_model_draw(struct pg_model* model, mat4 transform)
 /*  Raw vertex/triangle building    */
 void pg_model_reserve_verts(struct pg_model* model, unsigned count)
 {
+    model->v_count = count;
     if(model->components & PG_MODEL_COMPONENT_POSITION) {
         ARR_RESERVE(model->pos, count);
+        ARR_TRUNCATE_CLEAR(model->pos, model->pos.len);
         model->pos.len = count;
     }
     if(model->components & PG_MODEL_COMPONENT_COLOR) {
         ARR_RESERVE(model->color, count);
+        ARR_TRUNCATE_CLEAR(model->color, model->color.len);
         model->color.len = count;
     }
     if(model->components & PG_MODEL_COMPONENT_UV) {
         ARR_RESERVE(model->uv, count);
+        ARR_TRUNCATE_CLEAR(model->uv, model->uv.len);
         model->uv.len = count;
     }
     if(model->components & PG_MODEL_COMPONENT_NORMAL) {
         ARR_RESERVE(model->normal, count);
+        ARR_TRUNCATE_CLEAR(model->normal, model->normal.len);
         model->normal.len = count;
     }
     if(model->components & PG_MODEL_COMPONENT_TANGENT) {
         ARR_RESERVE(model->tangent, count);
+        ARR_TRUNCATE_CLEAR(model->tangent, model->tangent.len);
         model->tangent.len = count;
     }
     if(model->components & PG_MODEL_COMPONENT_BITANGENT) {
         ARR_RESERVE(model->bitangent, count);
+        ARR_TRUNCATE_CLEAR(model->bitangent, model->bitangent.len);
         model->bitangent.len = count;
     }
     if(model->components & PG_MODEL_COMPONENT_HEIGHT) {
         ARR_RESERVE(model->height, count);
+        ARR_TRUNCATE_CLEAR(model->height, model->height.len);
         model->height.len = count;
     }
 }
@@ -273,7 +280,7 @@ void pg_model_append(struct pg_model* dst, struct pg_model* src,
         vec4_normalize(new_bitan, new_bitan);
         v = (struct pg_vertex_full) {
             .pos = { new[0], new[1], new[2] },
-            .color = { v.color[0], v.color[1], v.color[2] },
+            .color = { v.color[0], v.color[1], v.color[2], v.color[3] },
             .uv = { v.uv[0], v.uv[1] },
             .normal = { new_norm[0], new_norm[1], new_norm[2] },
             .tangent = { new_tan[0], new_tan[1], new_tan[2] },
@@ -315,7 +322,7 @@ void pg_model_transform(struct pg_model* model, mat4 transform)
         vec4_normalize(new_bitan, new_bitan);
         v = (struct pg_vertex_full) { model->components,
             .pos = { new[0], new[1], new[2] },
-            .color = { v.color[0], v.color[1], v.color[2] },
+            .color = { v.color[0], v.color[1], v.color[2], v.color[3] },
             .uv = { v.uv[0], v.uv[1] },
             .normal = { new_norm[0], new_norm[1], new_norm[2] },
             .tangent = { new_tan[0], new_tan[1], new_tan[2] },
