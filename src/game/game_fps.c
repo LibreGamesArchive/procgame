@@ -245,13 +245,14 @@ static void fps_game_generate_assets(struct fps_game_data* d)
     pg_model_transform(&d->assets.test_cyl, transform);
     pg_shader_buffer_model(&d->rend.shader_3d, &d->assets.test_cyl);
     /*  Generating the SDF tree */
-    char sdf_src[] =
+    char sdf_src[] = "(SPHERE 0.8)";
+    /*char sdf_src[] =
     "(threshold (scalar -0.0) (subtract (subtract (SPHERE 0.8) (SPHERE 0.6))"
-    "           (translate (vector 0 0 -1) (BOX 1 1 1))))";
+    "           (translate (vector 0 0 -1) (BOX 1 1 1))))"; */
     pg_sdf_tree_init(&d->assets.test_sdf);
     pg_sdf_tree_parse(&d->assets.test_sdf, sdf_src, sizeof(sdf_src));
     pg_model_init(&d->assets.test_obj);
-    pg_model_sdf(&d->assets.test_obj, &d->assets.test_sdf, 0.04);
+    pg_model_sdf(&d->assets.test_obj, &d->assets.test_sdf, 0.16);
     pg_model_precalc_normals(&d->assets.test_obj);
     pg_model_blend_duplicates(&d->assets.test_obj, 1.5);
     pg_shader_buffer_model(&d->rend.shader_cubetex, &d->assets.test_obj);
@@ -259,7 +260,8 @@ static void fps_game_generate_assets(struct fps_game_data* d)
     fps_game_generate_floor_texture(&d->assets.floor_tex);
     struct pg_texture_cube cubetex = { {
         &d->assets.floor_tex, &d->assets.floor_tex, &d->assets.floor_tex,
-        &d->assets.floor_tex, &d->assets.floor_tex, &d->assets.floor_tex }};
+        &d->assets.floor_tex, &d->assets.floor_tex, &d->assets.floor_tex },
+        { {1, 1}, {4, 4}, {1, 1}, {4, 4}, {1, 1}, {4, 4} } };
     pg_shader_cubetex_set_texture(&d->rend.shader_cubetex, &cubetex);
     mat4_identity(transform);
     //fps_game_floor_texture_sdf(&d->assets.floor_tex, &d->assets.test_sdf, transform);

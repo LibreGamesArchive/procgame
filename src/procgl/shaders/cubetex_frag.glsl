@@ -14,6 +14,8 @@ uniform sampler2D norm_right;
 uniform sampler2D norm_top;
 uniform sampler2D norm_bottom;
 
+uniform vec2 tex_scale[6];
+
 /*  Distance from the viewer    */
 in float f_depth;
 in vec3 f_mpos;
@@ -35,24 +37,23 @@ void main()
     vec4 tex_c0, tex_c1, tex_c2;
     vec4 norm_c0, norm_c1, norm_c2;
     /*  Get the diffuse texture samples */
-    if(f_normal.y < 0) tex_c0 = texture(tex_front, f_mpos.xz);
-    else tex_c0 = texture(tex_back, f_mpos.xz);
-    if(f_normal.z < 0) tex_c1 = texture(tex_bottom, f_mpos.xy);
-    else tex_c1 = texture(tex_top, f_mpos.xy);
-    if(f_normal.x < 0) tex_c2 = texture(tex_left, f_mpos.yz);
-    else tex_c2 = texture(tex_right, f_mpos.yz);
+    if(f_normal.y < 0) tex_c0 = texture(tex_front, f_mpos.xz * tex_scale[0]);
+    else tex_c0 = texture(tex_back, f_mpos.xz * tex_scale[1]);
+    if(f_normal.z < 0) tex_c1 = texture(tex_bottom, f_mpos.xy * tex_scale[2]);
+    else tex_c1 = texture(tex_top, f_mpos.xy * tex_scale[3]);
+    if(f_normal.x < 0) tex_c2 = texture(tex_left, f_mpos.yz * tex_scale[4]);
+    else tex_c2 = texture(tex_right, f_mpos.yz * tex_scale[5]);
     /*  Get the normal texture samples  */
-    if(f_normal.y < 0) norm_c0 = texture(norm_front, f_mpos.xz);
-    else norm_c0 = texture(norm_back, f_mpos.xz);
-    if(f_normal.z < 0) norm_c1 = texture(norm_top, f_mpos.xy);
-    else norm_c1 = texture(norm_bottom, f_mpos.xy);
-    if(f_normal.x < 0) norm_c2 = texture(norm_left, f_mpos.yz);
-    else norm_c2 = texture(norm_right, f_mpos.yz);
+    if(f_normal.y < 0) norm_c0 = texture(norm_front, f_mpos.xz * tex_scale[0]);
+    else norm_c0 = texture(norm_back, f_mpos.xz * tex_scale[1]);
+    if(f_normal.z < 0) norm_c1 = texture(norm_top, f_mpos.xy * tex_scale[2]);
+    else norm_c1 = texture(norm_bottom, f_mpos.xy * tex_scale[3]);
+    if(f_normal.x < 0) norm_c2 = texture(norm_left, f_mpos.yz * tex_scale[4]);
+    else norm_c2 = texture(norm_right, f_mpos.yz * tex_scale[5]);
     /*  Blend them based on the vertex normals  */
     vec4 tex_blend = tex_c0 * f_blend.x +
                      tex_c1 * f_blend.y +
                      tex_c2 * f_blend.z;
-    if(tex_blend.a < 0.5) discard;
     vec4 norm_blend = norm_c0 * f_blend.x +
                       norm_c1 * f_blend.y +
                       norm_c2 * f_blend.z;

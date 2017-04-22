@@ -18,6 +18,7 @@ struct pg_texture {
 
 struct pg_texture_cube {
     struct pg_texture* tex[6];
+    vec2 scale[6];
 };
 
 void pg_texture_init_from_file(struct pg_texture* tex, const char* diffuse_file,

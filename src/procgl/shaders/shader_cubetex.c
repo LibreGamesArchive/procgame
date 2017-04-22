@@ -19,10 +19,14 @@ struct data_cubetex {
     struct {
         GLint tex_front, tex_back, tex_left, tex_right, tex_top, tex_bottom;
         GLint norm_front, norm_back, norm_left, norm_right, norm_top, norm_bottom;
+        vec2 tex_scale[6];
+        float blend_sharpness;
     } state;
     struct {
         GLint tex_front, tex_back, tex_left, tex_right, tex_top, tex_bottom;
         GLint norm_front, norm_back, norm_left, norm_right, norm_top, norm_bottom;
+        GLint tex_scale;
+        GLint blend_sharpness;
     } unis;
 };
 
@@ -35,6 +39,7 @@ static void begin(struct pg_shader* shader, struct pg_viewer* view)
     pg_shader_set_matrix(shader, PG_VIEW_MATRIX, view->view_matrix);
     pg_shader_set_matrix(shader, PG_PROJECTION_MATRIX, view->proj_matrix);
     pg_shader_set_matrix(shader, PG_PROJECTIONVIEW_MATRIX, projview);
+    glUniform1f(d->unis.blend_sharpness, d->state.blend_sharpness);
     /*  Set the uniforms    */
     if(d->tex_dirty) {
         glUniform1i(d->unis.tex_front, d->state.tex_front);
@@ -49,6 +54,7 @@ static void begin(struct pg_shader* shader, struct pg_viewer* view)
         glUniform1i(d->unis.norm_right, d->state.norm_right);
         glUniform1i(d->unis.norm_top, d->state.norm_top);
         glUniform1i(d->unis.norm_bottom, d->state.norm_bottom);
+        glUniform2fv(d->unis.tex_scale, 6, d->state.tex_scale);
         d->tex_dirty = 0;
     }
     /*  Enable depth testing    */
@@ -90,7 +96,10 @@ int pg_shader_cubetex(struct pg_shader* shader)
     d->unis.norm_right = glGetUniformLocation(shader->prog, "norm_right");
     d->unis.norm_top = glGetUniformLocation(shader->prog, "norm_top");
     d->unis.norm_bottom = glGetUniformLocation(shader->prog, "norm_bottom");
+    d->unis.blend_sharpness = glGetUniformLocation(shader->prog, "blend_sharpness");
+    d->unis.tex_scale = glGetUniformLocation(shader->prog, "tex_scale");
     d->tex_dirty = 1;
+    d->state.blend_sharpness = 4;
     shader->data = d;
     shader->deinit = free;
     shader->begin = begin;
@@ -115,6 +124,10 @@ void pg_shader_cubetex_set_texture(struct pg_shader* shader,
     d->state.norm_right = tex_cube->tex[3]->light_slot;
     d->state.norm_top = tex_cube->tex[4]->light_slot;
     d->state.norm_bottom = tex_cube->tex[5]->light_slot;
+    int i;
+    for(i = 0; i < 6; ++i) {
+        vec2_dup(d->state.tex_scale[i], tex_cube->scale[i]);
+    }
     if(pg_shader_is_active(shader)) {
         glUniform1i(d->unis.tex_front, d->state.tex_front);
         glUniform1i(d->unis.tex_back, d->state.tex_back);
@@ -131,3 +144,11 @@ void pg_shader_cubetex_set_texture(struct pg_shader* shader,
     }
 }
 
+void pg_shader_cubetex_blend_sharpness(struct pg_shader* shader, float k)
+{
+    struct data_cubetex* d = shader->data;
+    d->state.blend_sharpness = k;
+    if(pg_shader_is_active(shader)) {
+        glUniform1f(d->unis.blend_sharpness, d->state.blend_sharpness);
+    }
+}

@@ -13,3 +13,4 @@ void pg_shader_3d_set_texture(struct pg_shader* shader, struct pg_texture* tex);
 int pg_shader_cubetex(struct pg_shader* shader);
 void pg_shader_cubetex_set_texture(struct pg_shader* shader,
                                    struct pg_texture_cube* tex);
+void pg_shader_cubetex_blend_sharpness(struct pg_shader* shader, float k);

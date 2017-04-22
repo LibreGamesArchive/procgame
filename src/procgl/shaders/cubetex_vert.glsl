@@ -6,6 +6,8 @@ uniform mat4 proj_matrix;
 uniform mat4 view_matrix;
 uniform mat4 projview_matrix;
 
+uniform float blend_sharpness;
+
 in vec3 v_position;
 in vec3 v_normal;
 in vec4 v_color;
@@ -31,7 +33,7 @@ void main()
     f_bitangent = vec3(0, 1, 0) * f_normal.x +
                   vec3(0, 0, 1) * f_normal.y +
                   vec3(0, 1, 0) * f_normal.z;
-    f_blend = abs(f_normal).yzx;
+    f_blend = pow(abs(f_normal).yzx, vec3(blend_sharpness, blend_sharpness, blend_sharpness));
     f_blend /= (f_blend.x + f_blend.y + f_blend.z);
 }
 
