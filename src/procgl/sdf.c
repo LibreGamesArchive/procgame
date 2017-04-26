@@ -214,11 +214,12 @@ static const char* parse_node_recursive(struct pg_sdf_tree* sdf, int node_i,
                 EAT_SPACES;
                 READ_WORD;
                 /*  Get warp function name  */
-            } else if(kw->type == PG_SDF_NODE_THRESHOLD) {
-                READ_FLOAT(node->blend);
             }
             RECURSE;
         } else if(kw->type < PG_SDF_NODE_BOOLEANS__) {
+            if(kw->type == PG_SDF_NODE_BLEND) {
+                READ_FLOAT(node->blend);
+            }
             RECURSE;
         }
         EAT_SPACES;

@@ -310,24 +310,17 @@ void pg_model_transform(struct pg_model* model, mat4 transform)
         mat4_invert(inv, transform);
         mat4 norm;
         mat4_transpose(norm, inv);
-        vec4 old_norm = { v.normal[0], v.normal[1], v.normal[2], 0.0f };
-        vec4 old_tan = { v.tangent[0], v.tangent[1], v.tangent[2], 0.0f };
-        vec4 old_bitan = { v.bitangent[0], v.bitangent[1], v.bitangent[2], 0.0f };
+        vec4 old_norm = { v.normal[0], v.normal[1], v.normal[2], 1.0f };
+        vec4 old_tan = { v.tangent[0], v.tangent[1], v.tangent[2], 1.0f };
+        vec4 old_bitan = { v.bitangent[0], v.bitangent[1], v.bitangent[2], 1.0f };
         vec4 new_norm, new_tan, new_bitan;
         mat4_mul_vec4(new_norm, norm, old_norm);
         mat4_mul_vec4(new_tan, norm, old_tan);
         mat4_mul_vec4(new_bitan, norm, old_bitan);
-        vec4_normalize(new_norm, new_norm);
-        vec4_normalize(new_tan, new_tan);
-        vec4_normalize(new_bitan, new_bitan);
-        v = (struct pg_vertex_full) { model->components,
-            .pos = { new[0], new[1], new[2] },
-            .color = { v.color[0], v.color[1], v.color[2], v.color[3] },
-            .uv = { v.uv[0], v.uv[1] },
-            .normal = { new_norm[0], new_norm[1], new_norm[2] },
-            .tangent = { new_tan[0], new_tan[1], new_tan[2] },
-            .bitangent = { new_bitan[0], new_bitan[1], new_bitan[2] },
-            .height = v.height };
+        vec3_normalize(v.normal, new_norm);
+        vec3_normalize(v.tangent, new_tan);
+        vec3_normalize(v.bitangent, new_bitan);
+        vec3_dup(v.pos, new);
         pg_model_set_vertex(model, &v, i);
     }
 }

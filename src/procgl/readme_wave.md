@@ -112,11 +112,11 @@ The available modifiers and their parameters are:
         a 2d noise function, and for 2d, x is mapped to a circle on XY, and
         y is mapped to a circle on the ZW plane of a 4d noise function.
 * `PG_WAVE_MOD_MIX_FUNC`
-    * `mix`, a function pointer with the signature float(float,float)
+    * `mix`, a function pointer with the signature `float(float,float)`
 * `PG_WAVE_MOD_DISTORT`
     * `dist_v` a vec4 used to modulate the distortion
     * `distort` a function pointer with the signature
-        void(vec4 out, vec4 in, vec4 dist_v)
+        `void(vec4 out, vec4 in, vec4 dist_v)`
 
 TODO: add spherical, cylindrical, and cubic mappings.
 
