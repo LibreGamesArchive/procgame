@@ -1,53 +1,70 @@
-/*  A wave handling API
-    -------------------
-    A struct pg_wave can be in one of two states: a wave function, or waveform data.
-    As a wave function, its `func` member points to a function taking a float
-    and returning a float. As waveform data, its `samples` member will be
-    `num_samples` elements long.
-    The interface to wave functions and waveform data is identical. Both can be
-    repeated at any given frequency, used as samples for other waves, or
-    encoded to ints, in exactly the same way. To copy waveform data sample-for-
-    sample, then, only provide a frequency of 1.  */
 
 #include <stdarg.h>
 
+/*  Built-in wave definitions are in wave_defs.h    */
+
 struct pg_wave {
-    int dim;
-    float frequency[4];
-    float phase[4];
-    float scale;
-    float add;
-    enum { WAVE_CONSTANT, WAVE_FUNCTION, WAVE_FUNCTION_STATE, WAVE_COMPOSITE } type;
+    enum {
+        PG_WAVE_CONSTANT,
+        PG_WAVE_FUNCTION,
+        PG_WAVE_ARRAY,
+        PG_WAVE_MODIFIER } type;
     union {
+        float constant;
         struct {
+            unsigned dimension_mask;
             float (*func1)(float);
             float (*func2)(float, float);
             float (*func3)(float, float, float);
             float (*func4)(float, float, float, float);
+            float frequency[4];
+            float phase[4];
+            float scale;
+            float add;
         };
         struct {
-            void* state;
-            float (*func1_s)(void*, float);
-            float (*func2_s)(void*, float, float);
-            float (*func3_s)(void*, float, float, float);
-            float (*func4_s)(void*, float, float, float, float);
+            struct pg_wave* arr;
+            unsigned len;
         };
         struct {
-            struct pg_wave* comp0;
-            struct pg_wave* comp1;
-            float influence;
-            float (*mix)(float,float,float);
+            enum {
+                PG_WAVE_MOD_EXPAND,
+                PG_WAVE_MOD_OCTAVES,
+                PG_WAVE_MOD_SEAMLESS_1D,
+                PG_WAVE_MOD_SEAMLESS_2D,
+                PG_WAVE_MOD_MIX_FUNC,
+                PG_WAVE_MOD_DISTORT
+            } mod;
+            struct {
+                enum {
+                    PG_WAVE_EXPAND_ADD,
+                    PG_WAVE_EXPAND_SUB,
+                    PG_WAVE_EXPAND_MUL,
+                    PG_WAVE_EXPAND_DIV,
+                    PG_WAVE_EXPAND_AVG
+                } op;
+                enum {
+                    PG_WAVE_EXPAND_BEFORE,
+                    PG_WAVE_EXPAND_AFTER,
+                } mode;
+            };
+            union {
+                struct {
+                    int octaves;
+                    float ratio;
+                    float decay;
+                };
+                struct {
+                    vec4 dist_v;
+                    void (*distort)(vec4 out, vec4 in, vec4 dist_v);
+                };
+                float (*mix)(float a, float b);
+            };
         };
     };
 };
 
-float pg_wave_sample(struct pg_wave* wave, int d, ...);
+#define PG_WAVE_ARRAY(w, l) \
+    ((struct pg_wave){ .type = PG_WAVE_ARRAY, .arr = (w), .len = (l) })
 
-void pg_wave_composite(struct pg_wave* wave,
-                    struct pg_wave* comp0, struct pg_wave* comp1,
-                    float influence, float (*mix)(float, float, float));
-void pg_wave_init_sine(struct pg_wave* wave);
-void pg_wave_init_perlin(struct pg_wave* wave);
-void pg_wave_deinit(struct pg_wave* wave);
-
-float pg_wave_mix_add(float a, float b, float x);
+float pg_wave_sample(struct pg_wave* wave, int d, vec4 p);

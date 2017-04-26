@@ -22,8 +22,8 @@ void pg_heightmap_from_wave(struct pg_heightmap* hmap, struct pg_wave* wave,
     int x, y;
     for(x = 0; x < hmap->w; ++x) {
         for(y = 0; y < hmap->h; ++y) {
-            hmap->map[x + y * hmap->w] =
-                pg_wave_sample(wave, 2, x * fx, y * fy);
+            vec2 p = { (float)x / hmap->w * fx, (float)y / hmap->h * fy };
+            hmap->map[x + y * hmap->w] = pg_wave_sample(wave, 2, p);
         }
     }
 }

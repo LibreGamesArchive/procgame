@@ -1,5 +1,6 @@
 #include <GL/glew.h>
 #include <SDL2/SDL.h>
+#include "ext/linmath.h"
 #include "wave.h"
 #include "audio.h"
 #include "procgl_base.h"

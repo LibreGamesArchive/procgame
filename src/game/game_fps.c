@@ -1,7 +1,7 @@
 #include <stdlib.h>
 #include <limits.h>
 #include "procgl/procgl.h"
-#include "procgl/ext/noise1234.h"
+#include "procgl/wave_defs.h"
 
 struct fps_game_renderer {
     struct pg_viewer view;
@@ -134,17 +134,8 @@ static void fps_game_draw(struct pg_game_state* state)
     /*  Lighting    */
     pg_gbuffer_begin_light(&d->rend.gbuf, &d->rend.view);
     pg_gbuffer_draw_light(&d->rend.gbuf,
-        (vec4){ -1, -1, 2, 2.5 },
-        (vec3){ 1, 0, 0 });
-    pg_gbuffer_draw_light(&d->rend.gbuf,
-        (vec4){ 1, -1, 2, 2.5 },
-        (vec3){ 0, 1, 0 });
-    pg_gbuffer_draw_light(&d->rend.gbuf,
-        (vec4){ -1, 1, 2, 2.5 },
-        (vec3){ 0, 0, 1 });
-    pg_gbuffer_draw_light(&d->rend.gbuf,
-        (vec4){ 1, 1, 2, 2.5 },
-        (vec3){ 1, 0, 1 });
+        (vec4){ -3, -3, 3, 7.5 },
+        (vec3){ 1, 1, 1 });
     pg_screen_dst();
     pg_gbuffer_finish(&d->rend.gbuf, (vec3){ 0.1, 0.1, 0.1 });
     /*  Overlay */
@@ -193,33 +184,30 @@ static void fps_game_floor_texture_sdf(struct pg_texture* tex,
 
 static void fps_game_generate_floor_texture(struct pg_texture* tex)
 {
+    /*  Define a wave function: this is two octaves of perlin noise with the
+        "seamless 2d" modifier, it should generate a vaguely rough sort of
+        rocky texture which repeats seamlessly in both directions.    */
+    struct pg_wave w[] = {
+        { PG_WAVE_MODIFIER, .mod = PG_WAVE_MOD_SEAMLESS_2D },
+        { PG_WAVE_MODIFIER, .mod = PG_WAVE_MOD_OCTAVES,
+            .octaves = 2, .ratio = 2, .decay = 0.5 },
+        PG_WAVE_PERLIN(.scale = 1)
+    };
     float h[128 * 128];
     struct pg_heightmap hmap = { .map = h, .w = 128, .h = 128 };
+    pg_heightmap_from_wave(&hmap, &PG_WAVE_ARRAY(w, 3), 1, 1);
     pg_texture_init(tex, 128, 128);
     pg_texture_bind(tex, 1, 2);
     int x, y;
     for(x = 0; x < 128; ++x) {
         for(y = 0; y < 128; ++y) {
-            float _x = fabs(x - 64);
-            float _y = fabs(y - 64);
-            float dist = (_x > _y) ? _x : _y;
-            float s = noise2(x / 8.0f, y / 8.0f) * 0.5 + 0.5;
-            float c = s * 32 + 150;
-            if(dist < 56) {
-                hmap.map[x + y * 128] = s;
-                pg_texel_set(tex->diffuse[x + y * 128], c, c, c, 255);
-                pg_texel_set(tex->light[x + y * 128], 0, 0, 0, s * 48 + 128);
-            } else {
-                float scale = 1 - ((dist - 56) / 8);
-                c *= scale * 0.5 + 0.5;
-                s *= scale;
-                hmap.map[x + y * 128] = s;
-                pg_texel_set(tex->diffuse[x + y * 128], c, c, c, 255);
-                pg_texel_set(tex->light[x + y * 128], 0, 0, 0, s * 48);
-            }
+            float h_ = h[x + y * 128] * 0.5 + 0.5;
+            pg_texel_set(tex->diffuse[x + y * 128],
+                h_ * 128 + 64, h_ * 64 + 32, h_ * 32 + 16, 255);
+            pg_texel_set(tex->light[x + y * 128], 0, 0, 0, 0);
         }
     }
-    pg_texture_generate_normals(tex, &hmap, 2);
+    pg_texture_generate_normals(tex, &hmap, 10);
     pg_texture_buffer(tex);
 }
 
@@ -261,7 +249,7 @@ static void fps_game_generate_assets(struct fps_game_data* d)
     struct pg_texture_cube cubetex = { {
         &d->assets.floor_tex, &d->assets.floor_tex, &d->assets.floor_tex,
         &d->assets.floor_tex, &d->assets.floor_tex, &d->assets.floor_tex },
-        { {1, 1}, {4, 4}, {1, 1}, {4, 4}, {1, 1}, {4, 4} } };
+        { {1, 1}, {1, 1}, {1, 1}, {1, 1}, {1, 1}, {1, 1} } };
     pg_shader_cubetex_set_texture(&d->rend.shader_cubetex, &cubetex);
     mat4_identity(transform);
     //fps_game_floor_texture_sdf(&d->assets.floor_tex, &d->assets.test_sdf, transform);

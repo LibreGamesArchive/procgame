@@ -134,7 +134,7 @@ float grad4( int hash, float x, float y, float z, float t ) {
 //---------------------------------------------------------------------
 /** 1D float Perlin noise, SL "noise()"
  */
-float noise1( float x )
+float perlin1( float x )
 {
     int ix0, ix1;
     float fx0, fx1;
@@ -156,7 +156,7 @@ float noise1( float x )
 //---------------------------------------------------------------------
 /** 1D float Perlin periodic noise, SL "pnoise()"
  */
-float pnoise1( float x, int px )
+float perlin1_p( float x, int px )
 {
     int ix0, ix1;
     float fx0, fx1;
@@ -179,7 +179,7 @@ float pnoise1( float x, int px )
 //---------------------------------------------------------------------
 /** 2D float Perlin noise.
  */
-float noise2( float x, float y )
+float perlin2( float x, float y )
 {
     int ix0, iy0, ix1, iy1;
     float fx0, fy0, fx1, fy1;
@@ -213,7 +213,7 @@ float noise2( float x, float y )
 //---------------------------------------------------------------------
 /** 2D float Perlin periodic noise.
  */
-float pnoise2( float x, float y, int px, int py )
+float perlin2_p( float x, float y, int px, int py )
 {
     int ix0, iy0, ix1, iy1;
     float fx0, fy0, fx1, fy1;
@@ -248,7 +248,7 @@ float pnoise2( float x, float y, int px, int py )
 //---------------------------------------------------------------------
 /** 3D float Perlin noise.
  */
-float noise3( float x, float y, float z )
+float perlin3( float x, float y, float z )
 {
     int ix0, iy0, ix1, iy1, iz0, iz1;
     float fx0, fy0, fz0, fx1, fy1, fz1;
@@ -301,7 +301,7 @@ float noise3( float x, float y, float z )
 //---------------------------------------------------------------------
 /** 3D float Perlin periodic noise.
  */
-float pnoise3( float x, float y, float z, int px, int py, int pz )
+float perlin3_p( float x, float y, float z, int px, int py, int pz )
 {
     int ix0, iy0, ix1, iy1, iz0, iz1;
     float fx0, fy0, fz0, fx1, fy1, fz1;
@@ -356,7 +356,7 @@ float pnoise3( float x, float y, float z, int px, int py, int pz )
 /** 4D float Perlin noise.
  */
 
-float noise4( float x, float y, float z, float w )
+float perlin4( float x, float y, float z, float w )
 {
     int ix0, iy0, iz0, iw0, ix1, iy1, iz1, iw1;
     float fx0, fy0, fz0, fw0, fx1, fy1, fz1, fw1;
@@ -440,7 +440,7 @@ float noise4( float x, float y, float z, float w )
 /** 4D float Perlin periodic noise.
  */
 
-float pnoise4( float x, float y, float z, float w,
+float perlin4_p( float x, float y, float z, float w,
                             int px, int py, int pz, int pw )
 {
     int ix0, iy0, iz0, iw0, ix1, iy1, iz1, iw1;

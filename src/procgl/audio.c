@@ -2,6 +2,7 @@
 #include <stdio.h>
 #include <string.h>
 #include <SDL2/SDL.h>
+#include "ext/linmath.h"
 #include "arr.h"
 #include "wave.h"
 #include "audio.h"
@@ -90,7 +91,7 @@ void pg_audio_generate(struct pg_audio_chunk* chunk, float len,
     float decay = env->max - env->sustain;
     int i;
     for(i = 0; i < s_len; ++i) {
-        float s = pg_wave_sample(w, 1, (float)i / PG_AUDIO_SAMPLE_RATE);
+        float s = pg_wave_sample(w, 1, (vec4){ (float)i / PG_AUDIO_SAMPLE_RATE });
         if(i < attack_time) {
             chunk->samples[i] = s * (i / attack_time) * env->max;
         } else if(i < decay_end) {
