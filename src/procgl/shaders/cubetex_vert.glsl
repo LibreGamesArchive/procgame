@@ -17,6 +17,7 @@ out vec3 f_mpos;
 out vec3 f_blend;
 out vec3 f_pos;
 out vec3 f_normal;
+out vec3 f_v_normal;
 out vec3 f_tangent;
 out vec3 f_bitangent;
 
@@ -27,13 +28,14 @@ void main()
     f_pos = vec3(model_matrix * vec4(v_position, 1.0));
     f_depth = length(view_matrix * model_matrix * vec4(v_position, 1.0));
     f_normal = mat3(normal_matrix) * v_normal;
-    f_tangent = vec3(0, 0, 1) * f_normal.x +
-                vec3(1, 0, 0) * f_normal.y +
-                vec3(1, 0, 0) * f_normal.z;
-    f_bitangent = vec3(0, 1, 0) * f_normal.x +
-                  vec3(0, 0, 1) * f_normal.y +
-                  vec3(0, 1, 0) * f_normal.z;
-    f_blend = pow(abs(f_normal).yzx, vec3(blend_sharpness, blend_sharpness, blend_sharpness));
+    f_v_normal = v_normal;
+    f_tangent = vec3(0, 0, 1) * v_normal.x +
+                vec3(1, 0, 0) * v_normal.y +
+                vec3(1, 0, 0) * v_normal.z;
+    f_bitangent = vec3(0, 1, 0) * v_normal.x +
+                  vec3(0, 0, 1) * v_normal.y +
+                  vec3(0, 1, 0) * v_normal.z;
+    f_blend = pow(abs(v_normal).yzx, vec3(blend_sharpness, blend_sharpness, blend_sharpness));
     f_blend /= (f_blend.x + f_blend.y + f_blend.z);
 }
 
