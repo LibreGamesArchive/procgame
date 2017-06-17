@@ -16,11 +16,12 @@
 #include <string.h>
 
 #define ARR_T(T) struct { T* data; size_t cap; size_t len; }
-typedef ARR_T(int)      arr_int_t;
-typedef ARR_T(unsigned) arr_uint_t;
-typedef ARR_T(double)   arr_double_t;
-typedef ARR_T(char)     arr_char_t;
-typedef ARR_T(char*)    arr_str_t;
+typedef ARR_T(int)              arr_int_t;
+typedef ARR_T(unsigned)         arr_uint_t;
+typedef ARR_T(double)           arr_double_t;
+typedef ARR_T(char)             arr_char_t;
+typedef ARR_T(unsigned char)    arr_uchar_t;
+typedef ARR_T(char*)            arr_str_t;
 
 #define ARR_FAIL    0
 #define ARR_SUCCEED 1
@@ -35,6 +36,13 @@ typedef ARR_T(char*)    arr_str_t;
     ( ((arr).cap > (count)) ? ARR_SUCCEED \
         : ((arr).data = realloc((arr).data, (count) * sizeof(*(arr).data)), \
            (arr).data ? ((arr).cap = (count), ARR_SUCCEED) : ARR_FAIL) )  
+
+#define ARR_RESERVE_CLEAR(arr, count) \
+    ( ((arr).cap > (count)) ? ARR_SUCCEED \
+        : ((arr).data = realloc((arr).data, (count) * sizeof(*(arr).data)), \
+        (!(arr).data) ? ARR_FAIL : \
+            ((arr).cap = (count), ARR_TRUNCATE_CLEAR((arr), (arr).len), \
+            ARR_SUCCEED)) )
 
 /*  Adding elements */
 #define ARR_PUSH(arr, val) \
@@ -106,5 +114,6 @@ typedef ARR_T(char*)    arr_str_t;
     for((idx) = (arr).len - 1; \
         ((idx) >= 0) && ((iter) = &((arr).data[idx]), 1); \
         --(idx))
+#define ARR_FOREACH_REV_PTR ARR_FOREACH_PTR_REV
 
 #endif
