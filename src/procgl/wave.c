@@ -154,13 +154,7 @@ float pg_wave_sample(struct pg_wave* wave, int d, vec4 p)
 }
 
 /*  Function definitions for the built-in waves */
-
 float sin1(float x)
 {
     return sin(x * M_PI * 2);
-}
-
-float cos1(float x)
-{
-    return cos(x * M_PI * 2);
 }

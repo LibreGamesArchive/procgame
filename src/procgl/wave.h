@@ -1,4 +1,3 @@
-
 #include <stdarg.h>
 
 /*  Built-in wave definitions are in wave_defs.h    */
@@ -66,5 +65,23 @@ struct pg_wave {
 
 #define PG_WAVE_ARRAY(w, l) \
     ((struct pg_wave){ .type = PG_WAVE_ARRAY, .arr = (w), .len = (l) })
+#define PG_WAVE_MODIFY(mod, ...) \
+    ((struct pg_wave){ .type = PG_WAVE_MODIFIER, .mod = __VA_ARGS__ }
+#define PG_WAVE_EXPAND(...) \
+    ((struct pg_wave){ .type = PG_WAVE_MODIFIER, .mod = PG_WAVE_MOD_EXPAND, \
+                       __VA_ARGS__  })
+#define PG_WAVE_OCTAVES(...) \
+    ((struct pg_wave){ .type = PG_WAVE_MODIFIER, .mod = PG_WAVE_MOD_OCTAVES, \
+                       __VA_ARGS__ })
+#define PG_WAVE_SEAMLESS_1D() \
+    ((struct pg_wave){ .type = PG_WAVE_MODIFIER, .mod = PG_WAVE_MOD_SEAMLESS_1D })
+#define PG_WAVE_SEAMLESS_2D() \
+    ((struct pg_wave){ .type = PG_WAVE_MODIFIER, .mod = PG_WAVE_MOD_SEAMLESS_2D })
+#define PG_WAVE_MIX_FUNC(...) \
+    ((struct pg_wave){ .type = PG_WAVE_MODIFIER, .mod = PG_WAVE_MOD_MIX_FUNC, \
+                       __VA_ARGS__ })
+#define PG_WAVE_DISTORT(d, ...) \
+    ((struct pg_wave){ .type = PG_WAVE_MODIFIER, .mod = PG_WAVE_MOD_DISTORT, \
+                       __VA_ARGS__ })
 
 float pg_wave_sample(struct pg_wave* wave, int d, vec4 p);
