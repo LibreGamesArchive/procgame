@@ -9,6 +9,7 @@ struct fps_game_renderer {
     struct pg_shader shader_3d;
     struct pg_shader shader_cubetex;
     struct pg_shader shader_text;
+    struct pg_shader shader_uv;
 };
 
 struct fps_game_assets {
@@ -18,6 +19,7 @@ struct fps_game_assets {
     struct pg_texture floor_tex;
     struct pg_texture font;
     struct pg_sdf_tree test_sdf;
+    struct pg_wave sdf_wave[4];
 };
 
 struct fps_game_data {
@@ -47,6 +49,7 @@ void fps_game_start(struct pg_game_state* state)
     pg_viewer_init(&d->rend.view, (vec3){ 0, 0, 0 }, (vec2){ 0, 0 },
         (vec2){ sw, sh }, (vec2){ 0.1, 200});
     pg_shader_3d(&d->rend.shader_3d);
+    pg_shader_uv(&d->rend.shader_uv);
     pg_shader_cubetex(&d->rend.shader_cubetex);
     pg_shader_text(&d->rend.shader_text);
     fps_game_generate_assets(d);
@@ -117,20 +120,23 @@ static void fps_game_draw(struct pg_game_state* state)
                  d->player_dir[1] + d->mouse_motion[1] };
     pg_viewer_set(&d->rend.view, pos, dir);
     /*  Drawing */
+    pg_screen_dst();
     pg_gbuffer_dst(&d->rend.gbuf);
     pg_shader_begin(&d->rend.shader_3d, &d->rend.view);
     pg_model_begin(&d->assets.floor_model, &d->rend.shader_3d);
     mat4 model_transform;
     mat4_identity(model_transform);
-    pg_model_draw(&d->assets.floor_model, model_transform);
+    //pg_model_draw(&d->assets.floor_model, model_transform);
     pg_model_begin(&d->assets.test_cyl, &d->rend.shader_3d);
     mat4_translate(model_transform, 4, 0, 0);
     mat4_rotate_Z(model_transform, model_transform, (float)state->ticks * 0.01);
     pg_model_draw(&d->assets.test_cyl, model_transform);
     pg_shader_begin(&d->rend.shader_cubetex, &d->rend.view);
     pg_model_begin(&d->assets.test_obj, &d->rend.shader_cubetex);
-    mat4_translate(model_transform, 0, 0, 1);
+    mat4_translate(model_transform, 0, 0, 0);
+    mat4_rotate_Z(model_transform, model_transform, (float)state->ticks * 0.01);
     pg_model_draw(&d->assets.test_obj, model_transform);
+    glPolygonMode( GL_FRONT_AND_BACK, GL_FILL );
     /*  Lighting    */
     pg_gbuffer_begin_light(&d->rend.gbuf, &d->rend.view);
     pg_gbuffer_draw_light(&d->rend.gbuf,
@@ -139,7 +145,6 @@ static void fps_game_draw(struct pg_game_state* state)
     pg_screen_dst();
     pg_gbuffer_finish(&d->rend.gbuf, (vec3){ 0.1, 0.1, 0.1 });
     /*  Overlay */
-    pg_shader_begin(&d->rend.shader_text, NULL);
     char fps_str[10];
     snprintf(fps_str, 10, "FPS: %d", (int)pg_framerate());
     pg_shader_text_write(&d->rend.shader_text, fps_str,
@@ -232,18 +237,33 @@ static void fps_game_generate_assets(struct fps_game_data* d)
     mat4_translate_in_place(transform, 0, 0, 0);
     pg_model_transform(&d->assets.test_cyl, transform);
     pg_shader_buffer_model(&d->rend.shader_3d, &d->assets.test_cyl);
+    /*  Building a 3d sine wave */
+    d->assets.sdf_wave[0] = PG_WAVE_EXPAND(.op = PG_WAVE_EXPAND_ADD,
+                                           .mode = PG_WAVE_EXPAND_AFTER);
+    d->assets.sdf_wave[1] = PG_WAVE_SINE(.frequency = { 1 });
     /*  Generating the SDF tree */
-    char sdf_src[] = "(SPHERE 0.8)";
-    /*char sdf_src[] =
-    "(threshold (scalar -0.0) (subtract (subtract (SPHERE 0.8) (SPHERE 0.6))"
-    "           (translate (vector 0 0 -1) (BOX 1 1 1))))"; */
+    #if 1
+    char sdf_src[] = "$0";
     pg_sdf_tree_init(&d->assets.test_sdf);
     pg_sdf_tree_parse(&d->assets.test_sdf, sdf_src, sizeof(sdf_src));
+    struct pg_sdf_node* arg = pg_sdf_tree_get_arg(&d->assets.test_sdf, 0);
+    arg->type = PG_SDF_NODE_WAVE;
+    arg->wave = PG_WAVE_ARRAY(d->assets.sdf_wave, 2);
+    #else
+    char sdf_src[] = "(TORUS 0.6 0.2)";
+    pg_sdf_tree_init(&d->assets.test_sdf);
+    pg_sdf_tree_parse(&d->assets.test_sdf, sdf_src, sizeof(sdf_src));
+    #endif
     pg_model_init(&d->assets.test_obj);
-    pg_model_sdf(&d->assets.test_obj, &d->assets.test_sdf, 0.16);
+    pg_model_sdf(&d->assets.test_obj, &d->assets.test_sdf, 0.08);
     pg_model_precalc_normals(&d->assets.test_obj);
-    pg_model_blend_duplicates(&d->assets.test_obj, 1.5);
+    pg_model_precalc_uv(&d->assets.test_obj);
+    //pg_model_warp_verts(&d->assets.test_obj);
+    mat4_identity(transform);
+    mat4_scale_aniso(transform, transform, 3, 3, 3);
+    pg_model_transform(&d->assets.test_obj, transform);
     pg_shader_buffer_model(&d->rend.shader_cubetex, &d->assets.test_obj);
+    //pg_shader_buffer_model(&d->rend.shader_uv, &d->assets.test_obj);
     /*  Generating the floor texture    */
     fps_game_generate_floor_texture(&d->assets.floor_tex);
     struct pg_texture_cube cubetex = { {

@@ -46,7 +46,7 @@ struct pg_sdf_node {
         vec3 box, ellipsoid;
         vec2 cylinder, cone, capsule, torus;
         float sphere;
-        struct pg_wave* wave;
+        struct pg_wave wave;
         /*  Math structures */
         mat4 matrix;
         vec3 vector;

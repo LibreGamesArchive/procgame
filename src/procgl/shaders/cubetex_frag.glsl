@@ -25,6 +25,7 @@ in vec3 f_v_normal;
 in vec3 f_tangent;
 in vec3 f_bitangent;
 in vec3 f_blend;
+in vec4 f_color;
 
 layout(location = 0) out vec4 g_albedo;
 layout(location = 1) out vec4 g_normal;
@@ -43,15 +44,14 @@ void main()
     if(f_v_normal.z < 0) tex_c1 = texture(tex_bottom, f_mpos.xy * tex_scale[2]);
     else tex_c1 = texture(tex_top, f_mpos.xy * tex_scale[3]);
     if(f_v_normal.x < 0) tex_c2 = texture(tex_left, f_mpos.yz * tex_scale[4]);
-    else tex_c2 = texture(tex_right, f_mpos.yz * tex_scale[5]);
+    else tex_c2 = texture(tex_right, vec2(1 - f_mpos.y, f_mpos.z) * tex_scale[5]);
     /*  Get the normal texture samples  */
     if(f_v_normal.y < 0) norm_c0 = texture(norm_front, f_mpos.xz * tex_scale[0]);
     else norm_c0 = texture(norm_back, f_mpos.xz * tex_scale[1]);
     if(f_v_normal.z < 0) norm_c1 = texture(norm_top, f_mpos.xy * tex_scale[2]);
     else norm_c1 = texture(norm_bottom, f_mpos.xy * tex_scale[3]);
     if(f_v_normal.x < 0) norm_c2 = texture(norm_left, f_mpos.yz * tex_scale[4]);
-    else norm_c2 = texture(norm_right, f_mpos.yz * tex_scale[5]);
-    norm_c2.xy = 1 - norm_c2.xy;
+    else norm_c2 = texture(norm_right, vec2(1 - f_mpos.y, f_mpos.z) * tex_scale[5]);
     /*  Blend them based on the vertex normals  */
     vec4 tex_blend = tex_c0 * f_blend.x +
                      tex_c1 * f_blend.y +
@@ -62,5 +62,8 @@ void main()
     norm_blend = vec4(norm_blend.xyz * 2 - 1, norm_blend.w);
     g_albedo = tex_blend;
     g_normal = vec4(norm_blend.xyz * tbn * 0.5 + 0.5, norm_blend.w);
+    //g_albedo = vec4(f_v_normal.xyz * 0.5 + 0.5, 1);
+    g_normal = vec4(f_normal.xyz * 0.5 + 0.5, 1);
+    g_albedo = f_color;
     g_pos = vec4(f_pos.xyz, f_depth);
 }

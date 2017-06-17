@@ -94,8 +94,6 @@ void pg_model_precalc_uv(struct pg_model* model);
 /*  Vertex duplication/de-duplication/duplicate handling    */
 void pg_model_seams_tris(struct pg_model* model);
 void pg_model_seams_cardinal_directions(struct pg_model* model);
-/*  Duplicate vertex handling   */
-void pg_model_split_tris(struct pg_model* model);
 void pg_model_blend_duplicates(struct pg_model* model, float tolerance);
 void pg_model_join_duplicates(struct pg_model* model, float t);
 void pg_model_warp_verts(struct pg_model* model);

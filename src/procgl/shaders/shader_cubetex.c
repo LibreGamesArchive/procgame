@@ -19,7 +19,7 @@ struct data_cubetex {
     struct {
         GLint tex_front, tex_back, tex_left, tex_right, tex_top, tex_bottom;
         GLint norm_front, norm_back, norm_left, norm_right, norm_top, norm_bottom;
-        vec2 tex_scale[6];
+        vec2_t tex_scale[6];
         float blend_sharpness;
     } state;
     struct {
@@ -54,7 +54,12 @@ static void begin(struct pg_shader* shader, struct pg_viewer* view)
         glUniform1i(d->unis.norm_right, d->state.norm_right);
         glUniform1i(d->unis.norm_top, d->state.norm_top);
         glUniform1i(d->unis.norm_bottom, d->state.norm_bottom);
-        glUniform2fv(d->unis.tex_scale, 6, d->state.tex_scale);
+        glUniform2fv(d->unis.tex_scale, 0, d->state.tex_scale[0].v);
+        glUniform2fv(d->unis.tex_scale, 1, d->state.tex_scale[1].v);
+        glUniform2fv(d->unis.tex_scale, 2, d->state.tex_scale[2].v);
+        glUniform2fv(d->unis.tex_scale, 3, d->state.tex_scale[3].v);
+        glUniform2fv(d->unis.tex_scale, 4, d->state.tex_scale[4].v);
+        glUniform2fv(d->unis.tex_scale, 5, d->state.tex_scale[5].v);
         d->tex_dirty = 0;
     }
     /*  Enable depth testing    */
@@ -84,6 +89,7 @@ int pg_shader_cubetex(struct pg_shader* shader)
     pg_shader_link_matrix(shader, PG_PROJECTIONVIEW_MATRIX, "projview_matrix");
     pg_shader_link_component(shader, PG_MODEL_COMPONENT_POSITION, "v_position");
     pg_shader_link_component(shader, PG_MODEL_COMPONENT_NORMAL, "v_normal");
+    pg_shader_link_component(shader, PG_MODEL_COMPONENT_COLOR, "v_color");
     d->unis.tex_front = glGetUniformLocation(shader->prog, "tex_front");
     d->unis.tex_back = glGetUniformLocation(shader->prog, "tex_back");
     d->unis.tex_left = glGetUniformLocation(shader->prog, "tex_left");
@@ -104,7 +110,8 @@ int pg_shader_cubetex(struct pg_shader* shader)
     shader->deinit = free;
     shader->begin = begin;
     shader->components =
-        (PG_MODEL_COMPONENT_POSITION | PG_MODEL_COMPONENT_NORMAL);
+        (PG_MODEL_COMPONENT_POSITION | PG_MODEL_COMPONENT_NORMAL |
+         PG_MODEL_COMPONENT_COLOR);
     return 1;
 }
 
@@ -126,7 +133,7 @@ void pg_shader_cubetex_set_texture(struct pg_shader* shader,
     d->state.norm_bottom = tex_cube->tex[5]->light_slot;
     int i;
     for(i = 0; i < 6; ++i) {
-        vec2_dup(d->state.tex_scale[i], tex_cube->scale[i]);
+        vec2_dup(d->state.tex_scale[i].v, tex_cube->scale[i]);
     }
     if(pg_shader_is_active(shader)) {
         glUniform1i(d->unis.tex_front, d->state.tex_front);

@@ -10,6 +10,9 @@ void pg_shader_2d_set_texture(struct pg_shader* shader, GLint tex_unit);
 int pg_shader_3d(struct pg_shader* shader);
 void pg_shader_3d_set_texture(struct pg_shader* shader, struct pg_texture* tex);
 
+int pg_shader_uv(struct pg_shader* shader);
+void pg_shader_uv_set_texture(struct pg_shader* shader, struct pg_texture* tex);
+
 int pg_shader_cubetex(struct pg_shader* shader);
 void pg_shader_cubetex_set_texture(struct pg_shader* shader,
                                    struct pg_texture_cube* tex);

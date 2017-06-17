@@ -15,21 +15,21 @@ struct pg_sdf_keyword* pg_sdf_keyword_read(register const char* str,
                                            register unsigned int len);
 #include "sdf_keywords.gperf.c"
 
-/*  Create and/or get an argument node  */
-struct pg_sdf_node* pg_sdf_tree_get_arg(const struct pg_sdf_tree* sdf, int arg)
-{
-    if(arg >= sdf->args.cap
-    || sdf->args.data[arg].type == PG_SDF_NODE_NULL) return NULL;
-    return &sdf->args.data[arg];
-}
-
+/*  Create/get an argument node  */
 struct pg_sdf_node* pg_sdf_tree_add_arg(struct pg_sdf_tree* sdf, int arg)
 {
     if(arg >= sdf->args.cap) {
         ARR_RESERVE(sdf->args, arg + 1);
         sdf->args.len = arg + 1;
     }
+    sdf->args.data[arg].type = PG_SDF_NODE_NULL;
     return sdf->args.data + arg;
+}
+
+struct pg_sdf_node* pg_sdf_tree_get_arg(const struct pg_sdf_tree* sdf, int arg)
+{
+    if(arg >= sdf->args.cap) return NULL;
+    else return &sdf->args.data[arg];
 }
 
 /*  Add a child node    */
@@ -109,6 +109,7 @@ struct pg_sdf_node* pg_sdf_node_child(const struct pg_sdf_tree* sdf,
             printf("procgl SDF parse error: bad argument id: %s\n", tmp); \
             return src_i; \
         } \
+        pg_sdf_tree_add_arg(sdf, 0); \
         *node = (struct pg_sdf_node) { \
             .type = PG_SDF_NODE_ARGUMENT, \
             .arg = arg }; \
@@ -248,7 +249,7 @@ void pg_sdf_tree_parse(struct pg_sdf_tree* sdf, const char* src, unsigned len)
     struct pg_sdf_node root = { PG_SDF_NODE_NULL };
     ARR_PUSH(sdf->op_tree, root);
     const char* end = src + len;
-    const char* src_i = parse_node_recursive(sdf, 0, src, end);
+    parse_node_recursive(sdf, 0, src, end);
 }
 
 static const char* printouts[] = {

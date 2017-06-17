@@ -143,7 +143,7 @@ void pg_shader_link_matrix(struct pg_shader* shader, enum pg_matrix type,
 }
 
 void pg_shader_link_component(struct pg_shader* shader,
-                              enum pg_model_component comp, const char* name)
+                              uint32_t comp, const char* name)
 {
     if(!comp) return;
     int i = LEAST_SIGNIFICANT_BIT(comp);

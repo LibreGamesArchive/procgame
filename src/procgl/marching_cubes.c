@@ -4,6 +4,7 @@
 #include <math.h>
 #include "ext/linmath.h"
 #include "arr.h"
+#include "wave.h"
 #include "sdf.h"
 #include "model.h"
 
@@ -306,23 +307,19 @@ static void vert_interp(vec3 out, vec4 p0, vec4 p1);
     components besides PG_MODEL_COMPONENT_POSITION, the added verts will
     have all those components set to 0. */
 static int pg_sdf_model_area(struct pg_sdf_tree* sdf, struct pg_model* model,
-                             vec3 c0, vec3 c1)
+                             vec3 c0, vec3 c1, float* s)
 {
     int i;
     vec3 vertlist[12];
     vec4 cube[8] = {
-        { c0[0], c0[1], c0[2] },
-        { c1[0], c0[1], c0[2] },
-        { c1[0], c1[1], c0[2] },
-        { c0[0], c1[1], c0[2] },
-        { c0[0], c0[1], c1[2] },
-        { c1[0], c0[1], c1[2] },
-        { c1[0], c1[1], c1[2] },
-        { c0[0], c1[1], c1[2] } };
-    for(i = 0; i < 8; ++i) {
-        cube[i][3] = pg_sdf_tree_sample(sdf, cube[i]);
-    //    printf("Sample (%f, %f, %f) = %f\n", cube[i][0], cube[i][1], cube[i][2], cube[i][3]);
-    }
+        { c0[0], c0[1], c0[2], s[0] },
+        { c1[0], c0[1], c0[2], s[1] },
+        { c1[0], c1[1], c0[2], s[2] },
+        { c0[0], c1[1], c0[2], s[3] },
+        { c0[0], c0[1], c1[2], s[4] },
+        { c1[0], c0[1], c1[2], s[5] },
+        { c1[0], c1[1], c1[2], s[6] },
+        { c0[0], c1[1], c1[2], s[7] } };
     /* Edge table lookup */
     int cubeindex = 0;
     if (cube[0][3] < 0) cubeindex |= 1;
@@ -380,21 +377,40 @@ void pg_model_sdf(struct pg_model* model, struct pg_sdf_tree* sdf, float p)
     pg_model_reset(model);
     model->components = PG_MODEL_COMPONENT_POSITION;
     const float n = 1.0f / p;
+    int grid = (n * 2);
+    float samples[grid * grid * grid];
     int i, j, k;
-    for(i = 0; i < n * 2; ++i) {
-        for(j = 0; j < n * 2; ++j)  {
-            for(k = 0; k < n * 2; ++k) {
-                /*printf("Cube at (%f, %f, %f)\n", ((float)i / n) - 1,
-                                                 ((float)j / n) - 1,
-                                                 ((float)k / n) - 1); */
+    for(i = 0; i < grid; ++i) {
+        for(j = 0; j < grid; ++j)  {
+            for(k = 0; k < grid; ++k) {
+                vec3 s = { i * p - 1, j * p - 1, k * p -1 };
+                samples[i + (j * grid) + (k * grid * grid)] = 
+                    pg_sdf_tree_sample(sdf, s);
+            }
+        }
+    }
+    for(i = 0; i < grid - 1; ++i) {
+        for(j = 0; j < grid - 1; ++j)  {
+            for(k = 0; k < grid - 1; ++k) {
+                float cs[8] = {
+                    samples[i + (j * grid) + (k * grid * grid)],
+                    samples[(i + 1) + (j * grid) + (k * grid * grid)],
+                    samples[(i + 1) + ((j + 1) * grid) + (k * grid * grid)],
+                    samples[i + ((j + 1) * grid) + (k * grid * grid)],
+                    samples[i + (j * grid) + ((k + 1) * grid * grid)],
+                    samples[(i + 1) + (j * grid) + ((k + 1) * grid * grid)],
+                    samples[(i + 1) + ((j + 1) * grid) + ((k + 1) * grid * grid)],
+                    samples[i + ((j + 1) * grid) + ((k + 1) * grid * grid)]
+                };
                 vec3 c0 = { ((float)i / (float)n) - 1,
                             ((float)j / (float)n) - 1,
                             ((float)k / (float)n) - 1 };
                 vec3 c1 = { c0[0] + p, c0[1] + p, c0[2] + p };
-                pg_sdf_model_area(sdf, model, c0, c1);
+                pg_sdf_model_area(sdf, model, c0, c1, cs);
             }
         }
     }
+    pg_model_join_duplicates(model, 0.00001);
 }
 
 /*  Interpolate vertex position based on sample pair    */

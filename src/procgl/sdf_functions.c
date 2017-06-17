@@ -98,7 +98,7 @@ SDF_DEFINE_FUNC(func_torus)
 
 SDF_DEFINE_FUNC(func_wave)
 {
-    vec4_set(out, p[0], p[1], p[2], pg_wave_sample(node->wave, 3, p));
+    vec4_set(out, p[0], p[1], p[2], pg_wave_sample(&node->wave, 3, p));
 }
 
 /*  ----------------------------------------------

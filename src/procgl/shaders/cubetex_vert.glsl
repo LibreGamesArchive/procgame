@@ -20,6 +20,7 @@ out vec3 f_normal;
 out vec3 f_v_normal;
 out vec3 f_tangent;
 out vec3 f_bitangent;
+out vec4 f_color;
 
 void main()
 {
@@ -37,5 +38,6 @@ void main()
                   vec3(0, 1, 0) * v_normal.z;
     f_blend = pow(abs(v_normal).yzx, vec3(blend_sharpness, blend_sharpness, blend_sharpness));
     f_blend /= (f_blend.x + f_blend.y + f_blend.z);
+    f_color = v_color;
 }
 
