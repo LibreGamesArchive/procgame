@@ -104,7 +104,7 @@ void pg_model_draw(struct pg_model* model, mat4 transform)
     struct pg_shader* m_shader = model->buffers.data[model->active].shader;
     pg_shader_set_matrix(m_shader, PG_MODEL_MATRIX, transform);
     pg_shader_rebuild_matrices(m_shader);
-    glDrawElements(GL_TRIANGLES, model->tris.len, GL_UNSIGNED_INT, 0);
+    glDrawElements(GL_TRIANGLES, model->tris.len * 3, GL_UNSIGNED_INT, 0);
 }
 
 /*  Raw vertex/triangle building    */
@@ -112,46 +112,72 @@ void pg_model_reserve_verts(struct pg_model* model, unsigned count)
 {
     model->v_count = count;
     if(model->components & PG_MODEL_COMPONENT_POSITION) {
-        ARR_RESERVE(model->pos, count);
-        ARR_TRUNCATE_CLEAR(model->pos, model->pos.len);
+        ARR_RESERVE_CLEAR(model->pos, count);
         model->pos.len = count;
     }
     if(model->components & PG_MODEL_COMPONENT_COLOR) {
-        ARR_RESERVE(model->color, count);
-        ARR_TRUNCATE_CLEAR(model->color, model->color.len);
+        ARR_RESERVE_CLEAR(model->color, count);
         model->color.len = count;
     }
     if(model->components & PG_MODEL_COMPONENT_UV) {
-        ARR_RESERVE(model->uv, count);
-        ARR_TRUNCATE_CLEAR(model->uv, model->uv.len);
+        ARR_RESERVE_CLEAR(model->uv, count);
         model->uv.len = count;
     }
     if(model->components & PG_MODEL_COMPONENT_NORMAL) {
-        ARR_RESERVE(model->normal, count);
-        ARR_TRUNCATE_CLEAR(model->normal, model->normal.len);
+        ARR_RESERVE_CLEAR(model->normal, count);
         model->normal.len = count;
     }
     if(model->components & PG_MODEL_COMPONENT_TANGENT) {
-        ARR_RESERVE(model->tangent, count);
-        ARR_TRUNCATE_CLEAR(model->tangent, model->tangent.len);
+        ARR_RESERVE_CLEAR(model->tangent, count);
         model->tangent.len = count;
     }
     if(model->components & PG_MODEL_COMPONENT_BITANGENT) {
-        ARR_RESERVE(model->bitangent, count);
-        ARR_TRUNCATE_CLEAR(model->bitangent, model->bitangent.len);
+        ARR_RESERVE_CLEAR(model->bitangent, count);
         model->bitangent.len = count;
     }
     if(model->components & PG_MODEL_COMPONENT_HEIGHT) {
-        ARR_RESERVE(model->height, count);
-        ARR_TRUNCATE_CLEAR(model->height, model->height.len);
+        ARR_RESERVE_CLEAR(model->height, count);
         model->height.len = count;
     }
 }
 
+void pg_model_reserve_component(struct pg_model* model, uint32_t comp)
+{
+    if(comp & ~model->components & PG_MODEL_COMPONENT_POSITION) {
+        ARR_RESERVE_CLEAR(model->pos, model->v_count);
+        model->pos.len = model->v_count;
+    }
+    if(comp & ~model->components & PG_MODEL_COMPONENT_COLOR) {
+        ARR_RESERVE_CLEAR(model->color, model->v_count);
+        model->color.len = model->v_count;
+    }
+    if(comp & ~model->components & PG_MODEL_COMPONENT_UV) {
+        ARR_RESERVE_CLEAR(model->uv, model->v_count);
+        model->uv.len = model->v_count;
+    }
+    if(comp & ~model->components & PG_MODEL_COMPONENT_NORMAL) {
+        ARR_RESERVE_CLEAR(model->normal, model->v_count);
+        model->normal.len = model->v_count;
+    }
+    if(comp & ~model->components & PG_MODEL_COMPONENT_TANGENT) {
+        ARR_RESERVE_CLEAR(model->tangent, model->v_count);
+        model->tangent.len = model->v_count;
+    }
+    if(comp & ~model->components & PG_MODEL_COMPONENT_BITANGENT) {
+        ARR_RESERVE_CLEAR(model->bitangent, model->v_count);
+        model->bitangent.len = model->v_count;
+    }
+    if(comp & ~model->components & PG_MODEL_COMPONENT_HEIGHT) {
+        ARR_RESERVE_CLEAR(model->height, model->v_count);
+        model->height.len = model->v_count;
+    }
+    model->components |= comp;
+}
+
 void pg_model_reserve_tris(struct pg_model* model, unsigned count)
 {
-    ARR_RESERVE(model->tris, count * 3);
-    model->tris.len = count * 3;
+    ARR_RESERVE(model->tris, count);
+    model->tris.len = count;
 }
 
 void pg_model_set_vertex(struct pg_model* model, struct pg_vertex_full* v,
@@ -241,15 +267,47 @@ void pg_model_get_vertex(struct pg_model* model, struct pg_vertex_full* out,
     }
 }
 
+static void pg_model_remove_vertex(struct pg_model* model, unsigned v)
+{
+    if(v >= model->v_count) return;
+    if(model->components & PG_MODEL_COMPONENT_POSITION) {
+        ARR_SWAPSPLICE(model->pos, v, 1);
+    }
+    if(model->components & PG_MODEL_COMPONENT_COLOR) {
+        ARR_SWAPSPLICE(model->color, v, 1);
+    }
+    if(model->components & PG_MODEL_COMPONENT_UV) {
+        ARR_SWAPSPLICE(model->uv, v, 1);
+    }
+    if(model->components & PG_MODEL_COMPONENT_NORMAL) {
+        ARR_SWAPSPLICE(model->normal, v, 1);
+    }
+    if(model->components & PG_MODEL_COMPONENT_TANGENT) {
+        ARR_SWAPSPLICE(model->tangent, v, 1);
+    }
+    if(model->components & PG_MODEL_COMPONENT_BITANGENT) {
+        ARR_SWAPSPLICE(model->bitangent, v, 1);
+    }
+    if(model->components & PG_MODEL_COMPONENT_HEIGHT) {
+        ARR_SWAPSPLICE(model->height, v, 1);
+    }
+    --model->v_count;
+    int i;
+    struct pg_tri* tri;
+    ARR_FOREACH_PTR_REV(model->tris, tri, i) {
+        if(tri->t[0] == v || tri->t[1] == v || tri->t[2] == v)
+            ARR_SWAPSPLICE(model->tris, i, 1);
+        else if(tri->t[0] == model->v_count) tri->t[0] = v;
+        else if(tri->t[1] == model->v_count) tri->t[1] = v;
+        else if(tri->t[2] == model->v_count) tri->t[2] = v;
+    }
+}
+
 void pg_model_add_triangle(struct pg_model* model, unsigned v0,
                            unsigned v1, unsigned v2)
 {
-    int i = model->tris.len;
-    ARR_RESERVE(model->tris, i + 3);
-    model->tris.len += 3;
-    model->tris.data[i] = v0;
-    model->tris.data[i + 1] = v1;
-    model->tris.data[i + 2] = v2;
+    struct pg_tri tri = { { v0, v1, v2 } };
+    ARR_PUSH(model->tris, tri);
 }
 
 /*  Compos/transformation  */
@@ -289,12 +347,13 @@ void pg_model_append(struct pg_model* dst, struct pg_model* src,
         pg_model_add_vertex(dst, &v);
     }
     ARR_RESERVE(dst->tris, dst->tris.len + src->tris.len);
-    unsigned t;
     int i;
-    ARR_FOREACH(src->tris, t, i) {
-        dst->tris.data[dst->tris.len + i] = t + dst_v;
+    struct pg_tri* tri;
+    ARR_FOREACH_PTR(src->tris, tri, i) {
+        struct pg_tri dtri =
+            { { tri->t[0] + dst_v, tri->t[1] + dst_v, tri->t[2] + dst_v } };
+        ARR_PUSH(dst->tris, dtri);
     }
-    dst->tris.len += src->tris.len;
 }
 
 void pg_model_transform(struct pg_model* model, mat4 transform)
@@ -328,69 +387,52 @@ void pg_model_transform(struct pg_model* model, mat4 transform)
 /*  Component generation    */
 void pg_model_precalc_normals(struct pg_model* model)
 {
-    unsigned int t[3];
-    int i;
     if(!(model->components & PG_MODEL_COMPONENT_POSITION)) return;
     model->components |= PG_MODEL_COMPONENT_NORMAL;
-    ARR_RESERVE(model->normal, model->v_count);
-    ARR_TRUNCATE_CLEAR(model->normal, 0);
+    ARR_RESERVE_CLEAR(model->normal, model->v_count);
     model->normal.len = model->v_count;
-    for(i = 0; i < model->tris.len; i += 3) {
-        t[0] = model->tris.data[i];
-        t[1] = model->tris.data[i + 1];
-        t[2] = model->tris.data[i + 2];
-        /*  First we calculate the normal for each vertex   */
-        vec3 norm;
-        vec3 edge0, edge1;
-        vec3_sub(edge0, model->pos.data[t[0]].v, model->pos.data[t[1]].v);
-        vec3_sub(edge1, model->pos.data[t[0]].v, model->pos.data[t[2]].v);
+    int i;
+    struct pg_tri* tri;
+    ARR_FOREACH_PTR(model->tris, tri, i) {
+        vec3 norm, edge0, edge1;
+        vec3_sub(edge0, model->pos.data[tri->t[0]].v, model->pos.data[tri->t[1]].v);
+        vec3_sub(edge1, model->pos.data[tri->t[0]].v, model->pos.data[tri->t[2]].v);
         vec3_mul_cross(norm, edge0, edge1);
-        vec3_normalize(norm, norm);
-        /*  Now we average the calculated values with any existing values,
-            so each vertex will have an average value for each associated
-            face    */
-        int j;
-        for(j = 0; j < 3; ++j) {
-            vec3_add(model->normal.data[t[j]].v, norm, model->normal.data[t[j]].v);
-            vec3_normalize(model->normal.data[t[j]].v, model->normal.data[t[j]].v);
-        }
+        vec3_add(model->normal.data[tri->t[0]].v, model->normal.data[tri->t[0]].v, norm);
+        vec3_add(model->normal.data[tri->t[1]].v, model->normal.data[tri->t[1]].v, norm);
+        vec3_add(model->normal.data[tri->t[2]].v, model->normal.data[tri->t[2]].v, norm);
+    }
+    vec3_t* norm;
+    ARR_FOREACH_PTR(model->normal, norm, i) {
+        vec3_normalize(norm->v, norm->v);
     }
 }
 
 void pg_model_precalc_ntb(struct pg_model* model)
 {
-    unsigned int t[3];
-    int i;
     if(!(model->components &
         (PG_MODEL_COMPONENT_POSITION
         | PG_MODEL_COMPONENT_UV))) return;
     model->components |=
         PG_MODEL_COMPONENT_NORMAL | PG_MODEL_COMPONENT_TAN_BITAN;
-    ARR_RESERVE(model->normal, model->v_count);
-    ARR_RESERVE(model->tangent, model->v_count);
-    ARR_RESERVE(model->bitangent, model->v_count);
-    ARR_TRUNCATE_CLEAR(model->normal, 0);
-    ARR_TRUNCATE_CLEAR(model->tangent, 0);
-    ARR_TRUNCATE_CLEAR(model->bitangent, 0);
+    ARR_RESERVE_CLEAR(model->normal, model->v_count);
+    ARR_RESERVE_CLEAR(model->tangent, model->v_count);
+    ARR_RESERVE_CLEAR(model->bitangent, model->v_count);
     model->normal.len = model->v_count;
     model->tangent.len = model->v_count;
     model->bitangent.len = model->v_count;
-    for(i = 0; i < model->tris.len; i += 3) {
-        t[0] = model->tris.data[i];
-        t[1] = model->tris.data[i + 1];
-        t[2] = model->tris.data[i + 2];
-        /*  First we calculate the normal for each vertex   */
-        vec3 norm;
-        vec3 edge0, edge1;
-        vec3_sub(edge0, model->pos.data[t[0]].v, model->pos.data[t[1]].v);
-        vec3_sub(edge1, model->pos.data[t[0]].v, model->pos.data[t[2]].v);
+    int i;
+    struct pg_tri* tri;
+    ARR_FOREACH_PTR(model->tris, tri, i) {
+        /*  Calculate normals first   */
+        vec3 norm, edge0, edge1;
+        vec3_sub(edge0, model->pos.data[tri->t[0]].v, model->pos.data[tri->t[1]].v);
+        vec3_sub(edge1, model->pos.data[tri->t[0]].v, model->pos.data[tri->t[2]].v);
         vec3_mul_cross(norm, edge0, edge1);
-        vec3_normalize(norm, norm);
-        /*  Next we calculate the tangent and bitangent in alignment with the
-            tex_coords  */
+        /*  Then calculate tangent and bitangent, aligned with the UV coords */
         vec2 tex_d0, tex_d1;
-        vec2_sub(tex_d0, model->uv.data[t[1]].v, model->uv.data[t[0]].v);
-        vec2_sub(tex_d1, model->uv.data[t[2]].v, model->uv.data[t[0]].v);
+        vec2_sub(tex_d0, model->uv.data[tri->t[1]].v, model->uv.data[tri->t[0]].v);
+        vec2_sub(tex_d1, model->uv.data[tri->t[2]].v, model->uv.data[tri->t[0]].v);
         float r = 1.0f / (tex_d0[0] * tex_d1[1] - tex_d0[1] * tex_d1[0]);
         vec3 tmp0, tmp1, tangent, bitangent;
         vec3_scale(tmp0, edge0, tex_d1[1]);
@@ -401,42 +443,37 @@ void pg_model_precalc_ntb(struct pg_model* model)
         vec3_scale(tmp1, edge0, tex_d1[0]);
         vec3_sub(bitangent, tmp0, tmp1);
         vec3_scale(bitangent, bitangent, r);
-        /*  Now we average the calculated values with any existing values,
-            so each vertex will have an average value for each associated
-            face    */
         int j;
         for(j = 0; j < 3; ++j) {
-            vec3_add(model->normal.data[t[j]].v, model->normal.data[t[j]].v, norm);
-            vec3_normalize(model->normal.data[t[j]].v, model->normal.data[t[j]].v);
-            vec3_add(model->tangent.data[t[j]].v, model->tangent.data[t[j]].v,
+            vec3_add(model->normal.data[tri->t[j]].v, model->normal.data[tri->t[j]].v,
+                     norm);
+            vec3_add(model->tangent.data[tri->t[j]].v, model->tangent.data[tri->t[j]].v,
                      tangent);
-            vec3_normalize(model->tangent.data[t[j]].v,
-                           model->tangent.data[t[j]].v);
-            vec3_add(model->bitangent.data[t[j]].v, model->bitangent.data[t[j]].v,
+            vec3_add(model->bitangent.data[tri->t[j]].v, model->bitangent.data[tri->t[j]].v,
                      bitangent);
-            vec3_normalize(model->bitangent.data[t[j]].v,
-                           model->bitangent.data[t[j]].v);
         }
+    }
+    for(i = 0; i < model->v_count; ++i) {
+        vec3_normalize(model->normal.data[i].v, model->normal.data[i].v);
+        vec3_normalize(model->tangent.data[i].v, model->tangent.data[i].v);
+        vec3_normalize(model->bitangent.data[i].v, model->bitangent.data[i].v);
     }
 }
 
-void pg_model_split_tris(struct pg_model* model)
+void pg_model_seams_tris(struct pg_model* model)
 {
     struct pg_model new_model;
     pg_model_init(&new_model);
     new_model.components = model->components;
     struct pg_vertex_full tmp;
-    unsigned t[3];
     int i;
-    for(i = 0; i < model->tris.len; i += 3) {
-        t[0] = model->tris.data[i];
-        t[1] = model->tris.data[i + 1];
-        t[2] = model->tris.data[i + 2];
-        pg_model_get_vertex(model, &tmp, t[0]);
+    struct pg_tri* tri;
+    ARR_FOREACH_PTR(model->tris, tri, i) {
+        pg_model_get_vertex(model, &tmp, tri->t[0]);
         pg_model_add_vertex(&new_model, &tmp);
-        pg_model_get_vertex(model, &tmp, t[1]);
+        pg_model_get_vertex(model, &tmp, tri->t[1]);
         pg_model_add_vertex(&new_model, &tmp);
-        pg_model_get_vertex(model, &tmp, t[2]);
+        pg_model_get_vertex(model, &tmp, tri->t[2]);
         pg_model_add_vertex(&new_model, &tmp);
         pg_model_add_triangle(model, i, i + 1, i + 2);
     }
@@ -482,6 +519,45 @@ void pg_model_blend_duplicates(struct pg_model* model, float tolerance)
     }
 }
 
+void pg_model_warp_verts(struct pg_model* model)
+{
+    int i;
+    for(i = 0; i < model->pos.len; ++i) {
+        vec3 move = { rand() % 10 * 0.005, rand() % 10 * 0.005, rand() % 10 * 0.005 };
+        vec3_add(model->pos.data[i].v, model->pos.data[i].v, move);
+    }
+}
+
+/*  This is bad. It needs to be replaced with a proper decimation function  */
+void pg_model_join_duplicates(struct pg_model* model, float t)
+{
+    int i, j, k;
+    struct pg_tri* tri;
+    for(i = 0; i < model->v_count; ++i) {
+        for(j = 0; j < model->v_count; ++j) {
+            if(j == i
+            || fabsf(model->pos.data[i].v[0] - model->pos.data[j].v[0]) > t
+            || fabsf(model->pos.data[i].v[1] - model->pos.data[j].v[1]) > t
+            || fabsf(model->pos.data[i].v[2] - model->pos.data[j].v[2]) > t)
+                continue;
+            ARR_FOREACH_PTR_REV(model->tris, tri, k) {
+                int l = (tri->t[0] == j) ? 0 :
+                        (tri->t[1] == j) ? 1 :
+                        (tri->t[2] == j) ? 2 : 3;
+                if(l == 3) continue;
+                if(tri->t[0] == i || tri->t[1] == i || tri->t[2] == i) {
+                    ARR_SWAPSPLICE(model->tris, k, 1);
+                } else {
+                    tri->t[l] = i;
+                }
+            }
+            pg_model_remove_vertex(model, j);
+            if(i > j) --i;
+            --j;
+        }
+    }
+}
+
 static void pg_model_reset_buffers(struct pg_model* model)
 {
     struct pg_model_buffer* buf;
@@ -500,6 +576,17 @@ static void pg_model_reset_buffers(struct pg_model* model)
         buf->shader = NULL;
     }
     ARR_TRUNCATE(model->buffers, 0);
+}
+
+void pg_model_get_face_normal(struct pg_model* model, unsigned t, vec3 out)
+{
+    struct pg_tri* tri = &model->tris.data[t];
+    /*  First we calculate the normal for each vertex   */
+    vec3 edge0, edge1;
+    vec3_sub(edge0, model->pos.data[tri->t[0]].v, model->pos.data[tri->t[1]].v);
+    vec3_sub(edge1, model->pos.data[tri->t[0]].v, model->pos.data[tri->t[2]].v);
+    vec3_mul_cross(out, edge0, edge1);
+    vec3_normalize(out, out);
 }
 
 #if 0
