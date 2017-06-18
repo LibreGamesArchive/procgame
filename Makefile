@@ -16,7 +16,7 @@ LIBS_WINDOWS := -lmingw32 -l:src/libs/win32/GL/libglew32.a \
 
 TARGET := procgame
 
-GAME := obj/game_state.o obj/game_fps.o
+GAME := obj/game_state.o obj/state_play.o obj/map_area.o
 PROCGL := obj/procgl_base.o \
  obj/viewer.o obj/postproc.o obj/shader.o obj/gbuffer.o \
  obj/model.o obj/model_prims.o obj/marching_cubes.o \
@@ -50,12 +50,12 @@ obj/main.o: src/main.c $(GAME) $(PROCGL) $(PROCGL_LIBS)
 
 obj/game_state.o: src/game/game_state.c src/game/game_state.h
 	$(CC) $(CFLAGS) -o obj/game_state.o -c src/game/game_state.c $(INCLUDES)
-obj/game_example.o: src/game/game_example.c src/game/game_example.h \
+obj/state_play.o: src/BORK_of_DOOM/state_play.c src/BORK_of_DOOM/game_states.h \
  $(PROCGL) $(PROCGL_LIBS)
-	$(CC) $(CFLAGS) -o obj/game_example.o -c src/game/game_example.c $(INCLUDES)
-obj/game_fps.o: src/game/game_fps.c src/game/game_fps.h \
+	$(CC) $(CFLAGS) -o obj/state_play.o -c src/BORK_of_DOOM/state_play.c $(INCLUDES)
+obj/map_area.o: src/BORK_of_DOOM/map_area.c src/BORK_of_DOOM/map_area.h \
  $(PROCGL) $(PROCGL_LIBS)
-	$(CC) $(CFLAGS) -o obj/game_fps.o -c src/game/game_fps.c $(INCLUDES)
+	$(CC) $(CFLAGS) -o obj/map_area.o -c src/BORK_of_DOOM/map_area.c $(INCLUDES)
 
 obj/procgl_base.o: src/procgl/procgl_base.c src/procgl/procgl_base.h
 	$(CC) $(CFLAGS) -o obj/procgl_base.o -c src/procgl/procgl_base.c $(INCLUDES)
