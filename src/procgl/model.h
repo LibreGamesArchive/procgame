@@ -34,6 +34,9 @@ struct pg_vertex_full {
     float height;
 };
 
+void pg_vertex_transform(struct pg_vertex_full* out, struct pg_vertex_full* src,
+                         mat4 transform);
+
 struct pg_model_buffer {
     struct pg_shader* shader;
     GLuint vbo;
@@ -85,7 +88,7 @@ void pg_model_add_triangle(struct pg_model* model, unsigned v0,
                            unsigned v1, unsigned v2);
 /*  Composition/transformation  */
 void pg_model_append(struct pg_model* dst, struct pg_model* src,
-                         mat4 transform);
+                     mat4 transform);
 void pg_model_transform(struct pg_model* model, mat4 transform);
 /*  Component generation    */
 void pg_model_precalc_normals(struct pg_model* model);

@@ -9,6 +9,48 @@
 #include "heightmap.h"
 #include "texture.h"
 
+void pg_vertex_transform(struct pg_vertex_full* out, struct pg_vertex_full* src,
+                         mat4 transform)
+{
+    mat4 inv;
+    mat4_invert(inv, transform);
+    mat4 normal_matrix;
+    mat4_transpose(normal_matrix, inv);
+    if(src->components & PG_MODEL_COMPONENT_POSITION) {
+        vec4 old = { src->pos[0], src->pos[1], src->pos[2], 1.0f };
+        vec4 new;
+        mat4_mul_vec4(new, transform, old);
+        vec3_dup(out->pos, new);
+    }
+    if(src->components & PG_MODEL_COMPONENT_COLOR) {
+        vec4_dup(out->color, src->color);
+    }
+    if(src->components & PG_MODEL_COMPONENT_UV) {
+        vec2_dup(out->uv, src->uv);
+    }
+    if(src->components & PG_MODEL_COMPONENT_NORMAL) {
+        vec4 old = { src->normal[0], src->normal[1], src->normal[2], 1.0f };
+        vec4 new;
+        mat4_mul_vec4(new, normal_matrix, old);
+        vec3_dup(out->normal, new);
+    }
+    if(src->components & PG_MODEL_COMPONENT_TANGENT) {
+        vec4 old = { src->tangent[0], src->tangent[1], src->tangent[2], 1.0f };
+        vec4 new;
+        mat4_mul_vec4(new, normal_matrix, old);
+        vec3_dup(out->tangent, new);
+    }
+    if(src->components & PG_MODEL_COMPONENT_BITANGENT) {
+        vec4 old = { src->bitangent[0], src->bitangent[1], src->bitangent[2], 1.0f };
+        vec4 new;
+        mat4_mul_vec4(new, normal_matrix, old);
+        vec3_dup(out->bitangent, new);
+    }
+    if(src->components & PG_MODEL_COMPONENT_HEIGHT) {
+        out->height = src->height;
+    }
+}
+
 static void pg_model_reset_buffers(struct pg_model* model);
 
 /*  Setup+cleanup   */
@@ -312,39 +354,15 @@ void pg_model_add_triangle(struct pg_model* model, unsigned v0,
 
 /*  Compos/transformation  */
 void pg_model_append(struct pg_model* dst, struct pg_model* src,
-                         mat4 transform)
+                     mat4 transform)
 {
     unsigned dst_v = dst->v_count;
-    struct pg_vertex_full v;
+    struct pg_vertex_full src_vert, new_vert;
     int src_i;
     for(src_i = 0; src_i < src->v_count; ++src_i) {
-        pg_model_get_vertex(src, &v, src_i);
-        vec4 old = { v.pos[0], v.pos[1], v.pos[2], 1.0f };
-        vec4 new;
-        mat4_mul_vec4(new, transform, old);
-        mat4 inv;
-        mat4_invert(inv, transform);
-        mat4 norm;
-        mat4_transpose(norm, inv);
-        vec4 old_norm = { v.normal[0], v.normal[1], v.normal[2], 0.0f };
-        vec4 old_tan = { v.tangent[0], v.tangent[1], v.tangent[2], 0.0f };
-        vec4 old_bitan = { v.bitangent[0], v.bitangent[1], v.bitangent[2], 0.0f };
-        vec4 new_norm, new_tan, new_bitan;
-        mat4_mul_vec4(new_norm, norm, old_norm);
-        mat4_mul_vec4(new_tan, norm, old_tan);
-        mat4_mul_vec4(new_bitan, norm, old_bitan);
-        vec4_normalize(new_norm, new_norm);
-        vec4_normalize(new_tan, new_tan);
-        vec4_normalize(new_bitan, new_bitan);
-        v = (struct pg_vertex_full) {
-            .pos = { new[0], new[1], new[2] },
-            .color = { v.color[0], v.color[1], v.color[2], v.color[3] },
-            .uv = { v.uv[0], v.uv[1] },
-            .normal = { new_norm[0], new_norm[1], new_norm[2] },
-            .tangent = { new_tan[0], new_tan[1], new_tan[2] },
-            .bitangent = { new_bitan[0], new_bitan[1], new_bitan[2] },
-            .height = v.height };
-        pg_model_add_vertex(dst, &v);
+        pg_model_get_vertex(src, &src_vert, src_i);
+        pg_vertex_transform(&new_vert, &src_vert, transform);
+        pg_model_add_vertex(dst, &new_vert);
     }
     ARR_RESERVE(dst->tris, dst->tris.len + src->tris.len);
     int i;
@@ -359,28 +377,11 @@ void pg_model_append(struct pg_model* dst, struct pg_model* src,
 void pg_model_transform(struct pg_model* model, mat4 transform)
 {
     int i;
-    struct pg_vertex_full v;
+    struct pg_vertex_full old_vert, new_vert;
     for(i = 0; i < model->v_count; ++i) {
-        pg_model_get_vertex(model, &v, i);
-        vec4 old = { v.pos[0], v.pos[1], v.pos[2], 1.0f };
-        vec4 new;
-        mat4_mul_vec4(new, transform, old);
-        mat4 inv;
-        mat4_invert(inv, transform);
-        mat4 norm;
-        mat4_transpose(norm, inv);
-        vec4 old_norm = { v.normal[0], v.normal[1], v.normal[2], 1.0f };
-        vec4 old_tan = { v.tangent[0], v.tangent[1], v.tangent[2], 1.0f };
-        vec4 old_bitan = { v.bitangent[0], v.bitangent[1], v.bitangent[2], 1.0f };
-        vec4 new_norm, new_tan, new_bitan;
-        mat4_mul_vec4(new_norm, norm, old_norm);
-        mat4_mul_vec4(new_tan, norm, old_tan);
-        mat4_mul_vec4(new_bitan, norm, old_bitan);
-        vec3_normalize(v.normal, new_norm);
-        vec3_normalize(v.tangent, new_tan);
-        vec3_normalize(v.bitangent, new_bitan);
-        vec3_dup(v.pos, new);
-        pg_model_set_vertex(model, &v, i);
+        pg_model_get_vertex(model, &old_vert, i);
+        pg_vertex_transform(&new_vert, &old_vert, transform);
+        pg_model_set_vertex(model, &new_vert, i);
     }
 }
 
