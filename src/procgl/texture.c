@@ -45,8 +45,8 @@ void pg_texture_init_from_file(struct pg_texture* tex,
                      GL_UNSIGNED_BYTE, tex->light);
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
     } else {
         tex->light = NULL;
         tex->light_slot = -1;
@@ -146,4 +146,16 @@ void pg_texture_set_atlas(struct pg_texture* tex, int frame_w, int frame_h)
 {
     tex->frame_w = frame_w;
     tex->frame_h = frame_h;
+}
+
+void pg_texture_get_frame(struct pg_texture* tex, int frame,
+                          vec2 start, vec2 end)
+{
+    int frames_wide = tex->w / tex->frame_w;
+    float frame_u = (float)tex->frame_w / tex->w;
+    float frame_v = (float)tex->frame_h / tex->h;
+    float frame_x = (float)(frame % frames_wide) * frame_u;
+    float frame_y = (float)(frame / frames_wide) * frame_v;
+    vec2_set(start, frame_x, frame_y + frame_v);
+    vec2_set(end, frame_x + frame_u, frame_y);
 }
