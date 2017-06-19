@@ -1,7 +1,7 @@
 #include <stdio.h>
 #include <time.h>
 #include "procgl/procgl.h"
-#include "BORK_of_DOOM/game_states.h"
+#include "BORK_of_DOOM/bork.h"
 
 int main(int argc, char *argv[])
 {
@@ -15,9 +15,11 @@ int main(int argc, char *argv[])
     pg_init(w, h, fullscreen, "procgame");
     glEnable(GL_CULL_FACE);
     srand(time(0));
-    /*  Init example game   */
+    /*  Init BORK OF DOOM   */
+    struct bork_game_core bork;
     struct pg_game_state game;
-    bork_game_start(&game);
+    bork_init(&bork);
+    bork_menu_start(&game, &bork);
     /*  Main loop   */
     while(game.tick) {
         glEnable(GL_DEPTH_TEST);

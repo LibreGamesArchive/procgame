@@ -1,6 +1,7 @@
 #include <stdlib.h>
 #include <limits.h>
 #include "procgl/procgl.h"
+#include "bork.h"
 #include "map_area.h"
 
 void bork_map_init(struct bork_map* map, int w, int l, int h)
@@ -39,9 +40,9 @@ static const vec3 vert_tan[6] = {
     [FACE_UP] = { 1.0, 0, 0 }, 
     [FACE_DOWN] = { 1.0, 0, 0 } };
 static const vec3 vert_bitan[6] = {
-    [FACE_FRONT] = { 0, 0, 1.0 }, 
+    [FACE_FRONT] = { 0, 0, -1.0 }, 
     [FACE_BACK] = { 0, 0, -1.0 },
-    [FACE_LEFT] = { 0, 0, 1.0 }, 
+    [FACE_LEFT] = { 0, 0, -1.0 }, 
     [FACE_RIGHT] = { 0, 0, -1.0 }, 
     [FACE_UP] = { 0, -1.0, 0 }, 
     [FACE_DOWN] = { 0, 1.0, 0 } };

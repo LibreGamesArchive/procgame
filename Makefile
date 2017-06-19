@@ -16,14 +16,14 @@ LIBS_WINDOWS := -lmingw32 -l:src/libs/win32/GL/libglew32.a \
 
 TARGET := procgame
 
-GAME := obj/game_state.o obj/state_play.o obj/map_area.o
+GAME := obj/game_state.o obj/bork.o obj/state_menu.o obj/state_play.o obj/map_area.o
 PROCGL := obj/procgl_base.o \
  obj/viewer.o obj/postproc.o obj/shader.o obj/gbuffer.o \
  obj/model.o obj/model_prims.o obj/marching_cubes.o \
  obj/shader_2d.o obj/shader_3d.o obj/shader_cubetex.o obj/shader_text.o \
  obj/wave.o obj/heightmap.o obj/texture.o obj/audio.o \
  obj/sdf.o obj/sdf_functions.o
-PROCGL_LIBS := obj/lodepng.o obj/noise1234.o obj/wavfile.o
+PROCGL_LIBS := obj/lodepng.o obj/noise1234.o obj/wavfile.o obj/easing.o
 
 debug_linux: INCLUDES += -Isrc/libs/linux
 debug_linux: LIBS := $(LIBS_LINUX)
@@ -50,7 +50,13 @@ obj/main.o: src/main.c $(GAME) $(PROCGL) $(PROCGL_LIBS)
 
 obj/game_state.o: src/game/game_state.c src/game/game_state.h
 	$(CC) $(CFLAGS) -o obj/game_state.o -c src/game/game_state.c $(INCLUDES)
-obj/state_play.o: src/BORK_of_DOOM/state_play.c src/BORK_of_DOOM/game_states.h \
+obj/bork.o: src/BORK_of_DOOM/bork.c src/BORK_of_DOOM/bork.h \
+ $(PROCGL) $(PROCGL_LIBS)
+	$(CC) $(CFLAGS) -o obj/bork.o -c src/BORK_of_DOOM/bork.c $(INCLUDES)
+obj/state_menu.o: src/BORK_of_DOOM/state_menu.c src/BORK_of_DOOM/bork.h \
+ $(PROCGL) $(PROCGL_LIBS)
+	$(CC) $(CFLAGS) -o obj/state_menu.o -c src/BORK_of_DOOM/state_menu.c $(INCLUDES)
+obj/state_play.o: src/BORK_of_DOOM/state_play.c src/BORK_of_DOOM/bork.h \
  $(PROCGL) $(PROCGL_LIBS)
 	$(CC) $(CFLAGS) -o obj/state_play.o -c src/BORK_of_DOOM/state_play.c $(INCLUDES)
 obj/map_area.o: src/BORK_of_DOOM/map_area.c src/BORK_of_DOOM/map_area.h \
@@ -127,6 +133,8 @@ obj/noise1234.o: src/procgl/ext/noise1234.c src/procgl/ext/noise1234.h
 	$(CC) $(CFLAGS) -o obj/noise1234.o -c src/procgl/ext/noise1234.c $(INCLUDES)
 obj/wavfile.o: src/procgl/ext/wavfile.c src/procgl/ext/wavfile.h
 	$(CC) $(CFLAGS) -o obj/wavfile.o -c src/procgl/ext/wavfile.c $(INCLUDES)
+obj/easing.o: src/procgl/ext/AHEasing/easing.c src/procgl/ext/AHEasing/easing.h
+	$(CC) $(CFLAGS) -o obj/easing.o -c src/procgl/ext/AHEasing/easing.c $(INCLUDES)
 
 dump_shaders: src/procgl/shaders/*.glsl
 	cd src/procgl/shaders && \

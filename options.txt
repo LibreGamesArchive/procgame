@@ -1,4 +1,4 @@
-x:800
-y:600
+x:1280
+y:720
 fullscreen:0
 mouse:0.005

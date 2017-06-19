@@ -11,6 +11,10 @@ struct bork_tile {
 };
 
 struct bork_map {
+    int station_area[2]; /* z start, z end  */
+    int area_radius[BORK_AREA_EXTERIOR];
+    int area_order[BORK_AREA_EXTERIOR];
+    int mutt_area[5]; /* x, y, z start, z end, radius */
     int w, l, h;
     struct bork_tile* data;
     struct pg_texture* tex_atlas;
