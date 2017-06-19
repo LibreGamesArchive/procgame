@@ -34,7 +34,7 @@ void pg_game_state_update(struct pg_game_state* state, float new_time)
         ++ticks_done;
         acc += tick_time;
         state->time = state->last_tick + acc;
-        state->tick(state);
+        if(state->tick) state->tick(state);
     }
     if(ticks_done == state->tick_max) {
         state->last_tick = new_time;
