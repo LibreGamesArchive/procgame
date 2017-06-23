@@ -16,7 +16,8 @@ LIBS_WINDOWS := -lmingw32 -l:src/libs/win32/GL/libglew32.a \
 
 TARGET := procgame
 
-GAME := obj/game_state.o obj/bork.o obj/state_menu.o obj/state_play.o obj/map_area.o
+GAME := obj/game_state.o obj/bork.o obj/state_menu.o obj/state_play.o \
+    obj/map_area.o obj/physics.o
 PROCGL := obj/procgl_base.o \
  obj/viewer.o obj/postproc.o obj/shader.o obj/gbuffer.o \
  obj/model.o obj/model_prims.o obj/marching_cubes.o \
@@ -62,6 +63,9 @@ obj/state_play.o: src/BORK_of_DOOM/state_play.c src/BORK_of_DOOM/bork.h \
 obj/map_area.o: src/BORK_of_DOOM/map_area.c src/BORK_of_DOOM/map_area.h \
  $(PROCGL) $(PROCGL_LIBS)
 	$(CC) $(CFLAGS) -o obj/map_area.o -c src/BORK_of_DOOM/map_area.c $(INCLUDES)
+obj/physics.o: src/BORK_of_DOOM/physics.c src/BORK_of_DOOM/map_area.h \
+ $(PROCGL) $(PROCGL_LIBS)
+	$(CC) $(CFLAGS) -o obj/physics.o -c src/BORK_of_DOOM/physics.c $(INCLUDES)
 
 obj/procgl_base.o: src/procgl/procgl_base.c src/procgl/procgl_base.h
 	$(CC) $(CFLAGS) -o obj/procgl_base.o -c src/procgl/procgl_base.c $(INCLUDES)

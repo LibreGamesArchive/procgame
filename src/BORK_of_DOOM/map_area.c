@@ -87,6 +87,7 @@ static void bork_map_model_add_face(struct pg_model* model,
                 -vert_pos[i][2] + (float)y, vert_pos[i][1] + (float)z );
             break;
         }
+        vec3_add(new_vert.pos, new_vert.pos, (vec3){ 0.5, 0.5, 0.5 });
         vec3_scale(new_vert.pos, new_vert.pos, 2);
         vec3_dup(new_vert.normal, vert_norm[dir]);
         vec3_dup(new_vert.tangent, vert_tan[dir]);
@@ -106,12 +107,14 @@ void bork_map_generate_model(struct bork_map* map, struct pg_model* model,
 {
     pg_model_reset(model);
     model->components = comp;
+    map->model = model;
     struct bork_tile* tile;
     int x, y, z;
     for(x = 0; x < map->w; ++x) {
         for(y = 0; y < map->l; ++y) {
             for(z = 0; z < map->h; ++z) {
                 tile = bork_map_get_tile(map, x, y, z);
+                tile->model_tri_idx = model->tris.len;
                 if(!tile || tile->type < 2) continue;
                 struct bork_tile* surr_tiles[6] = {
                     bork_map_get_tile(map, x, y + 1, z),    /* Front */
@@ -123,13 +126,13 @@ void bork_map_generate_model(struct bork_map* map, struct pg_model* model,
                 int s;
                 for(s = 0; s < 6; ++s) {
                     if(surr_tiles[s] && surr_tiles[s]->type > 1) continue;
+                    tile->num_tris += 2;
                     bork_map_model_add_face(model, tex, tile->type,
                                             s, x, y, z);
                 }
             }
         }
     }
-
 }
 
 struct bork_tile* bork_map_get_tile(struct bork_map* map, int x, int y, int z)

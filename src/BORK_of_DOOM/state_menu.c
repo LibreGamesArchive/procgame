@@ -39,11 +39,10 @@ void bork_menu_start(struct pg_game_state* state, struct bork_game_core* core)
     /*  Set up the game state, 60 ticks per second, keyboard input   */
     pg_game_state_init(state, pg_time(), 30, 3);
     struct bork_menu_data* d = malloc(sizeof(*d));
-    d->current_selection = 0;
-    d->core = core;
-    d->kb_state = SDL_GetKeyboardState(NULL);
-    SDL_SetRelativeMouseMode(SDL_TRUE);
-    vec2_set(d->mouse_motion, 0, 0);
+    *d = (struct bork_menu_data) {
+        .core = core,
+        .kb_state = SDL_GetKeyboardState(NULL) };
+    //SDL_SetRelativeMouseMode(SDL_TRUE);
     /*  Assign all the pointers, and it's finished  */
     state->data = d;
     state->update = NULL;
