@@ -1,6 +1,7 @@
 #include <math.h>
 #include <stdio.h>
 #include "procgl/procgl.h"
+#include "bork.h"
 #include "map_area.h"
 
 #define PLANE_BACKSIDE 0x000001
@@ -89,7 +90,6 @@ void nearest_on_triangle(vec3 out, vec3 p, vec3 a, vec3 b, vec3 c)
     vec3_scale(ac, ac, w);
     vec3_add(ab, ab, ac);
     vec3_add(out, ab, a);
-    printf("P inside face region\n");
 }
 
 /*  Some utility functions for ray casting  */
@@ -173,9 +173,6 @@ static int bork_collide_iterate(struct bork_map* map, vec3 out, vec3 _pos, vec3 
     //box_div_vec3(bbox, bbox, size);
     int check[2][3] = { { (int)bbox[0][0]-1, (int)bbox[0][1]-1, (int)bbox[0][2]-1 },
                         { (int)bbox[1][0]+1, (int)bbox[1][1]+1, (int)bbox[1][2]+1 } };
-    printf("Checking box: %d, %d, %d -> %d, %d, %d\n",
-        check[0][0], check[0][1], check[0][1],
-        check[1][0], check[1][1], check[1][1]);
     /*  Set up the arg struct and push accumulation variables for the
         collision function  */
     vec3 push = {};
@@ -188,8 +185,6 @@ static int bork_collide_iterate(struct bork_map* map, vec3 out, vec3 _pos, vec3 
                 struct bork_tile* tile = bork_map_get_tile(map, x, y, z);
                 /*  If the tile is outside the map, or the tile is not
                     collidable, move on to the next one */
-                printf("Tile: %d, %d, %d: %p, %s\n", x, y, z, tile,
-                       (tile && tile->type == BORK_TILE_HULL) ? "HULL" : "SPACE");
                 if(!tile || tile->type < 2) continue;
                 unsigned i;
                 for(i = 0; i < tile->num_tris; ++i) {

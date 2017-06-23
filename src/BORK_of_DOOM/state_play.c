@@ -116,7 +116,6 @@ static void bork_play_tick(struct pg_game_state* state)
         vec3_normalize(coll_dir, coll_dir);
         vec3 down_dir = { 0, 0, 1 };
         float down_angle = vec3_angle_diff(coll_dir, down_dir);
-        printf("Downness: %f\n", down_angle);
         if(down_angle < 0.1 * M_PI) {
             d->player_ground = 1;
             vec3_scale(d->player_vel, d->player_vel, 0.8);
