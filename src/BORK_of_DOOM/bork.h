@@ -1,17 +1,20 @@
-enum bork_area_id {
-    BORK_AREA_COMMAND_STATION,
-    BORK_AREA_OFFICES,
-    BORK_AREA_WAREHOUSE,
-    BORK_AREA_UNION_HALL,
-    BORK_AREA_INFIRMARY,
-    BORK_AREA_RECREATION,
-    BORK_AREA_SCIENCE_LABS,
-    BORK_AREA_CAFETERIA,
-    BORK_AREA_KITCHEN,
-    BORK_AREA_PETS,
-    BORK_AREA_EXTERIOR,
-    BORK_AREA_MUTT,
+enum bork_direction {
+    BORK_FRONT = 0,
+    BORK_Y_POS = BORK_FRONT,
+    BORK_BACK = 1,
+    BORK_Y_NEG = BORK_BACK,
+    BORK_LEFT = 2,
+    BORK_X_POS = BORK_LEFT,
+    BORK_RIGHT = 3,
+    BORK_X_NEG = BORK_RIGHT,
+    BORK_UP = 4,
+    BORK_Z_POS = BORK_UP,
+    BORK_TOP = BORK_UP,
+    BORK_DOWN = 5,
+    BORK_Z_NEG = BORK_DOWN,
+    BORK_BOTTOM = BORK_DOWN
 };
+#define BORK_DIR_OPPOSITE(a)    (a % 2 ? a - 1 : a + 1)
 
 struct bork_game_core {
     /*  Rendering data  */

@@ -1,7 +1,40 @@
+enum bork_area {
+    BORK_AREA_EXTERIOR,
+    BORK_AREA_MUTT,
+    BORK_AREA_COMMAND,
+    BORK_AREA_WAREHOUSE,
+    BORK_AREA_UNION_HALL,
+    BORK_AREA_INFIRMARY,
+    BORK_AREA_REC_CENTER,
+    BORK_AREA_SCIENCE_LABS,
+    BORK_AREA_CAFETERIA,
+    BORK_AREA_KITCHEN,
+    BORK_AREA_PETS
+};
+
 enum bork_tile_type {
     BORK_TILE_VAC,
     BORK_TILE_ATMO,
     BORK_TILE_HULL
+};
+
+static struct bork_tile_detail {
+    enum {
+        BORK_TILE_EMPTY,
+        BORK_TILE_REGULAR,
+        BORK_TILE_MODEL } type;
+    uint8_t face_flags[6];
+    int tex_tile[6];
+    struct pg_model model;
+} BORK_TILE_DETAILS[] = {
+    [BORK_TILE_VAC] = {},
+    [BORK_TILE_ATMO] = {},
+    [BORK_TILE_HULL] = {
+        BORK_TILE_REGULAR,
+        .tex_tile = {
+            [BORK_LEFT] = 2, [BORK_RIGHT] = 2,
+            [BORK_FRONT] = 2, [BORK_BACK] = 2,
+            [BORK_UP] = 3, [BORK_DOWN] = 4 } }
 };
 
 struct bork_tile {
@@ -12,10 +45,7 @@ struct bork_tile {
 };
 
 struct bork_map {
-    int station_area[2]; /* z start, z end  */
-    int area_radius[10];
-    int area_order[10];
-    int mutt_area[5]; /* x, y, z start, z end, radius */
+    box station_areas[BORK_AREA_PETS];
     int w, l, h;
     struct bork_tile* data;
     struct pg_texture* tex_atlas;

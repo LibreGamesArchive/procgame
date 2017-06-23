@@ -59,6 +59,7 @@ static void bork_map_model_add_face(struct pg_model* model,
                                     enum face_dir dir, int x, int y, int z)
 {
     struct pg_vertex_full new_vert = { .components = comp };
+    struct bork_tile_detail* detail = &BORK_TILE_DETAILS[tile_type];
     int i;
     for(i = 0; i < 4; ++i) {
         switch(dir) {
@@ -93,7 +94,8 @@ static void bork_map_model_add_face(struct pg_model* model,
         vec3_dup(new_vert.tangent, vert_tan[dir]);
         vec3_dup(new_vert.bitangent, vert_bitan[dir]);
         vec2 tex_frame[2];
-        pg_texture_get_frame(tex_atlas, tile_type, tex_frame[0], tex_frame[1]);
+        pg_texture_get_frame(tex_atlas, detail->tex_tile[dir],
+                             tex_frame[0], tex_frame[1]);
         vec2_set(new_vert.uv, tex_frame[vert_uv[i][0]][0], tex_frame[vert_uv[i][1]][1]);
         pg_model_add_vertex(model, &new_vert);
     }

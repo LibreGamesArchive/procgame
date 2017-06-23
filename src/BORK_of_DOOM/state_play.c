@@ -52,7 +52,7 @@ void bork_play_start(struct pg_game_state* state, struct bork_game_core* core)
     bork_play_generate_map(d, 32, 32, 128);
     /*  Initialize the player data  */
     vec2_set(d->player_dir, 0, 0);
-    vec3_set(d->player_pos, 5, 5, 20);
+    vec3_set(d->player_pos, 5, 5, 5);
     vec3_set(d->player_vel, 0, 0, 0);
     d->player_speed = 0.02;
     /*  Assign all the pointers, and it's finished  */
@@ -176,7 +176,7 @@ static void bork_play_generate_map(struct bork_play_data* d, int w, int l, int h
         for(y = 0; y < l; ++y) {
             for(z = 0; z < h; ++z) {
                 //if((rand() % 20 == 0) || (z == 12) || (x < 8 && (z == 0)) || (x >= 8 && z <= x - 8)) {
-                if(z == 0 || (y - z > 8)) {
+                if(z == 0 || z == 3 || rand() % 10 == 0) {
                     bork_map_set_tile(&d->map, x, y, z, (struct bork_tile) {
                         BORK_TILE_HULL });
                 } else {
