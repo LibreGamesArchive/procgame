@@ -61,6 +61,12 @@ static inline void vec##n##_mul(vec##n r, vec##n const a, vec##n const b) \
     for(i=0; i<n; ++i) \
         r[i] = a[i] * b[i]; \
 } \
+static inline void vec##n##_div(vec##n r, vec##n const a, vec##n const b) \
+{ \
+    int i; \
+    for(i=0; i<n; ++i) \
+        r[i] = a[i] / b[i]; \
+} \
 static inline void vec##n##_scale(vec##n r, vec##n const v, float const s) \
 { \
     int i; \
@@ -82,7 +88,12 @@ static inline float vec##n##_len(vec##n const v) \
 static inline void vec##n##_normalize(vec##n r, vec##n const v) \
 { \
     float k = 1.0 / vec##n##_len(v); \
-    vec##n##_scale(r, v, k); \
+    vec##n##_scale(r,v,k); \
+} \
+static inline void vec##n##_set_len(vec##n r, vec##n const v, float const l) \
+{ \
+    float len = vec##n##_len(v); \
+    if(len != 0) vec##n##_scale(r,v,l/len); \
 } \
 static inline void vec##n##_min(vec##n r, vec##n const a, vec##n const b) \
 { \
@@ -137,7 +148,18 @@ static inline void vec##n##_clamp(vec##n r, vec##n const v, \
     int i; \
     for(i=0; i<n; ++i) \
         r[i] = v[i] < a[i] ? a[i] : (v[i] > b[i] ? b[i] : v[i]); \
-}
+} \
+static inline int vec##n##_is_zero(vec##n const v) \
+{ \
+    int i; \
+    for(i=0; i<n; ++i) \
+        if(v[i] != 0.0f) return 0; \
+    return 1; \
+} \
+static inline float vec##n##_angle_diff(vec##n const a, vec##n const b) \
+{ \
+    return acosf(vec##n##_mul_inner(a, b) / (vec##n##_len(a) * vec##n##_len(b))); \
+} \
 
 LINMATH_H_DEFINE_VEC(2)
 LINMATH_H_DEFINE_VEC(3)
@@ -177,6 +199,13 @@ static inline void vec3_reflect(vec3 r, vec3 const v, vec3 const n)
     int i;
     for(i=0;i<3;++i)
         r[i] = v[i] - p*n[i];
+}
+
+static inline void vec3_wedge(vec3 r, vec3 const a, vec3 const b)
+{
+    r[0] = (a[1] * b[2]) - (b[1] * a[2]);
+    r[1] = (a[2] * b[0]) - (b[2] * a[0]);
+    r[2] = (a[0] * b[1]) - (b[0] * a[1]);
 }
 
 static inline void vec4_mul_cross(vec4 r, vec4 a, vec4 b)
@@ -684,5 +713,39 @@ static inline void quat_from_mat4(quat q, mat4 M)
     q[3] = (M[p[2]][p[1]] - M[p[1]][p[2]])/(2.f*r);
 }
 
+typedef vec3 box[2];
+static inline void box_bound(box out, box a, box b)
+{
+    out[0][0] = MIN(MIN(a[0][0], a[1][0]), MIN(b[0][0], b[1][0]));
+    out[0][1] = MIN(MIN(a[0][1], a[1][1]), MIN(b[0][1], b[1][1]));
+    out[0][2] = MIN(MIN(a[0][2], a[1][2]), MIN(b[0][2], b[1][2]));
+    out[1][0] = MAX(MAX(a[0][0], a[1][0]), MAX(b[0][0], b[1][0]));
+    out[1][1] = MAX(MAX(a[0][1], a[1][1]), MAX(b[0][1], b[1][1]));
+    out[1][2] = MAX(MAX(a[0][2], a[1][2]), MAX(b[0][2], b[1][2]));
+}
+
+static inline void box_add_vec3(box out, box a, vec3 v)
+{
+    vec3_add(out[0], a[0], v);
+    vec3_add(out[1], a[1], v);
+}
+
+static inline void box_sub_vec3(box out, box a, vec3 v)
+{
+    vec3_sub(out[0], a[0], v);
+    vec3_sub(out[1], a[1], v);
+}
+
+static inline void box_mul_vec3(box out, box a, vec3 v)
+{
+    vec3_mul(out[0], a[0], v);
+    vec3_mul(out[1], a[1], v);
+}
+
+static inline void box_div_vec3(box out, box a, vec3 v)
+{
+    vec3_div(out[0], a[0], v);
+    vec3_div(out[1], a[1], v);
+}
 #endif
 
