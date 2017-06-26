@@ -18,7 +18,7 @@ uniform float spacing;
 /*  128-character string packed into uints  */
 uniform uint string[32];
 
-#define STR_CHAR(i) (((string[i / 4u] >> ((i % 4u) * 8u)) & 0xFFu) - 32u)
+#define STR_CHAR(i) (((string[uint(i) / uint(4)] >> ((uint(i) % uint(4)) * uint(8))) & uint(0xFF)) - uint(32))
 
 out vec2 f_tex;
 
