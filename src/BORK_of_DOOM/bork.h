@@ -14,7 +14,14 @@ enum bork_direction {
     BORK_Z_NEG = BORK_DOWN,
     BORK_BOTTOM = BORK_DOWN
 };
-#define BORK_DIR_OPPOSITE(a)    (a % 2 ? a - 1 : a + 1)
+static const int BORK_DIR_OPPOSITE[6] = { 1, 0, 3, 2, 5, 4 };
+static const int BORK_DIR[6][3] = {
+    [BORK_FRONT] = { 0, 1, 0 }, 
+    [BORK_BACK] = { 0, -1, 0 },
+    [BORK_LEFT] = { 1, 0, 0 }, 
+    [BORK_RIGHT] = { -1, 0, 0 }, 
+    [BORK_UP] = { 0, 0, 1 }, 
+    [BORK_DOWN] = { 0, 0, -1 } };
 
 struct bork_game_core {
     /*  Rendering data  */

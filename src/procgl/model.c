@@ -524,7 +524,7 @@ void pg_model_warp_verts(struct pg_model* model)
 {
     int i;
     for(i = 0; i < model->pos.len; ++i) {
-        vec3 move = { rand() % 10 * 0.005, rand() % 10 * 0.005, rand() % 10 * 0.005 };
+        vec3 move = { rand() % 10 * 0.00001, rand() % 10 * 0.00001, rand() % 10 * 0.00001 };
         vec3_add(model->pos.data[i].v, model->pos.data[i].v, move);
     }
 }

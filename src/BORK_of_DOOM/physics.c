@@ -3,10 +3,7 @@
 #include "procgl/procgl.h"
 #include "bork.h"
 #include "map_area.h"
-
-#define PLANE_BACKSIDE 0x000001
-#define PLANE_FRONT    0x000010
-#define ON_PLANE       0x000100
+#include "physics.h"
 
 static int is_point_in_triangle(vec3 point, vec3 a, vec3 b, vec3 c)
 {
@@ -155,7 +152,8 @@ static int collide_with_tri(struct collision_info* info, vec3 pos,
     return 1;
 }
 
-static int bork_collide_iterate(struct bork_map* map, vec3 out, vec3 _pos, vec3 size)
+int bork_map_collide(struct bork_map* map, struct bork_collision* coll_out,
+                     vec3 out, vec3 _pos, vec3 size)
 {
     /*   The first thing we do is scale the player and his velocity to
          ellipsoid space    */
@@ -170,7 +168,6 @@ static int bork_collide_iterate(struct bork_map* map, vec3 out, vec3 _pos, vec3 
     vec3_sub(bbox[0], _pos, size_scaled);
     vec3_add(bbox[1], _pos, size_scaled);
     box_mul_vec3(bbox, bbox, (vec3){ 0.5, 0.5, 0.5 });
-    //box_div_vec3(bbox, bbox, size);
     int check[2][3] = { { (int)bbox[0][0]-1, (int)bbox[0][1]-1, (int)bbox[0][2]-1 },
                         { (int)bbox[1][0]+1, (int)bbox[1][1]+1, (int)bbox[1][2]+1 } };
     /*  Set up the arg struct and push accumulation variables for the
@@ -179,6 +176,7 @@ static int bork_collide_iterate(struct bork_map* map, vec3 out, vec3 _pos, vec3 
     struct collision_info info = {};
     int x, y, z;
     int count = 0;
+    float deepest = 0;
     for(x = check[0][0]; x < check[1][0]; ++x) {
         for(y = check[0][1]; y < check[1][1]; ++y) {
             for(z = check[0][2]; z < check[1][2]; ++z) {
@@ -204,13 +202,18 @@ static int bork_collide_iterate(struct bork_map* map, vec3 out, vec3 _pos, vec3 
                     vec3_normalize(norm, norm);
                     int c = collide_with_tri(&info, pos, p0, p1, p2, norm);
                     if(c) {
-                        ++count;
                         vec3 tri_push;
                         vec3_sub(tri_push, info.face_ix, info.sphere_ix);
                         /*  If this collision has the greatest depth, then
                             this is the one we will use */
                         float depth = vec3_len(tri_push);
-                        if(depth > vec3_len(push)) vec3_dup(push, tri_push);
+                        if(depth <= deepest) continue;
+                        ++count;
+                        deepest = depth;
+                        vec3_dup(push, tri_push);
+                        *coll_out = (struct bork_collision) {
+                            .x = x, .y = y, .z = z,
+                            .tile = tile };
                     }
                 }
             }
@@ -228,6 +231,7 @@ static int bork_collide_iterate(struct bork_map* map, vec3 out, vec3 _pos, vec3 
     return 1;
 }
 
+#if 0
 int bork_map_collide(struct bork_map* map, vec3 out, vec3 pos, vec3 size)
 {
     vec3 new_pos = { pos[0], pos[1], pos[2] };
@@ -238,3 +242,4 @@ int bork_map_collide(struct bork_map* map, vec3 out, vec3 pos, vec3 size)
     vec3_dup(out, new_pos);
     return hit;
 }
+#endif
