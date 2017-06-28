@@ -95,30 +95,6 @@ static inline float sd_plane(vec3 const p, vec3 const normal, float plane_d)
     return vec3_mul_inner(p, normal) + plane_d;
 }
 
-static inline float ray_to_plane(vec3 ray_origin, vec3 ray_dir,
-                                 vec3 plane_origin, vec3 plane_normal)
-{
-  float d = -(vec3_mul_inner(plane_normal, plane_origin));
-  float a = vec3_mul_inner(plane_normal, ray_origin) + d;
-  float b = vec3_mul_inner(plane_normal, ray_dir);
-  if(b == 0) return (-1.0f);
-  return -(a / b);
-}
-
-static inline float ray_to_sphere(vec3 ray_origin, vec3 ray_dir,
-                                  vec3 sphere_origin, float sphere_radius)
-{
-   vec3 Q;
-   vec3_sub(Q, sphere_origin, ray_origin);
-   float c = vec3_len(Q);
-   float v = vec3_mul_inner(Q,ray_dir);
-   float d = sphere_radius*sphere_radius - (c*c - v*v);
-   // If there was no intersection, return -1
-   if(d < 0.0) return (-1.0f);
-   // Return the distance to the [first] intersecting point
-   return (v - sqrt(d));
-}
-
 /*  Actual collision detection/response below:  */
 
 struct collision_info {
@@ -152,6 +128,9 @@ static int collide_with_tri(struct collision_info* info, vec3 pos,
     return 1;
 }
 
+/*  Finds the triangle which has the deepest collision into the ellipsoid,
+    and returns information about the collision through 'coll_out', while
+    returning 1 if there is a collision, 0 otherwise    */
 int bork_map_collide(struct bork_map* map, struct bork_collision* coll_out,
                      vec3 out, vec3 _pos, vec3 size)
 {
@@ -170,7 +149,7 @@ int bork_map_collide(struct bork_map* map, struct bork_collision* coll_out,
     box_mul_vec3(bbox, bbox, (vec3){ 0.5, 0.5, 0.5 });
     int check[2][3] = { { (int)bbox[0][0]-1, (int)bbox[0][1]-1, (int)bbox[0][2]-1 },
                         { (int)bbox[1][0]+1, (int)bbox[1][1]+1, (int)bbox[1][2]+1 } };
-    /*  Set up the arg struct and push accumulation variables for the
+    /*  Set up the return struct and push accumulation variables for the
         collision function  */
     vec3 push = {};
     struct collision_info info = {};
@@ -213,33 +192,16 @@ int bork_map_collide(struct bork_map* map, struct bork_collision* coll_out,
                         vec3_dup(push, tri_push);
                         *coll_out = (struct bork_collision) {
                             .x = x, .y = y, .z = z,
+                            .norm = { norm[0], norm[1], norm[2] },
                             .tile = tile };
                     }
                 }
             }
         }
     }
-    if(!count) {
-        vec3_dup(out, pos);
-        vec3_mul(out, out, size);
-        return 0;
-    }
     /*  Set the new position to the final pushed position   */
     vec3_add(out, pos, push);
     /*  Convert back from ellipsoid space, and we're done   */
     vec3_mul(out, out, size);
-    return 1;
+    return (!!count);
 }
-
-#if 0
-int bork_map_collide(struct bork_map* map, vec3 out, vec3 pos, vec3 size)
-{
-    vec3 new_pos = { pos[0], pos[1], pos[2] };
-    int hit = 0, steps = 0;
-    while(bork_collide_iterate(map, new_pos, new_pos, size) && steps++ < 5) {
-        ++hit;
-    }
-    vec3_dup(out, new_pos);
-    return hit;
-}
-#endif

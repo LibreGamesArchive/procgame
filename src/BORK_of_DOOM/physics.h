@@ -1,5 +1,6 @@
 struct bork_collision {
     int x, y, z;
+    vec3 norm;
     struct bork_tile* tile;
 };
 

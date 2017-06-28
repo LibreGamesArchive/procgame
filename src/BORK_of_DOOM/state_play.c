@@ -54,7 +54,7 @@ void bork_play_start(struct pg_game_state* state, struct bork_game_core* core)
     pg_shader_buffer_model(&d->core->shader_3d, &d->core->map_model);
     /*  Initialize the player data  */
     bork_entity_init(&d->plr, (vec3){ 0.5, 0.5, 0.8 });
-    vec3_set(d->plr.pos, 32, 32, 200);
+    vec3_set(d->plr.pos, 32, 32, 190);
     d->player_speed = 0.02;
     /*  Assign all the pointers, and it's finished  */
     state->data = d;
@@ -75,6 +75,15 @@ static void bork_play_update(struct pg_game_state* state)
     while(SDL_PollEvent(&e)) {
         if(e.type == SDL_QUIT) state->tick = NULL;
     }
+}
+
+static void bork_play_tick(struct pg_game_state* state)
+{
+    struct bork_play_data* d = state->data;
+    vec2_set(d->plr.dir,
+             d->plr.dir[0] + d->mouse_motion[0],
+             d->plr.dir[1] + d->mouse_motion[1]);
+    vec2_set(d->mouse_motion, 0, 0);
     if(d->kb_state[SDL_SCANCODE_SPACE] && d->plr.ground) {
         d->plr.vel[2] = 0.3;
         d->plr.ground = 0;
@@ -96,15 +105,6 @@ static void bork_play_update(struct pg_game_state* state)
         d->plr.vel[0] -= move_speed * cos(d->plr.dir[0]);
         d->plr.vel[1] -= move_speed * sin(d->plr.dir[0]);
     }
-}
-
-static void bork_play_tick(struct pg_game_state* state)
-{
-    struct bork_play_data* d = state->data;
-    vec2_set(d->plr.dir,
-             d->plr.dir[0] + d->mouse_motion[0],
-             d->plr.dir[1] + d->mouse_motion[1]);
-    vec2_set(d->mouse_motion, 0, 0);
     vec3_add(d->plr.vel, d->plr.vel, (vec3){ 0, 0, -0.02 });
     bork_entity_move(&d->plr, &d->map);
 }

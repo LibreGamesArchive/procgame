@@ -22,33 +22,45 @@ void bork_entity_move(struct bork_entity* ent, struct bork_map* map)
 {
     ent->ground = 0;
     struct bork_collision coll = {};
-    vec3 dest_pos;
-    vec3_add(dest_pos, ent->pos, ent->vel);
-    vec3 new_pos = { dest_pos[0], dest_pos[1], dest_pos[2] };
+    float curr_move = 0;
+    float max_move = vec3_vmin(ent->size);
+    float full_dist = vec3_len(ent->vel);
+    vec3 max_move_dir;
+    vec3_set_len(max_move_dir, ent->vel, max_move);
+    vec3 new_pos = { ent->pos[0], ent->pos[1], ent->pos[2] };
     int ladder = 0;
-    int hit = 0, steps = 0;
-    while(bork_map_collide(map, &coll, new_pos, new_pos, ent->size) && steps++ < 5) {
-        vec3 coll_dir;
-        vec3_sub(coll_dir, new_pos, dest_pos);
-        vec3_normalize(coll_dir, coll_dir);
-        vec3 down_dir = { 0, 0, 1 };
-        float down_angle = vec3_angle_diff(coll_dir, down_dir);
-        /*  If there was a collision with an angle nearly directly down,
-            mark the entity as being on the ground  */
-        if(down_angle < 0.1 * M_PI) {
-            ent->ground = 1;
-        } else if(coll.tile->type == BORK_TILE_LADDER) {
-            ladder = 1;
+    int steps = 0;
+    int hit = 0;
+    while(curr_move < full_dist) {
+        vec3 curr_dest;
+        if(curr_move + max_move >= full_dist) {
+            vec3_set_len(max_move_dir, ent->vel, full_dist - curr_move);
+            curr_move = full_dist;
+        } else {
+            curr_move += max_move;
         }
-        ++hit;
+        vec3_add(curr_dest, new_pos, max_move_dir);
+        steps = 0;
+        while(bork_map_collide(map, &coll, new_pos, curr_dest, ent->size)
+                && (steps++ < 4)) {
+            vec3 coll_dir;
+            vec3_sub(coll_dir, new_pos, curr_dest);
+            vec3_dup(curr_dest, new_pos);
+            float down_angle = vec3_angle_diff(coll.norm, BORK_DIR_VEC[BORK_UP]);
+            if(down_angle < 0.1 * M_PI) ent->ground = 1;
+            else if(coll.tile->type == BORK_TILE_LADDER) ladder = 1;
+            ++hit;
+        }
     }
     vec3_sub(ent->vel, new_pos, ent->pos);
     vec3_dup(ent->pos, new_pos);
     int friction = 0;
-    if(ent->ground) friction = 1;
     if(ladder) {
-        friction = 1;
         ent->vel[2] = 0.1;
+        friction = 1;
+    } else if(ent->ground) {
+        ent->vel[2] = 0;
+        friction = 1;
     }
     if(friction) vec3_scale(ent->vel, ent->vel, 0.8);
     if(vec3_len(ent->vel) < 0.0005) vec3_set(ent->vel, 0, 0, 0);

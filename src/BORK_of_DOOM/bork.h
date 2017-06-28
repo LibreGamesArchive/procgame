@@ -16,11 +16,18 @@ enum bork_direction {
 };
 static const int BORK_DIR_OPPOSITE[6] = { 1, 0, 3, 2, 5, 4 };
 static const int BORK_DIR[6][3] = {
-    [BORK_FRONT] = { 0, 1, 0 }, 
+    [BORK_FRONT] = { 0, 1, 0 },
     [BORK_BACK] = { 0, -1, 0 },
-    [BORK_LEFT] = { 1, 0, 0 }, 
-    [BORK_RIGHT] = { -1, 0, 0 }, 
-    [BORK_UP] = { 0, 0, 1 }, 
+    [BORK_LEFT] = { 1, 0, 0 },
+    [BORK_RIGHT] = { -1, 0, 0 },
+    [BORK_UP] = { 0, 0, 1 },
+    [BORK_DOWN] = { 0, 0, -1 } };
+static const vec3 BORK_DIR_VEC[6] = {
+    [BORK_FRONT] = { 0, 1, 0 },
+    [BORK_BACK] = { 0, -1, 0 },
+    [BORK_LEFT] = { 1, 0, 0 },
+    [BORK_RIGHT] = { -1, 0, 0 },
+    [BORK_UP] = { 0, 0, 1 },
     [BORK_DOWN] = { 0, 0, -1 } };
 
 struct bork_game_core {
