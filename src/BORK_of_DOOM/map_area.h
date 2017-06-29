@@ -32,15 +32,17 @@ enum bork_tile_type {
     BORK_TILE_VAC,
     BORK_TILE_ATMO,
     BORK_TILE_HULL,
-    BORK_TILE_LADDER
+    BORK_TILE_LADDER,
+    BORK_TILE_CATWALK
 };
 
-#define BORK_TILE_HAS_SURFACE   (1 << 0)
-#define BORK_TILE_SEETHRU_SURFACE  (1 << 1)
-#define BORK_TILE_FORCE_SURFACE (1 << 2)
-#define BORK_TILE_FLUSH_SURFACE (1 << 3)
-#define BORK_TILE_HAS_BACKFACE  (1 << 4)
-#define BORK_TILE_NO_FRONTFACE  (1 << 5)
+#define BORK_TILE_HAS_SURFACE       (1 << 0)
+#define BORK_TILE_SEETHRU_SURFACE   (1 << 1)
+#define BORK_TILE_FORCE_SURFACE     (1 << 2)
+#define BORK_TILE_FLUSH_SURFACE     (1 << 3)
+#define BORK_TILE_NO_SELF_OPPOSITE  (1 << 4)
+#define BORK_TILE_HAS_BACKFACE      (1 << 5)
+#define BORK_TILE_NO_FRONTFACE      (1 << 6)
 
 static struct bork_tile_detail {
     uint8_t face_flags[6];
@@ -71,6 +73,22 @@ static struct bork_tile_detail {
         .tex_tile = {
             [BORK_LEFT] = 5, [BORK_RIGHT] = 5,
             [BORK_FRONT] = 5, [BORK_BACK] = 5 }
+    },
+    [BORK_TILE_CATWALK] = {
+        .face_flags = { BORK_TILE_HAS_SURFACE | BORK_TILE_HAS_BACKFACE |
+                            BORK_TILE_SEETHRU_SURFACE | BORK_TILE_NO_SELF_OPPOSITE,
+                        BORK_TILE_HAS_SURFACE | BORK_TILE_HAS_BACKFACE |
+                            BORK_TILE_SEETHRU_SURFACE | BORK_TILE_NO_SELF_OPPOSITE,
+                        BORK_TILE_HAS_SURFACE | BORK_TILE_HAS_BACKFACE |
+                            BORK_TILE_SEETHRU_SURFACE | BORK_TILE_NO_SELF_OPPOSITE,
+                        BORK_TILE_HAS_SURFACE | BORK_TILE_HAS_BACKFACE |
+                            BORK_TILE_SEETHRU_SURFACE | BORK_TILE_NO_SELF_OPPOSITE,
+                        0, BORK_TILE_HAS_SURFACE | BORK_TILE_HAS_BACKFACE },
+        .face_inset = { 0.1, 0.1, 0.1, 0.1 , 0.1, 0.1 },
+        .tex_tile = {
+            [BORK_LEFT] = 7, [BORK_RIGHT] = 7,
+            [BORK_FRONT] = 7, [BORK_BACK] = 7,
+            [BORK_TOP] = 0, [BORK_BOTTOM] = 6 }
     }
 };
 

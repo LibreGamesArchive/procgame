@@ -23,26 +23,26 @@ static const uint32_t comp = PG_MODEL_COMPONENT_POSITION |
     PG_MODEL_COMPONENT_UV;
 
 static const vec3 vert_norm[6] = {
-    [BORK_FRONT] = { 0, 1.0, 0 }, 
+    [BORK_FRONT] = { 0, 1.0, 0 },
     [BORK_BACK] = { 0, -1.0, 0 },
-    [BORK_LEFT] = { 1.0, 0, 0 }, 
-    [BORK_RIGHT] = { -1.0, 0, 0 }, 
-    [BORK_UP] = { 0, 0, 1.0 }, 
+    [BORK_LEFT] = { 1.0, 0, 0 },
+    [BORK_RIGHT] = { -1.0, 0, 0 },
+    [BORK_UP] = { 0, 0, 1.0 },
     [BORK_DOWN] = { 0, 0, -1.0 } };
 static const vec3 vert_tan[6] = {
-    [BORK_FRONT] = { -1.0, 0, 0 }, 
+    [BORK_FRONT] = { -1.0, 0, 0 },
     [BORK_BACK] = { 1.0, 0, 0 },
-    [BORK_LEFT] = { 0, 1.0, 0 }, 
-    [BORK_RIGHT] = { 0, -1.0, 0 }, 
-    [BORK_UP] = { 1.0, 0, 0 }, 
-    [BORK_DOWN] = { 1.0, 0, 0 } };
-static const vec3 vert_bitan[6] = {
-    [BORK_FRONT] = { 0, 0, -1.0 }, 
-    [BORK_BACK] = { 0, 0, -1.0 },
-    [BORK_LEFT] = { 0, 0, -1.0 }, 
-    [BORK_RIGHT] = { 0, 0, -1.0 }, 
-    [BORK_UP] = { 0, -1.0, 0 }, 
+    [BORK_LEFT] = { 0, 1.0, 0 },
+    [BORK_RIGHT] = { 0, -1.0, 0 },
+    [BORK_UP] = { 1.0, 0, 0 },
     [BORK_DOWN] = { 0, 1.0, 0 } };
+static const vec3 vert_bitan[6] = {
+    [BORK_FRONT] = { 0, 0, -1.0 },
+    [BORK_BACK] = { 0, 0, -1.0 },
+    [BORK_LEFT] = { 0, 0, -1.0 },
+    [BORK_RIGHT] = { 0, 0, -1.0 },
+    [BORK_UP] = { 0, -1.0, 0 },
+    [BORK_DOWN] = { -1.0, 0, 0 } };
 static const vec3 vert_pos[6][4] = {
     { { 0.5, 0.5, -0.5 },
       { 0.5, 0.5, 0.5 },
@@ -80,7 +80,7 @@ static int bork_map_model_add_face(struct bork_map* map, struct bork_tile* tile,
     if(!(face_flags & BORK_TILE_HAS_SURFACE)) return 0;
     int opp[3] = { x + BORK_DIR[dir][0], y + BORK_DIR[dir][1], z + BORK_DIR[dir][2] };
     struct bork_tile* opp_tile = bork_map_get_tile(map, opp[0], opp[1], opp[2]);
-    struct bork_tile_detail* opp_detail = opp_tile ? 
+    struct bork_tile_detail* opp_detail = opp_tile ?
         &BORK_TILE_DETAILS[opp_tile->type] : &BORK_TILE_DETAILS[0];
     enum bork_direction opp_dir = BORK_DIR_OPPOSITE[dir];
     uint32_t opp_flags = opp_detail->face_flags[opp_dir];
@@ -88,6 +88,9 @@ static int bork_map_model_add_face(struct bork_map* map, struct bork_tile* tile,
     if(opp_flags & BORK_TILE_HAS_SURFACE && !(opp_flags & BORK_TILE_SEETHRU_SURFACE)) {
         if(!(face_flags & BORK_TILE_FORCE_SURFACE)
         && !(face_flags & BORK_TILE_FLUSH_SURFACE)) return 0;
+    } else if(face_flags & BORK_TILE_NO_SELF_OPPOSITE
+            && opp_flags & BORK_TILE_NO_SELF_OPPOSITE) {
+        return 0;
     } else {
         if(face_flags & BORK_TILE_FLUSH_SURFACE) return 0;
     }
@@ -190,7 +193,6 @@ static void bork_map_generate_area(struct bork_map* map, enum bork_area area);
 void bork_map_generate(struct bork_map* map)
 {
     memset(map->data, 0, sizeof(*map->data) * map->w * map->l * map->h);
-    #if 1
     int order[BORK_AREA_EXTERIOR] = { 0, 1, 2, 3, 4, 5, 6 };
     struct {
         int w, l, h, d;
@@ -229,7 +231,6 @@ void bork_map_generate(struct bork_map* map)
     for(i = 0; i < BORK_AREA_EXTERIOR; ++i) {
         bork_map_generate_area(map, order[i]);
     }
-    #endif
 }
 
 static void bork_map_generate_area(struct bork_map* map, enum bork_area area)
@@ -253,6 +254,9 @@ static void bork_map_generate_area(struct bork_map* map, enum bork_area area)
                 } else if(x == 4 && y == 2) {
                     bork_map_set_tile(map, x + start_x, y + start_y, z + start_z,
                         (struct bork_tile){ .type = BORK_TILE_LADDER });
+                } else if((x == 1 || y == 1 || x == 8) && (z == 3)) {
+                    bork_map_set_tile(map, x + start_x, y + start_y, z + start_z,
+                        (struct bork_tile){ .type = BORK_TILE_CATWALK });
                 } else {
                     bork_map_set_tile(map, x + start_x, y + start_y, z + start_z,
                         (struct bork_tile){ .type = BORK_TILE_ATMO });
