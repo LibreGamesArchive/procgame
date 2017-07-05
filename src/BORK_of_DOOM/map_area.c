@@ -4,6 +4,73 @@
 #include "bork.h"
 #include "map_area.h"
 
+#define BORK_AREA_FLAG_SQUARE   (1 << 0)
+
+/*  Area generation range definitions   */
+static struct bork_area_detail {
+    uint32_t flags;
+    int w[2];   /*  range of lateral sizes in tiles */
+    int h[2];   /*  range of heights in FLOORS (2-3 tile height)    */
+} BORK_AREA_DETAILS[] = {
+    [BORK_AREA_PETS] = {            .w = { 12, 16 }, .h = { 3, 5 },
+        .flags = BORK_AREA_FLAG_SQUARE },
+    [BORK_AREA_WAREHOUSE] = {       .w = { 26, 30 }, .h = { 4, 6 } },
+    [BORK_AREA_CAFETERIA] = {       .w = { 20, 24 }, .h = { 4, 6 } },
+    [BORK_AREA_REC_CENTER] = {      .w = { 20, 24 }, .h = { 2, 3 } },
+    [BORK_AREA_INFIRMARY] = {       .w = { 14, 18 }, .h = { 2, 3 } },
+    [BORK_AREA_SCIENCE_LABS] = {    .w = { 14, 18 }, .h = { 2, 3 } },
+    [BORK_AREA_COMMAND] = {         .w = { 12, 16 }, .h = { 2, 3 },
+        .flags = BORK_AREA_FLAG_SQUARE }
+};
+
+/*  Tile model generation function declarations */
+static int tile_model_basic(struct bork_map*, struct bork_tile*, int, int, int);
+
+/*  Tile details */
+struct bork_tile_detail BORK_TILE_DETAILS[] = {
+    [BORK_TILE_VAC] = {},
+    [BORK_TILE_ATMO] = {},
+    [BORK_TILE_HULL] = {
+        .face_flags = { 1, 1, 1, 1, 1, 1 },
+        .tex_tile = {
+            [PG_LEFT] = 3, [PG_RIGHT] = 3,
+            [PG_FRONT] = 3, [PG_BACK] = 3,
+            [PG_TOP] = 3, [PG_DOWN] = 3 },
+        .add_model = tile_model_basic },
+    [BORK_TILE_LADDER] = {
+        .face_flags = { BORK_TILE_HAS_SURFACE | BORK_TILE_FLUSH_SURFACE |
+                            BORK_TILE_HAS_BACKFACE | BORK_TILE_SEETHRU_SURFACE,
+                        BORK_TILE_HAS_SURFACE | BORK_TILE_FLUSH_SURFACE |
+                            BORK_TILE_HAS_BACKFACE | BORK_TILE_SEETHRU_SURFACE,
+                        BORK_TILE_HAS_SURFACE | BORK_TILE_FLUSH_SURFACE |
+                            BORK_TILE_HAS_BACKFACE | BORK_TILE_SEETHRU_SURFACE,
+                        BORK_TILE_HAS_SURFACE | BORK_TILE_FLUSH_SURFACE |
+                            BORK_TILE_HAS_BACKFACE | BORK_TILE_SEETHRU_SURFACE,
+                        0, 0 },
+        .face_inset = { 0.2, 0.2, 0.2, 0.2 },
+        .tex_tile = {
+            [PG_LEFT] = 5, [PG_RIGHT] = 5,
+            [PG_FRONT] = 5, [PG_BACK] = 5 },
+        .add_model = tile_model_basic },
+    [BORK_TILE_CATWALK] = {
+        .face_flags = { BORK_TILE_HAS_SURFACE | BORK_TILE_HAS_BACKFACE |
+                            BORK_TILE_SEETHRU_SURFACE | BORK_TILE_NO_SELF_OPPOSITE,
+                        BORK_TILE_HAS_SURFACE | BORK_TILE_HAS_BACKFACE |
+                            BORK_TILE_SEETHRU_SURFACE | BORK_TILE_NO_SELF_OPPOSITE,
+                        BORK_TILE_HAS_SURFACE | BORK_TILE_HAS_BACKFACE |
+                            BORK_TILE_SEETHRU_SURFACE | BORK_TILE_NO_SELF_OPPOSITE,
+                        BORK_TILE_HAS_SURFACE | BORK_TILE_HAS_BACKFACE |
+                            BORK_TILE_SEETHRU_SURFACE | BORK_TILE_NO_SELF_OPPOSITE,
+                        0, BORK_TILE_HAS_SURFACE | BORK_TILE_HAS_BACKFACE },
+        .face_inset = { 0.1, 0.1, 0.1, 0.1 , 0.1, 0.1 },
+        .tex_tile = {
+            [PG_LEFT] = 7, [PG_RIGHT] = 7,
+            [PG_FRONT] = 7, [PG_BACK] = 7,
+            [PG_TOP] = 0, [PG_BOTTOM] = 6 },
+        .add_model = tile_model_basic },
+};
+
+/*  Public interface    */
 void bork_map_init(struct bork_map* map, int w, int l, int h)
 {
     *map = (struct bork_map) {
@@ -18,142 +85,15 @@ void bork_map_deinit(struct bork_map* map)
     free(map->data);
 }
 
-static const uint32_t comp = PG_MODEL_COMPONENT_POSITION |
-    PG_MODEL_COMPONENT_NORMAL | PG_MODEL_COMPONENT_TAN_BITAN |
-    PG_MODEL_COMPONENT_UV;
-
-static const vec3 vert_norm[6] = {
-    [BORK_FRONT] = { 0, 1.0, 0 },
-    [BORK_BACK] = { 0, -1.0, 0 },
-    [BORK_LEFT] = { 1.0, 0, 0 },
-    [BORK_RIGHT] = { -1.0, 0, 0 },
-    [BORK_UP] = { 0, 0, 1.0 },
-    [BORK_DOWN] = { 0, 0, -1.0 } };
-static const vec3 vert_tan[6] = {
-    [BORK_FRONT] = { -1.0, 0, 0 },
-    [BORK_BACK] = { 1.0, 0, 0 },
-    [BORK_LEFT] = { 0, 1.0, 0 },
-    [BORK_RIGHT] = { 0, -1.0, 0 },
-    [BORK_UP] = { 1.0, 0, 0 },
-    [BORK_DOWN] = { 0, 1.0, 0 } };
-static const vec3 vert_bitan[6] = {
-    [BORK_FRONT] = { 0, 0, -1.0 },
-    [BORK_BACK] = { 0, 0, -1.0 },
-    [BORK_LEFT] = { 0, 0, -1.0 },
-    [BORK_RIGHT] = { 0, 0, -1.0 },
-    [BORK_UP] = { 0, -1.0, 0 },
-    [BORK_DOWN] = { -1.0, 0, 0 } };
-static const vec3 vert_pos[6][4] = {
-    { { 0.5, 0.5, -0.5 },
-      { 0.5, 0.5, 0.5 },
-      { -0.5, 0.5, -0.5 },
-      { -0.5, 0.5, 0.5 } },
-    { { -0.5, -0.5, -0.5 },
-      { -0.5, -0.5, 0.5 },
-      { 0.5, -0.5, -0.5 },
-      { 0.5, -0.5, 0.5 } },
-    { { 0.5, -0.5, -0.5 },
-      { 0.5, -0.5, 0.5 },
-      { 0.5, 0.5, -0.5 },
-      { 0.5, 0.5, 0.5 } },
-    { { -0.5, 0.5, -0.5 },
-      { -0.5, 0.5, 0.5 },
-      { -0.5, -0.5, -0.5 },
-      { -0.5, -0.5, 0.5 } },
-    { { -0.5, -0.5, 0.5 },
-      { -0.5, 0.5, 0.5 },
-      { 0.5, -0.5, 0.5 },
-      { 0.5, 0.5, 0.5 } },
-    { { -0.5, -0.5, -0.5 },
-      { 0.5, -0.5, -0.5 },
-      { -0.5, 0.5, -0.5 },
-      { 0.5, 0.5, -0.5 } } };
-static const int vert_uv[4][2] = { { 0, 0 }, { 0, 1 }, { 1, 0 }, { 1, 1 } };
-
-static int bork_map_model_add_face(struct bork_map* map, struct bork_tile* tile,
-                                   int x, int y, int z,
-                                   enum bork_direction dir)
-{
-    struct pg_vertex_full new_vert = { .components = comp };
-    struct bork_tile_detail* detail = &BORK_TILE_DETAILS[tile->type];
-    uint32_t face_flags = detail->face_flags[dir];
-    if(!(face_flags & BORK_TILE_HAS_SURFACE)) return 0;
-    int opp[3] = { x + BORK_DIR[dir][0], y + BORK_DIR[dir][1], z + BORK_DIR[dir][2] };
-    struct bork_tile* opp_tile = bork_map_get_tile(map, opp[0], opp[1], opp[2]);
-    struct bork_tile_detail* opp_detail = opp_tile ?
-        &BORK_TILE_DETAILS[opp_tile->type] : &BORK_TILE_DETAILS[0];
-    enum bork_direction opp_dir = BORK_DIR_OPPOSITE[dir];
-    uint32_t opp_flags = opp_detail->face_flags[opp_dir];
-    /*  Decide if this face of the tile needs to be generated   */
-    if(opp_flags & BORK_TILE_HAS_SURFACE && !(opp_flags & BORK_TILE_SEETHRU_SURFACE)) {
-        if(!(face_flags & BORK_TILE_FORCE_SURFACE)
-        && !(face_flags & BORK_TILE_FLUSH_SURFACE)) return 0;
-    } else if(face_flags & BORK_TILE_NO_SELF_OPPOSITE
-            && opp_flags & BORK_TILE_NO_SELF_OPPOSITE) {
-        return 0;
-    } else {
-        if(face_flags & BORK_TILE_FLUSH_SURFACE) return 0;
-    }
-    unsigned vert_idx = map->model->v_count;
-    int i;
-    if(!(face_flags & BORK_TILE_NO_FRONTFACE)) {
-        for(i = 0; i < 4; ++i) {
-            vec3_dup(new_vert.pos, vert_pos[dir][i]);
-            vec3_add(new_vert.pos, new_vert.pos, (vec3){ 0.5, 0.5, 0.5 });
-            vec3_add(new_vert.pos, new_vert.pos, (vec3){ x, y, z });
-            vec3 inset_dir;
-            vec3_scale(inset_dir, vert_norm[dir], detail->face_inset[dir]);
-            vec3_sub(new_vert.pos, new_vert.pos, inset_dir);
-            vec3_scale(new_vert.pos, new_vert.pos, 2);
-            vec3_dup(new_vert.normal, vert_norm[dir]);
-            vec3_dup(new_vert.tangent, vert_tan[dir]);
-            vec3_dup(new_vert.bitangent, vert_bitan[dir]);
-            vec2 tex_frame[2];
-            pg_texture_get_frame(map->tex_atlas, detail->tex_tile[dir],
-                                 tex_frame[0], tex_frame[1]);
-            vec2_set(new_vert.uv, tex_frame[vert_uv[i][0]][0], tex_frame[vert_uv[i][1]][1]);
-            pg_model_add_vertex(map->model, &new_vert);
-        }
-    }
-    if(face_flags & BORK_TILE_HAS_BACKFACE) {
-        for(i = 0; i < 4; ++i) {
-            vec3_dup(new_vert.pos, vert_pos[dir][i]);
-            vec3_add(new_vert.pos, new_vert.pos, (vec3){ 0.5, 0.5, 0.5 });
-            vec3_add(new_vert.pos, new_vert.pos, (vec3){ x, y, z });
-            vec3 inset_dir;
-            vec3_scale(inset_dir, vert_norm[dir], detail->face_inset[dir]);
-            vec3_sub(new_vert.pos, new_vert.pos, inset_dir);
-            vec3_scale(new_vert.pos, new_vert.pos, 2);
-            vec3_dup(new_vert.normal, vert_norm[BORK_DIR_OPPOSITE[dir]]);
-            vec3_dup(new_vert.tangent, vert_tan[dir]);
-            vec3_dup(new_vert.bitangent, vert_bitan[dir]);
-            vec2 tex_frame[2];
-            pg_texture_get_frame(map->tex_atlas, detail->tex_tile[dir],
-                                 tex_frame[0], tex_frame[1]);
-            vec2_set(new_vert.uv, tex_frame[vert_uv[i][0]][0], tex_frame[vert_uv[i][1]][1]);
-            pg_model_add_vertex(map->model, &new_vert);
-        }
-    }
-    int num_tris = 0;
-    if(!(face_flags & BORK_TILE_NO_FRONTFACE)) {
-        pg_model_add_triangle(map->model, vert_idx + 1, vert_idx + 0, vert_idx + 2);
-        pg_model_add_triangle(map->model, vert_idx + 1, vert_idx + 2, vert_idx + 3);
-        num_tris += 2;
-    }
-    if(face_flags & BORK_TILE_HAS_BACKFACE) {
-        pg_model_add_triangle(map->model, vert_idx + 4, vert_idx + 5, vert_idx + 6);
-        pg_model_add_triangle(map->model, vert_idx + 6, vert_idx + 5, vert_idx + 7);
-        num_tris += 2;
-    }
-    return num_tris;
-}
-
 void bork_map_generate_model(struct bork_map* map, struct pg_model* model,
                              struct pg_texture* tex)
 {
     pg_model_reset(model);
-    model->components = comp;
+    model->components = PG_MODEL_COMPONENT_POSITION |
+        PG_MODEL_COMPONENT_NORMAL | PG_MODEL_COMPONENT_TAN_BITAN |
+        PG_MODEL_COMPONENT_UV;
     map->model = model;
+    map->tex_atlas = tex;
     struct bork_tile* tile;
     int x, y, z;
     for(x = 0; x < map->w; ++x) {
@@ -161,16 +101,13 @@ void bork_map_generate_model(struct bork_map* map, struct pg_model* model,
             for(z = 0; z < map->h; ++z) {
                 tile = bork_map_get_tile(map, x, y, z);
                 if(!tile || tile->type < 2) continue;
-                tile->num_tris = 0;
+                struct bork_tile_detail* detail = &BORK_TILE_DETAILS[tile->type];
                 tile->model_tri_idx = model->tris.len;
-                int s;
-                for(s = 0; s < 6; ++s) {
-                    tile->num_tris += bork_map_model_add_face(map, tile, x, y, z, s);
-                }
+                tile->num_tris = detail->add_model(map, tile, x, y, z);
             }
         }
     }
-    pg_model_warp_verts(model);
+    pg_model_precalc_ntb(model);
 }
 
 struct bork_tile* bork_map_get_tile(struct bork_map* map, int x, int y, int z)
@@ -257,6 +194,9 @@ static void bork_map_generate_area(struct bork_map* map, enum bork_area area)
                 } else if((x == 1 || y == 1 || x == 8) && (z == 3)) {
                     bork_map_set_tile(map, x + start_x, y + start_y, z + start_z,
                         (struct bork_tile){ .type = BORK_TILE_CATWALK });
+                } else if(x == 6 && y == 7 && z == 1) {
+                    bork_map_set_tile(map, x + start_x, y + start_y, z + start_z,
+                        (struct bork_tile){ .type = BORK_TILE_HULL });
                 } else {
                     bork_map_set_tile(map, x + start_x, y + start_y, z + start_z,
                         (struct bork_tile){ .type = BORK_TILE_ATMO });
@@ -265,3 +205,108 @@ static void bork_map_generate_area(struct bork_map* map, enum bork_area area)
         }
     }
 }
+
+/*  Generating geometry for individual tiles    */
+/*  The BASIC tile geometry generation; just variations on a cube   */
+static const vec3 vert_pos[6][4] = {
+    { { 0.5, 0.5, -0.5 },
+      { 0.5, 0.5, 0.5 },
+      { -0.5, 0.5, -0.5 },
+      { -0.5, 0.5, 0.5 } },
+    { { -0.5, -0.5, -0.5 },
+      { -0.5, -0.5, 0.5 },
+      { 0.5, -0.5, -0.5 },
+      { 0.5, -0.5, 0.5 } },
+    { { 0.5, -0.5, -0.5 },
+      { 0.5, -0.5, 0.5 },
+      { 0.5, 0.5, -0.5 },
+      { 0.5, 0.5, 0.5 } },
+    { { -0.5, 0.5, -0.5 },
+      { -0.5, 0.5, 0.5 },
+      { -0.5, -0.5, -0.5 },
+      { -0.5, -0.5, 0.5 } },
+    { { -0.5, -0.5, 0.5 },
+      { -0.5, 0.5, 0.5 },
+      { 0.5, -0.5, 0.5 },
+      { 0.5, 0.5, 0.5 } },
+    { { -0.5, -0.5, -0.5 },
+      { 0.5, -0.5, -0.5 },
+      { -0.5, 0.5, -0.5 },
+      { 0.5, 0.5, -0.5 } } };
+
+static int tile_face_basic(struct bork_map* map, struct bork_tile* tile,
+                           int x, int y, int z, enum pg_direction dir)
+{
+    /*  Get the details for this face   */
+    struct bork_tile_detail* detail = &BORK_TILE_DETAILS[tile->type];
+    uint32_t face_flags = detail->face_flags[dir];
+    if(!(face_flags & BORK_TILE_HAS_SURFACE)) return 0; /*  Tile has no face here   */
+    /*  Get details for the opposing face   */
+    int opp[3] = { x + PG_DIR_VEC[dir][0], y + PG_DIR_VEC[dir][1], z + PG_DIR_VEC[dir][2] };
+    struct bork_tile* opp_tile = bork_map_get_tile(map, opp[0], opp[1], opp[2]);
+    struct bork_tile_detail* opp_detail = opp_tile ?
+        &BORK_TILE_DETAILS[opp_tile->type] : &BORK_TILE_DETAILS[0];
+    uint32_t opp_flags = opp_detail->face_flags[PG_DIR_OPPOSITE[dir]];
+    /*  Decide if this face of the tile needs to be generated   */
+    if(opp_flags & BORK_TILE_HAS_SURFACE && !(opp_flags & BORK_TILE_SEETHRU_SURFACE)) {
+        if(!(face_flags & BORK_TILE_FORCE_SURFACE)
+        && !(face_flags & BORK_TILE_FLUSH_SURFACE)) return 0;
+    } else if(face_flags & BORK_TILE_NO_SELF_OPPOSITE
+            && opp_flags & BORK_TILE_NO_SELF_OPPOSITE) {
+        return 0;
+    } else {
+        if(face_flags & BORK_TILE_FLUSH_SURFACE) return 0;
+    }
+    /*  Calculate the base info for this face   */
+    int num_tris = 0;
+    vec3 inset_dir;
+    vec3_scale(inset_dir, PG_DIR_VEC[dir], detail->face_inset[dir]);
+    vec2 tex_frame[2];
+    pg_texture_get_frame(map->tex_atlas, detail->tex_tile[dir],
+                         tex_frame[0], tex_frame[1]);
+    unsigned vert_idx = map->model->v_count;
+    /*  Generate the geometry   */
+    struct pg_vertex_full new_vert = { .components = map->model->components };
+    int i;
+    if(!(face_flags & BORK_TILE_NO_FRONTFACE)) {
+        for(i = 0; i < 4; ++i) {
+            vec3_dup(new_vert.pos, vert_pos[dir][i]);
+            vec3_add(new_vert.pos, new_vert.pos, (vec3){ 0.5, 0.5, 0.5 });
+            vec3_add(new_vert.pos, new_vert.pos, (vec3){ x, y, z });
+            vec3_sub(new_vert.pos, new_vert.pos, inset_dir);
+            vec3_scale(new_vert.pos, new_vert.pos, 2);
+            vec2_set(new_vert.uv, tex_frame[(i < 2)][0], tex_frame[(i % 2)][1]);
+            pg_model_add_vertex(map->model, &new_vert);
+        }
+        pg_model_add_triangle(map->model, vert_idx + 1, vert_idx + 0, vert_idx + 2);
+        pg_model_add_triangle(map->model, vert_idx + 1, vert_idx + 2, vert_idx + 3);
+        num_tris += 2;
+    }
+    if(face_flags & BORK_TILE_HAS_BACKFACE) {
+        for(i = 0; i < 4; ++i) {
+            vec3_dup(new_vert.pos, vert_pos[dir][i]);
+            vec3_add(new_vert.pos, new_vert.pos, (vec3){ 0.5, 0.5, 0.5 });
+            vec3_add(new_vert.pos, new_vert.pos, (vec3){ x, y, z });
+            vec3_sub(new_vert.pos, new_vert.pos, inset_dir);
+            vec3_scale(new_vert.pos, new_vert.pos, 2);
+            vec2_set(new_vert.uv, tex_frame[(i < 2)][0], tex_frame[(i % 2)][1]);
+            pg_model_add_vertex(map->model, &new_vert);
+        }
+        pg_model_add_triangle(map->model, vert_idx + 4, vert_idx + 5, vert_idx + 6);
+        pg_model_add_triangle(map->model, vert_idx + 6, vert_idx + 5, vert_idx + 7);
+        num_tris += 2;
+    }
+    return num_tris;
+}
+
+static int tile_model_basic(struct bork_map* map, struct bork_tile* tile,
+                            int x, int y, int z)
+{
+    int tri_count = 0;
+    int s;
+    for(s = 0; s < 6; ++s) {
+        tri_count += tile_face_basic(map, tile, x, y, z, s);
+    }
+    return tri_count;
+}
+
