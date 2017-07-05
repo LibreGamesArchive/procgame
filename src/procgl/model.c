@@ -433,8 +433,8 @@ void pg_model_precalc_ntb(struct pg_model* model)
         vec3_mul_cross(norm, edge0, edge1);
         /*  Then calculate tangent and bitangent, aligned with the UV coords */
         vec2 tex_d0, tex_d1;
-        vec2_sub(tex_d0, model->uv.data[tri->t[1]].v, model->uv.data[tri->t[0]].v);
-        vec2_sub(tex_d1, model->uv.data[tri->t[2]].v, model->uv.data[tri->t[0]].v);
+        vec2_sub(tex_d0, model->uv.data[tri->t[0]].v, model->uv.data[tri->t[1]].v);
+        vec2_sub(tex_d1, model->uv.data[tri->t[0]].v, model->uv.data[tri->t[2]].v);
         float r = 1.0f / (tex_d0[0] * tex_d1[1] - tex_d0[1] * tex_d1[0]);
         vec3 tmp0, tmp1, tangent, bitangent;
         vec3_scale(tmp0, edge0, tex_d1[1]);
