@@ -1,3 +1,42 @@
+enum pg_direction {
+    PG_FRONT = 0,
+    PG_Y_POS = PG_FRONT,
+    PG_BACK = 1,
+    PG_Y_NEG = PG_BACK,
+    PG_LEFT = 2,
+    PG_X_POS = PG_LEFT,
+    PG_RIGHT = 3,
+    PG_X_NEG = PG_RIGHT,
+    PG_UP = 4,
+    PG_Z_POS = PG_UP,
+    PG_TOP = PG_UP,
+    PG_DOWN = 5,
+    PG_Z_NEG = PG_DOWN,
+    PG_BOTTOM = PG_DOWN
+};
+static const int PG_DIR_OPPOSITE[6] = { 1, 0, 3, 2, 5, 4 };
+static const vec3 PG_DIR_VEC[6] = {
+    [PG_FRONT] = { 0, 1.0f, 0 },
+    [PG_BACK] = { 0, -1.0f, 0 },
+    [PG_LEFT] = { 1.0f, 0, 0 },
+    [PG_RIGHT] = { -1.0f, 0, 0 },
+    [PG_UP] = { 0, 0, 1.0f },
+    [PG_DOWN] = { 0, 0, -1.0f } };
+static const vec3 PG_DIR_TAN[6] = {
+    [PG_FRONT] = { -1.0f, 0, 0 },
+    [PG_BACK] = { 1.0f, 0, 0 },
+    [PG_LEFT] = { 0, 1.0f, 0 },
+    [PG_RIGHT] = { 0, -1.0f, 0 },
+    [PG_UP] = { 1.0f, 0, 0 },
+    [PG_DOWN] = { -1.0f, 0, 0 } };
+static const vec3 PG_DIR_BITAN[6] = {
+    [PG_FRONT] = { 0, 0, 1.0f },
+    [PG_BACK] = { 0, 0, -1.0f },
+    [PG_LEFT] = { 0, 0, 1.0f },
+    [PG_RIGHT] = { 0, 0, -1.0f },
+    [PG_UP] = { 0, 1.0f, 0 },
+    [PG_DOWN] = { 0, -1.0f, 0 } };
+
 int pg_init(int w, int h, int fullscreen, const char* window_title);
 void pg_deinit(void);
 void pg_screen_size(int* w, int* h);
