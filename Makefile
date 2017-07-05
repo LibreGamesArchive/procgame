@@ -90,7 +90,7 @@ obj/model.o: src/procgl/model.c src/procgl/ext/linmath.h  \
  src/procgl/wave.h src/procgl/heightmap.h src/procgl/texture.h
 	$(CC) $(CFLAGS) -o obj/model.o -c src/procgl/model.c $(INCLUDES)
 obj/model_prims.o: src/procgl/model_prims.c src/procgl/ext/linmath.h \
-  src/procgl/arr.h src/procgl/viewer.h src/procgl/shader.h \
+  src/procgl/arr.h src/procgl/procgl_base.h src/procgl/viewer.h src/procgl/shader.h \
  src/procgl/model.h src/procgl/wave.h src/procgl/heightmap.h src/procgl/texture.h
 	$(CC) $(CFLAGS) -o obj/model_prims.o -c src/procgl/model_prims.c $(INCLUDES)
 obj/heightmap.o: src/procgl/heightmap.c src/procgl/heightmap.h \

@@ -106,6 +106,7 @@ void pg_model_warp_verts(struct pg_model* model);
 /*  PRIMITIVES  model_prims.c   */
 void pg_model_quad(struct pg_model* model, vec2 tex_scale);
 void pg_model_cube(struct pg_model* model, vec2 tex_scale);
+void pg_model_rect_prism(struct pg_model* model, vec3 scale, vec4* face_uv);
 void pg_model_cylinder(struct pg_model* model, int n, vec2 tex_scale);
 void pg_model_cone(struct pg_model* model, int n, float base,
                    vec3 warp, vec2 tex_scale);

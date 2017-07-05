@@ -16,6 +16,7 @@ void pg_vertex_transform(struct pg_vertex_full* out, struct pg_vertex_full* src,
     mat4_invert(inv, transform);
     mat4 normal_matrix;
     mat4_transpose(normal_matrix, inv);
+    out->components = src->components;
     if(src->components & PG_MODEL_COMPONENT_POSITION) {
         vec4 old = { src->pos[0], src->pos[1], src->pos[2], 1.0f };
         vec4 new;
