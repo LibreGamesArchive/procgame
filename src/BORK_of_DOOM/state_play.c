@@ -47,14 +47,10 @@ void bork_play_start(struct pg_game_state* state, struct bork_game_core* core)
     SDL_SetRelativeMouseMode(SDL_TRUE);
     vec2_set(d->mouse_motion, 0, 0);
     /*  Generate the BONZ station   */
-    bork_map_init(&d->map, 32, 32, 128);
-    d->map.tex_atlas = &core->env_atlas;
-    bork_map_generate(&d->map);
-    bork_map_generate_model(&d->map, &d->core->map_model, &d->core->env_atlas);
-    pg_shader_buffer_model(&d->core->shader_3d, &d->core->map_model);
+    bork_map_init(&d->map, &core->env_atlas, &core->shader_3d);
     /*  Initialize the player data  */
-    bork_entity_init(&d->plr, (vec3){ 0.5, 0.5, 0.8 });
-    vec3_set(d->plr.pos, 32, 32, 190);
+    bork_entity_init(&d->plr, (vec3){ 0.25, 0.25, 0.8 });
+    vec3_set(d->plr.pos, 32, 32, 180);
     d->player_speed = 0.02;
     /*  Assign all the pointers, and it's finished  */
     state->data = d;
@@ -125,10 +121,7 @@ static void bork_play_draw(struct pg_game_state* state)
     //glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
     pg_gbuffer_dst(&d->core->gbuf);
     pg_shader_begin(&d->core->shader_3d, &d->core->view);
-    pg_model_begin(&d->core->map_model, &d->core->shader_3d);
-    mat4 model_transform;
-    mat4_identity(model_transform);
-    pg_model_draw(&d->core->map_model, model_transform);
+    bork_map_draw_area(&d->map, 0);
     glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
     /*  Lighting    */
     pg_gbuffer_begin_light(&d->core->gbuf, &d->core->view);

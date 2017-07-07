@@ -159,17 +159,27 @@ int bork_map_collide(struct bork_map* map, struct bork_collision* coll_out,
     for(x = check[0][0]; x < check[1][0]; ++x) {
         for(y = check[0][1]; y < check[1][1]; ++y) {
             for(z = check[0][2]; z < check[1][2]; ++z) {
-                struct bork_tile* tile = bork_map_get_tile(map, x, y, z);
+                enum bork_area area = bork_map_get_area(map, x, y, z);
+                int idx[3] = {
+                    x - map->area_pos[area][0],
+                    y - map->area_pos[area][1],
+                    z - map->area_pos[area][2] };
+                vec3 area_pos = { map->area_pos[area][0], map->area_pos[area][1], map->area_pos[area][2] };
+                struct bork_tile* tile = bork_map_tile_ptr(map, area, idx[0], idx[1], idx[2]);
                 /*  If the tile is outside the map, or the tile is not
                     collidable, move on to the next one */
                 if(!tile || tile->type < 2) continue;
+                struct pg_model* model = &map->area_model[area];
                 unsigned i;
                 for(i = 0; i < tile->num_tris; ++i) {
-                    struct pg_tri* tri = &map->model->tris.data[i + tile->model_tri_idx];
+                    struct pg_tri* tri = &model->tris.data[i + tile->model_tri_idx];
                     vec3 p0, p1, p2;
-                    vec3_dup(p0, map->model->pos.data[tri->t[0]].v);
-                    vec3_dup(p1, map->model->pos.data[tri->t[1]].v);
-                    vec3_dup(p2, map->model->pos.data[tri->t[2]].v);
+                    vec3_dup(p0, model->pos.data[tri->t[0]].v);
+                    vec3_dup(p1, model->pos.data[tri->t[1]].v);
+                    vec3_dup(p2, model->pos.data[tri->t[2]].v);
+                    vec3_add(p0, p0, area_pos);
+                    vec3_add(p1, p1, area_pos);
+                    vec3_add(p2, p2, area_pos);
                     vec3_div(p0, p0, size);
                     vec3_div(p1, p1, size);
                     vec3_div(p2, p2, size);

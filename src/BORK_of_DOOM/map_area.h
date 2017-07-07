@@ -36,28 +36,27 @@ struct bork_tile {
 };
 
 struct bork_map {
-    int station_order[BORK_AREA_EXTERIOR];
-    box area_dims[BORK_AREA_EXTERIOR];
-    int w, l, h;
-    struct bork_tile* data;
+    int area_pos[BORK_AREA_EXTERIOR][3];
+    struct bork_tile* data[BORK_AREA_EXTERIOR];
+    struct pg_model area_model[BORK_AREA_EXTERIOR];
     struct pg_texture* tex_atlas;
-    struct pg_model* model;
+    struct pg_shader* shader;
 };
 
 struct bork_tile_detail {
     uint32_t face_flags[6];
     float face_inset[6];
     int tex_tile[6];
-    int (*add_model)(struct bork_map*, struct bork_tile*, int, int, int);
+    int (*add_model)(struct bork_map*, enum bork_area,
+                     struct bork_tile*, int, int, int);
 };
 
-void bork_map_init(struct bork_map* map, int w, int l, int h);
+void bork_map_init(struct bork_map* map, struct pg_texture* tex,
+                   struct pg_shader* shader);
 void bork_map_deinit(struct bork_map* map);
-void bork_map_generate(struct bork_map* map);
-void bork_map_generate_model(struct bork_map* map, struct pg_model* model,
-                             struct pg_texture* tex);
-struct bork_tile* bork_map_get_tile(struct bork_map* map, int x, int y, int z);
-void bork_map_set_tile(struct bork_map* map, int x, int y, int z,
-                       struct bork_tile tile);
+void bork_map_draw_area(struct bork_map* map, enum bork_area area);
+enum bork_area bork_map_get_area(struct bork_map* map, int x, int y, int z);
+struct bork_tile* bork_map_tile_ptr(struct bork_map* map, enum bork_area area,
+                                    int x, int y, int z);
 
 /*  See physics.c   */

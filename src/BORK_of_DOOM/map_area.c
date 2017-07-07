@@ -24,7 +24,8 @@ static struct bork_area_detail {
 };
 
 /*  Tile model generation function declarations */
-static int tile_model_basic(struct bork_map*, struct bork_tile*, int, int, int);
+static void bork_map_generate_area_model(struct bork_map* map, enum bork_area area);
+static int tile_model_basic(struct bork_map*, enum bork_area, struct bork_tile*, int, int, int);
 
 /*  Tile details */
 struct bork_tile_detail BORK_TILE_DETAILS[] = {
@@ -71,20 +72,87 @@ struct bork_tile_detail BORK_TILE_DETAILS[] = {
 };
 
 /*  Public interface    */
-void bork_map_init(struct bork_map* map, int w, int l, int h)
+void bork_map_init(struct bork_map* map, struct pg_texture* tex,
+                   struct pg_shader* shader)
 {
-    *map = (struct bork_map) {
-        .data = calloc(w * l * h, sizeof(struct bork_tile)),
-        .w = w,
-        .l = l,
-        .h = h };
+    map->tex_atlas = tex;
+    map->shader = shader;
+    int i;
+    for(i = 0; i < BORK_AREA_EXTERIOR; ++i) {
+        map->area_pos[i][0] = 0;
+        map->area_pos[i][1] = 0;
+        map->area_pos[i][2] = i * 32;
+        map->data[i] = calloc(32 * 32 * 32, sizeof(struct bork_tile));
+        pg_model_init(&map->area_model[i]);
+        int j;
+        for(j = 0; j < 32 * 32 *32; ++j) {
+            map->data[i][j] = (struct bork_tile){ BORK_TILE_HULL };
+        }
+        bork_map_generate_area_model(map, i);
+        pg_shader_buffer_model(shader, &map->area_model[i]);
+    }
 }
 
 void bork_map_deinit(struct bork_map* map)
 {
-    free(map->data);
+    int i;
+    for(i = 0; i < BORK_AREA_EXTERIOR; ++i) {
+        free(map->data[i]);
+        pg_model_deinit(&map->area_model[i]);
+    }
 }
 
+void bork_map_draw_area(struct bork_map* map, enum bork_area area)
+{
+    pg_model_begin(&map->area_model[area], map->shader);
+    mat4 model_transform;
+    mat4_translate(model_transform,
+                   map->area_pos[area][0] * 2.0f,
+                   map->area_pos[area][1] * 2.0f,
+                   map->area_pos[area][2] * 2.0f);
+    pg_model_draw(&map->area_model[area], model_transform);
+}
+static void bork_map_generate_area_model(struct bork_map* map, enum bork_area area)
+{
+    pg_model_reset(&map->area_model[area]);
+    map->area_model[area].components = PG_MODEL_COMPONENT_POSITION | PG_MODEL_COMPONENT_UV;
+    struct bork_tile* tile;
+    int x, y, z;
+    for(x = 0; x < 32; ++x) {
+        for(y = 0; y < 32; ++y) {
+            for(z = 0; z < 32; ++z) {
+                tile = bork_map_tile_ptr(map, area, x, y, z);
+                if(!tile || tile->type < 2) continue;
+                struct bork_tile_detail* detail = &BORK_TILE_DETAILS[tile->type];
+                tile->model_tri_idx = map->area_model[area].tris.len;
+                tile->num_tris = detail->add_model(map, area, tile, x, y, z);
+            }
+        }
+    }
+    pg_model_precalc_ntb(&map->area_model[area]);
+}
+
+enum bork_area bork_map_get_area(struct bork_map* map, int x, int y, int z)
+{
+    int i;
+    for(i = 0; i < BORK_AREA_EXTERIOR; ++i) {
+        if(x >= map->area_pos[i][0] && x < map->area_pos[i][0] + 32
+        && y >= map->area_pos[i][1] && y < map->area_pos[i][1] + 32
+        && z >= map->area_pos[i][2] && z < map->area_pos[i][2] + 32)
+            return i;
+    }
+    return BORK_AREA_EXTERIOR;
+}
+
+struct bork_tile* bork_map_tile_ptr(struct bork_map* map, enum bork_area area,
+                                    int x, int y, int z)
+{
+    if(x >= 0 && x < 32 && y >= 0 && y < 32 && z >= 0 && z < 32)
+        return &map->data[area][x + y * 32 + z * 32 * 32];
+    else return NULL;
+}
+
+#if 0
 void bork_map_generate_model(struct bork_map* map, struct pg_model* model,
                              struct pg_texture* tex)
 {
@@ -99,30 +167,15 @@ void bork_map_generate_model(struct bork_map* map, struct pg_model* model,
     for(x = 0; x < map->w; ++x) {
         for(y = 0; y < map->l; ++y) {
             for(z = 0; z < map->h; ++z) {
-                tile = bork_map_get_tile(map, x, y, z);
+                tile = &map->data[area][x + y * 32 + z * 32 * 32];
                 if(!tile || tile->type < 2) continue;
                 struct bork_tile_detail* detail = &BORK_TILE_DETAILS[tile->type];
                 tile->model_tri_idx = model->tris.len;
-                tile->num_tris = detail->add_model(map, tile, x, y, z);
+                tile->num_tris = detail->add_model(map, area, tile, x, y, z);
             }
         }
     }
     pg_model_precalc_ntb(model);
-}
-
-struct bork_tile* bork_map_get_tile(struct bork_map* map, int x, int y, int z)
-{
-    if(x < 0 || x >= map->w || y < 0 || y >= map->l || z < 0 || z >= map->h)
-        return NULL;
-    return &map->data[x + y * map->w + z * map->w * map->l];
-}
-
-void bork_map_set_tile(struct bork_map* map, int x, int y, int z,
-                       struct bork_tile tile)
-{
-    if(x < 0 || x >= map->w || y < 0 || y >= map->l || z < 0 || z >= map->h)
-        return;
-    map->data[x + y * map->w + z * map->w * map->l] = tile;
 }
 
 static void bork_map_generate_area(struct bork_map* map, enum bork_area area);
@@ -205,6 +258,7 @@ static void bork_map_generate_area(struct bork_map* map, enum bork_area area)
         }
     }
 }
+#endif
 
 /*  Generating geometry for individual tiles    */
 /*  The BASIC tile geometry generation; just variations on a cube   */
@@ -234,8 +288,9 @@ static const vec3 vert_pos[6][4] = {
       { -0.5, 0.5, -0.5 },
       { 0.5, 0.5, -0.5 } } };
 
-static int tile_face_basic(struct bork_map* map, struct bork_tile* tile,
-                           int x, int y, int z, enum pg_direction dir)
+static int tile_face_basic(struct bork_map* map, enum bork_area area,
+                           struct bork_tile* tile, int x, int y, int z,
+                           enum pg_direction dir)
 {
     /*  Get the details for this face   */
     struct bork_tile_detail* detail = &BORK_TILE_DETAILS[tile->type];
@@ -243,7 +298,7 @@ static int tile_face_basic(struct bork_map* map, struct bork_tile* tile,
     if(!(face_flags & BORK_TILE_HAS_SURFACE)) return 0; /*  Tile has no face here   */
     /*  Get details for the opposing face   */
     int opp[3] = { x + PG_DIR_VEC[dir][0], y + PG_DIR_VEC[dir][1], z + PG_DIR_VEC[dir][2] };
-    struct bork_tile* opp_tile = bork_map_get_tile(map, opp[0], opp[1], opp[2]);
+    struct bork_tile* opp_tile = bork_map_tile_ptr(map, area, opp[0], opp[1], opp[2]);
     struct bork_tile_detail* opp_detail = opp_tile ?
         &BORK_TILE_DETAILS[opp_tile->type] : &BORK_TILE_DETAILS[0];
     uint32_t opp_flags = opp_detail->face_flags[PG_DIR_OPPOSITE[dir]];
@@ -257,6 +312,7 @@ static int tile_face_basic(struct bork_map* map, struct bork_tile* tile,
     } else {
         if(face_flags & BORK_TILE_FLUSH_SURFACE) return 0;
     }
+    struct pg_model* model = &map->area_model[area];
     /*  Calculate the base info for this face   */
     int num_tris = 0;
     vec3 inset_dir;
@@ -264,9 +320,10 @@ static int tile_face_basic(struct bork_map* map, struct bork_tile* tile,
     vec2 tex_frame[2];
     pg_texture_get_frame(map->tex_atlas, detail->tex_tile[dir],
                          tex_frame[0], tex_frame[1]);
-    unsigned vert_idx = map->model->v_count;
+    unsigned vert_idx = model->v_count;
     /*  Generate the geometry   */
-    struct pg_vertex_full new_vert = { .components = map->model->components };
+    struct pg_vertex_full new_vert = { .components =
+        PG_MODEL_COMPONENT_POSITION | PG_MODEL_COMPONENT_UV };
     int i;
     if(!(face_flags & BORK_TILE_NO_FRONTFACE)) {
         for(i = 0; i < 4; ++i) {
@@ -276,10 +333,10 @@ static int tile_face_basic(struct bork_map* map, struct bork_tile* tile,
             vec3_sub(new_vert.pos, new_vert.pos, inset_dir);
             vec3_scale(new_vert.pos, new_vert.pos, 2);
             vec2_set(new_vert.uv, tex_frame[(i < 2)][0], tex_frame[(i % 2)][1]);
-            pg_model_add_vertex(map->model, &new_vert);
+            pg_model_add_vertex(model, &new_vert);
         }
-        pg_model_add_triangle(map->model, vert_idx + 1, vert_idx + 0, vert_idx + 2);
-        pg_model_add_triangle(map->model, vert_idx + 1, vert_idx + 2, vert_idx + 3);
+        pg_model_add_triangle(model, vert_idx + 1, vert_idx + 0, vert_idx + 2);
+        pg_model_add_triangle(model, vert_idx + 1, vert_idx + 2, vert_idx + 3);
         num_tris += 2;
     }
     if(face_flags & BORK_TILE_HAS_BACKFACE) {
@@ -290,22 +347,22 @@ static int tile_face_basic(struct bork_map* map, struct bork_tile* tile,
             vec3_sub(new_vert.pos, new_vert.pos, inset_dir);
             vec3_scale(new_vert.pos, new_vert.pos, 2);
             vec2_set(new_vert.uv, tex_frame[(i < 2)][0], tex_frame[(i % 2)][1]);
-            pg_model_add_vertex(map->model, &new_vert);
+            pg_model_add_vertex(model, &new_vert);
         }
-        pg_model_add_triangle(map->model, vert_idx + 4, vert_idx + 5, vert_idx + 6);
-        pg_model_add_triangle(map->model, vert_idx + 6, vert_idx + 5, vert_idx + 7);
+        pg_model_add_triangle(model, vert_idx + 4, vert_idx + 5, vert_idx + 6);
+        pg_model_add_triangle(model, vert_idx + 6, vert_idx + 5, vert_idx + 7);
         num_tris += 2;
     }
     return num_tris;
 }
 
-static int tile_model_basic(struct bork_map* map, struct bork_tile* tile,
-                            int x, int y, int z)
+static int tile_model_basic(struct bork_map* map, enum bork_area area,
+                            struct bork_tile* tile, int x, int y, int z)
 {
     int tri_count = 0;
     int s;
     for(s = 0; s < 6; ++s) {
-        tri_count += tile_face_basic(map, tile, x, y, z, s);
+        tri_count += tile_face_basic(map, area, tile, x, y, z, s);
     }
     return tri_count;
 }
