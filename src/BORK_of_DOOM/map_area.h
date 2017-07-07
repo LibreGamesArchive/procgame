@@ -1,3 +1,5 @@
+#include "map_object.h"
+
 enum bork_area {
     BORK_AREA_PETS,
     BORK_AREA_WAREHOUSE,
@@ -39,8 +41,10 @@ struct bork_map {
     int area_pos[BORK_AREA_EXTERIOR][3];
     struct bork_tile* data[BORK_AREA_EXTERIOR];
     struct pg_model area_model[BORK_AREA_EXTERIOR];
+    ARR_T(struct bork_map_object) objects[BORK_AREA_EXTERIOR];
     struct pg_texture* tex_atlas;
     struct pg_shader* shader;
+    struct pg_model door_model;
 };
 
 struct bork_tile_detail {

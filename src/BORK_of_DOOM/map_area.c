@@ -85,12 +85,27 @@ void bork_map_init(struct bork_map* map, struct pg_texture* tex,
         map->data[i] = calloc(32 * 32 * 32, sizeof(struct bork_tile));
         pg_model_init(&map->area_model[i]);
         int j;
-        for(j = 0; j < 32 * 32 *32; ++j) {
+        for(j = 0; j < 32 * 32 * 32 - 32 * 32; ++j) {
             map->data[i][j] = (struct bork_tile){ BORK_TILE_HULL };
         }
         bork_map_generate_area_model(map, i);
         pg_shader_buffer_model(shader, &map->area_model[i]);
+        ARR_INIT(map->objects[i]);
+        if(i == 0) {
+            struct bork_map_object test_door = {
+                .type = BORK_MAP_OBJ_DOOR,
+                .x = 16, .y = 16, .z = 31 };
+            ARR_PUSH(map->objects[i], test_door);
+        }
     }
+    pg_model_init(&map->door_model);
+    vec4 face_uv[6];
+    for(i = 0; i < 6; ++i) {
+        pg_texture_get_frame(tex, 2, face_uv[i], face_uv[i] + 2);
+    }
+    pg_model_rect_prism(&map->door_model, (vec3){ 0.5, 0.5, 0.5 }, face_uv);
+    pg_model_precalc_ntb(&map->door_model);
+    pg_shader_buffer_model(shader, &map->door_model);
 }
 
 void bork_map_deinit(struct bork_map* map)
@@ -111,6 +126,16 @@ void bork_map_draw_area(struct bork_map* map, enum bork_area area)
                    map->area_pos[area][1] * 2.0f,
                    map->area_pos[area][2] * 2.0f);
     pg_model_draw(&map->area_model[area], model_transform);
+    struct bork_map_object* obj;
+    int i;
+    pg_model_begin(&map->door_model, map->shader);
+    ARR_FOREACH_PTR(map->objects[area], obj, i) {
+        mat4_translate(model_transform,
+            (map->area_pos[area][0] + obj->x) * 2.0f + 1.0f,
+            (map->area_pos[area][1] + obj->y) * 2.0f + 1.0f,
+            (map->area_pos[area][2] + obj->z) * 2.0f + 1.0f + obj->door.pos);
+        pg_model_draw(&map->door_model, model_transform);
+    }
 }
 static void bork_map_generate_area_model(struct bork_map* map, enum bork_area area)
 {
