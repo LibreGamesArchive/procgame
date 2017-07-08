@@ -60,8 +60,8 @@ struct pg_model {
     ARR_T(vec3_t) bitangent;
     ARR_T(float) height;
     ARR_T(struct pg_tri) tris;
-    int active;
     ARR_T(struct pg_model_buffer) buffers;
+    int active;
     int dirty_tris;
     GLuint ebo;
 };
@@ -102,6 +102,19 @@ void pg_model_split_tris(struct pg_model* model);
 void pg_model_blend_duplicates(struct pg_model* model, float tolerance);
 void pg_model_join_duplicates(struct pg_model* model, float t);
 void pg_model_warp_verts(struct pg_model* model);
+/*  Generic triangle operations */
+void pg_model_get_face_normal(struct pg_model* model, unsigned tri,
+                              vec3 norm);
+void pg_model_face_projection_overlap(struct pg_model* model, vec3 proj,
+                                      unsigned tri0, unsigned tri1);
+/*  Collision functions */
+int pg_model_collide_ellipsoid(struct pg_model* model, mat4 transform,
+                               vec3 ellipsoid_r, vec3 ellipsoid_pos,
+                               vec3 out, vec3 out_norm);
+int pg_model_collide_ellipsoid_sub(struct pg_model* model, mat4 transform,
+                                   unsigned sub_i, unsigned sub_len,
+                                   vec3 ellipsoid_r, vec3 ellipsoid_pos,
+                                   vec3 out, vec3 out_norm);
 
 /*  PRIMITIVES  model_prims.c   */
 void pg_model_quad(struct pg_model* model, vec2 tex_scale);
@@ -113,11 +126,6 @@ void pg_model_cone(struct pg_model* model, int n, float base,
 void pg_model_cone_trunc(struct pg_model* model, int n, float t, vec3 warp,
                          vec2 tex_scale, int tex_style);
 void pg_model_icosphere(struct pg_model* model, int n);
+
 /*  Generate a model from an SDF tree   marching_cubes.c    */
 void pg_model_sdf(struct pg_model* model, struct pg_sdf_tree* sdf, float p);
-
-/*  Generic triangle operations */
-void pg_model_get_face_normal(struct pg_model* model, unsigned tri,
-                              vec3 norm);
-void pg_model_face_projection_overlap(struct pg_model* model, vec3 proj,
-                                      unsigned tri0, unsigned tri1);

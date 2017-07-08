@@ -591,6 +591,181 @@ void pg_model_get_face_normal(struct pg_model* model, unsigned t, vec3 out)
     vec3_normalize(out, out);
 }
 
+/*  Collision functions */
+static inline float sd_plane(vec3 const p, vec3 const normal, float plane_d)
+{
+    return vec3_mul_inner(p, normal) + plane_d;
+}
+
+static int is_point_in_triangle(vec3 point, vec3 a, vec3 b, vec3 c)
+{
+    float total_angles = 0.0f;
+    vec3 v1, v2, v3;
+    vec3_sub(v1, point, a);
+    vec3_sub(v2, point, b);
+    vec3_sub(v3, point, c);
+    vec3_normalize(v1, v1);
+    vec3_normalize(v2, v2);
+    vec3_normalize(v3, v3);
+    total_angles += acosf(vec3_mul_inner(v1,v2));   
+    total_angles += acosf(vec3_mul_inner(v2,v3));
+    total_angles += acosf(vec3_mul_inner(v3,v1)); 
+    if (fabs(total_angles - 2 * M_PI) <= 0.05) return 1;
+    else return 0;
+}
+
+void nearest_on_triangle(vec3 out, vec3 p, vec3 a, vec3 b, vec3 c)
+{
+    // Check if P in vertex region outside A
+    vec3 ab, ac, ap, bp, cp;
+    vec3_sub(ab, b, a);
+    vec3_sub(ac, c, a);
+    vec3_sub(ap, p, a);
+    float d1 = vec3_mul_inner(ab, ap);
+    float d2 = vec3_mul_inner(ac, ap);
+    if (d1 <= 0.0f && d2 <= 0.0f) {
+        vec3_dup(out, a);
+        return;
+    }
+    // Check if P in vertex region outside B
+    vec3_sub(bp, p, b);
+    float d3 = vec3_mul_inner(ab, bp);
+    float d4 = vec3_mul_inner(ac, bp);
+    if (d3 >= 0.0f && d4 <= d3) {
+        vec3_dup(out, b);
+        return; // barycentric coordinates (0,1,0)
+    }
+    // Check if P in edge region of AB, if so return projection of P onto AB
+    float vc = d1*d4 - d3*d2;
+    if (vc <= 0.0f && d1 >= 0.0f && d3 <= 0.0f) {
+        float v=d1/(d1- d3);
+        vec3_dup(out, ab);
+        vec3_scale(out, out, v);
+        vec3_add(out, out, a);
+        return; // barycentric coordinates (1-v,v,0)
+    }
+    // Check if P in vertex region outside C
+    vec3_sub(cp, p, c);
+    float d5 = vec3_mul_inner(ab, cp);
+    float d6 = vec3_mul_inner(ac, cp);
+    if (d6 >= 0.0f && d5 <= d6) {
+        vec3_dup(out, c);
+        return; // barycentric coordinates (0,0,1)
+    }
+    // Check if P in edge region of AC, if so return projection of P onto AC
+    float vb = d5*d2 - d1*d6;
+    if (vb <= 0.0f && d2 >= 0.0f && d6 <= 0.0f) {
+        float w=d2/(d2- d6);
+        vec3_dup(out, ac);
+        vec3_scale(out, out, w);
+        vec3_add(out, out, a);
+        return; // barycentric coordinates (1-w,0,w)
+    }
+    // Check if P in edge region of BC, if so return projection of P onto BC
+    float va = d3*d6 - d5*d4;
+    if (va <= 0.0f && (d4 - d3) >= 0.0f && (d5 - d6) >= 0.0f) {
+        float w = (d4 - d3) / ((d4 - d3) + (d5 - d6));
+        vec3_sub(out, c, b);
+        vec3_scale(out, out, w);
+        vec3_add(out, out, b);
+        return; // barycentric coordinates (0,1-w,w)
+    }
+    // P inside face region. Compute Q through its barycentric coordinates (u,v,w)
+    float denom = 1.0f / (va + vb + vc);
+    float v=vb* denom;
+    float w=vc* denom;
+    vec3_scale(ab, ab, v);
+    vec3_scale(ac, ac, w);
+    vec3_add(ab, ab, ac);
+    vec3_add(out, ab, a);
+}
+
+static int collide_with_tri(vec3 sphere_pos, vec3 t0, vec3 t1, vec3 t2,
+                            vec3 tnorm, vec3 out)
+{
+    vec3 sphere_ix, face_ix;
+    float plane_d = -sd_plane(t0, tnorm, 0);
+    float dist_to_plane = sd_plane(sphere_pos, tnorm, plane_d);
+    if(dist_to_plane > 1 || dist_to_plane < 0) return 0;
+    vec3_set(face_ix, sphere_pos[0] - dist_to_plane * tnorm[0],
+                      sphere_pos[1] - dist_to_plane * tnorm[1],
+                      sphere_pos[2] - dist_to_plane * tnorm[2]);
+    if(is_point_in_triangle(face_ix, t0, t1, t2)) {
+        vec3_sub(sphere_ix, sphere_pos, tnorm);
+        vec3_dup(face_ix, face_ix);
+        vec3_sub(out, face_ix, sphere_ix);
+        return 1;
+    }
+    nearest_on_triangle(face_ix, sphere_pos, t0, t1, t2);
+    vec3_sub(sphere_ix, face_ix, sphere_pos);
+    float dist = vec3_len(sphere_ix);
+    if(dist > 1) return 0;
+    vec3_normalize(sphere_ix, sphere_ix);
+    vec3_add(sphere_ix, sphere_ix, sphere_pos);
+    vec3_sub(out, face_ix, sphere_ix);
+    return 1;
+}
+
+int pg_model_collide_ellipsoid(struct pg_model* model, mat4 transform,
+                               vec3 ellipsoid_r, vec3 ellipsoid_pos,
+                               vec3 out, vec3 out_norm)
+{
+    return pg_model_collide_ellipsoid_sub(model, transform, 0, model->tris.len,
+                                          ellipsoid_r, ellipsoid_pos,
+                                          out, out_norm);
+}
+
+int pg_model_collide_ellipsoid_sub(struct pg_model* model, mat4 transform,
+                                   unsigned sub_i, unsigned sub_len,
+                                   vec3 ellipsoid_r, vec3 ellipsoid_pos,
+                                   vec3 out, vec3 out_norm)
+{
+    float deepest = 0;
+    int tri_idx = -1;
+    int sub_end = sub_i + sub_len;
+    int i;
+    vec3 pos, tri_push, tri_norm;
+    vec3_div(pos, ellipsoid_pos, ellipsoid_r);
+    for(i = sub_i; i < sub_end; ++i) {
+        struct pg_tri* tri = &model->tris.data[i];
+        vec4 p0 = { 0, 0, 0, 1 };
+        vec4 p1 = { 0, 0, 0, 1 };
+        vec4 p2 = { 0, 0, 0, 1 };
+        vec3_dup(p0, model->pos.data[tri->t[0]].v);
+        vec3_dup(p1, model->pos.data[tri->t[1]].v);
+        vec3_dup(p2, model->pos.data[tri->t[2]].v);
+        mat4_mul_vec4(p0, transform, p0);
+        mat4_mul_vec4(p1, transform, p1);
+        mat4_mul_vec4(p2, transform, p2);
+        vec3_div(p0, p0, ellipsoid_r);
+        vec3_div(p1, p1, ellipsoid_r);
+        vec3_div(p2, p2, ellipsoid_r);
+        vec3 plane_1, plane_2;
+        vec3_sub(plane_1, p1, p0);
+        vec3_sub(plane_2, p2, p0);
+        vec3 tmp_push, tmp_norm;
+        vec3_wedge(tmp_norm, plane_1, plane_2);
+        vec3_normalize(tmp_norm, tmp_norm);
+        int c = collide_with_tri(pos, p0, p1, p2, tmp_norm, tmp_push);
+        if(c) {
+            /*  If this collision has the greatest depth so far, then
+                set the result to this one  */
+            float depth = vec3_len(tmp_push);
+            if(depth <= deepest) continue;
+            deepest = depth;
+            vec3_dup(tri_push, tmp_push);
+            vec3_dup(tri_norm, tmp_norm);
+            tri_idx = i;
+        }
+    }
+    vec3 new_pos;
+    vec3_add(new_pos, pos, tri_push);
+    vec3_mul(new_pos, new_pos, ellipsoid_r);
+    if(out) vec3_sub(out, new_pos, ellipsoid_pos);
+    if(out_norm) vec3_dup(out_norm, tri_norm);
+    return tri_idx;
+}
+
 #if 0
 void pg_model_generate_texture(struct pg_model* model,
                                    struct pg_texture* texture,

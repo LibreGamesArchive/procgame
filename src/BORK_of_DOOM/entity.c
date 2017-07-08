@@ -23,7 +23,7 @@ void bork_entity_move(struct bork_entity* ent, struct bork_map* map)
     ent->ground = 0;
     struct bork_collision coll = {};
     float curr_move = 0;
-    float max_move = vec3_vmin(ent->size);
+    float max_move = vec3_vmin(ent->size) * 0.5;
     float full_dist = vec3_len(ent->vel);
     vec3 max_move_dir;
     vec3_set_len(max_move_dir, ent->vel, max_move);
@@ -48,7 +48,7 @@ void bork_entity_move(struct bork_entity* ent, struct bork_map* map)
             vec3_dup(curr_dest, new_pos);
             float down_angle = vec3_angle_diff(coll.norm, PG_DIR_VEC[PG_UP]);
             if(down_angle < 0.1 * M_PI) ent->ground = 1;
-            else if(coll.tile->type == BORK_TILE_LADDER) ladder = 1;
+            else if(coll.tile && coll.tile->type == BORK_TILE_LADDER) ladder = 1;
             ++hit;
         }
     }
