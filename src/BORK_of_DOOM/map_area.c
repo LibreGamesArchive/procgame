@@ -85,7 +85,7 @@ void bork_map_init(struct bork_map* map, struct pg_texture* tex,
         map->data[i] = calloc(32 * 32 * 32, sizeof(struct bork_tile));
         pg_model_init(&map->area_model[i]);
         int j;
-        for(j = 0; j < 32 * 32 * 32 - 32 * 32; ++j) {
+        for(j = 0; j < 32 * 32 * 32 - (32 * 32 * 2); ++j) {
             map->data[i][j] = (struct bork_tile){ BORK_TILE_HULL };
         }
         bork_map_generate_area_model(map, i);
@@ -94,7 +94,7 @@ void bork_map_init(struct bork_map* map, struct pg_texture* tex,
         if(i == 0) {
             struct bork_map_object test_door = {
                 .type = BORK_MAP_OBJ_DOOR,
-                .x = 16, .y = 16, .z = 31 };
+                .x = 16, .y = 16, .z = 30 };
             ARR_PUSH(map->objects[i], test_door);
         }
     }
