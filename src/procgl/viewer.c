@@ -7,6 +7,7 @@ void pg_viewer_init(struct pg_viewer* view, vec3 pos, vec2 dir,
 {
     pg_viewer_set(view, pos, dir);
     vec2_dup(view->size, size);
+    vec2_dup(view->near_far, near_far);
     mat4_perspective(view->proj_matrix, 1.0f, size[0] / size[1],
                      near_far[0], near_far[1]);
 }

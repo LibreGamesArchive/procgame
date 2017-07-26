@@ -22,8 +22,8 @@ void pg_model_quad(struct pg_model* model, vec2 tex_scale)
         .pos = { 0.5, -0.5, 0 }, .uv = { tex_scale[0], 0 } });
     pg_model_add_vertex(model, &(struct pg_vertex_full) { c,
         .pos = { 0.5, 0.5, 0 }, .uv = { tex_scale[0], tex_scale[1] } });
-    pg_model_add_triangle(model, 1, 0, 2);
-    pg_model_add_triangle(model, 1, 2, 3);
+    pg_model_add_triangle(model, 0, 1, 2);
+    pg_model_add_triangle(model, 2, 1, 3);
 }
 
 void pg_model_cube(struct pg_model* model, vec2 tex_scale)

@@ -22,9 +22,8 @@ void pg_gbuffer_init(struct pg_gbuffer* gbuf, int w, int h)
         and the framebuffer that they are all attached to   */
     glGenTextures(1, &gbuf->color);
     glGenTextures(1, &gbuf->normal);
-    glGenTextures(1, &gbuf->pos);
     glGenTextures(1, &gbuf->light);
-    glGenRenderbuffers(1, &gbuf->depth);
+    glGenTextures(1, &gbuf->depth);
     glGenFramebuffers(1, &gbuf->frame);
     glActiveTexture(GL_TEXTURE0);
     glBindTexture(GL_TEXTURE_2D, gbuf->color);
@@ -37,19 +36,21 @@ void pg_gbuffer_init(struct pg_gbuffer* gbuf, int w, int h)
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
     glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, w, h, 0,
                  GL_RGBA, GL_UNSIGNED_BYTE, NULL);
-    glBindTexture(GL_TEXTURE_2D, gbuf->pos);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA32F, w, h, 0,
-                 GL_RGBA, GL_FLOAT, NULL);
     glBindTexture(GL_TEXTURE_2D, gbuf->light);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
     glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, w, h, 0,
                  GL_RGBA, GL_UNSIGNED_BYTE, NULL);
+    glBindTexture(GL_TEXTURE_2D, gbuf->depth);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_DEPTH_COMPONENT32F, w, h, 0,
+                 GL_DEPTH_COMPONENT, GL_FLOAT, NULL);
+                 /*
     glBindRenderbuffer(GL_RENDERBUFFER, gbuf->depth);
-    glRenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH24_STENCIL8, w, h);
+    glRenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH24_STENCIL8, w, h);*/
     glBindFramebuffer(GL_FRAMEBUFFER, gbuf->frame);
+
     /*  Attach all the buffers. 0, 1, 2, and the depth buffer are all drawn
         in the geometry pass. 3 is the light accumulation buffer and is only
         drawn in the lighting pass; each light's pixels are additively
@@ -58,12 +59,10 @@ void pg_gbuffer_init(struct pg_gbuffer* gbuf, int w, int h)
                            GL_TEXTURE_2D, gbuf->color, 0);
     glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT1,
                            GL_TEXTURE_2D, gbuf->normal, 0);
+    glFramebufferTexture2D(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT,
+                           GL_TEXTURE_2D, gbuf->depth, 0);
     glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT2,
-                           GL_TEXTURE_2D, gbuf->pos, 0);
-    glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT3,
                            GL_TEXTURE_2D, gbuf->light, 0);
-    glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_DEPTH_STENCIL_ATTACHMENT,
-                              GL_RENDERBUFFER, gbuf->depth);
     /*  Load the shader to render the light volumes */
 #ifdef PROCGL_STATIC_SHADERS
     pg_compile_glsl_static(&gbuf->l_vert, &gbuf->l_frag, &gbuf->l_prog,
@@ -75,11 +74,13 @@ void pg_gbuffer_init(struct pg_gbuffer* gbuf, int w, int h)
                     "src/procgl/shaders/deferred_frag.glsl");
 #endif
     gbuf->uni_projview = glGetUniformLocation(gbuf->l_prog, "projview_matrix");
+    gbuf->uni_view = glGetUniformLocation(gbuf->l_prog, "view_matrix");
     gbuf->uni_eye_pos = glGetUniformLocation(gbuf->l_prog, "eye_pos");
     gbuf->uni_normal = glGetUniformLocation(gbuf->l_prog, "g_normal");
-    gbuf->uni_pos = glGetUniformLocation(gbuf->l_prog, "g_pos");
+    gbuf->uni_depth = glGetUniformLocation(gbuf->l_prog, "g_depth");
     gbuf->uni_light = glGetUniformLocation(gbuf->l_prog, "light");
     gbuf->uni_color = glGetUniformLocation(gbuf->l_prog, "color");
+    gbuf->uni_clip = glGetUniformLocation(gbuf->l_prog, "clip_planes");
     /*  Load the shader which combines the light accumulation buffer and the
         color buffer, and draws the final result    */
 #ifdef PROCGL_STATIC_SHADERS
@@ -101,9 +102,8 @@ void pg_gbuffer_deinit(struct pg_gbuffer* gbuf)
 {
     glDeleteTextures(1, &gbuf->color);
     glDeleteTextures(1, &gbuf->normal);
-    glDeleteTextures(1, &gbuf->pos);
+    glDeleteTextures(1, &gbuf->depth);
     glDeleteTextures(1, &gbuf->light);
-    glDeleteRenderbuffers(1, &gbuf->depth);
     glDeleteFramebuffers(1, &gbuf->frame);
     glDeleteVertexArrays(1, &gbuf->dummy_vao);
     glDeleteShader(gbuf->l_vert);
@@ -115,39 +115,38 @@ void pg_gbuffer_deinit(struct pg_gbuffer* gbuf)
 }
 
 void pg_gbuffer_bind(struct pg_gbuffer* gbuf, int color_slot,
-                     int normal_slot, int pos_slot, int light_slot)
+                     int normal_slot, int depth_slot, int light_slot)
 {
     gbuf->color_slot = color_slot;
     gbuf->normal_slot = normal_slot;
-    gbuf->pos_slot = pos_slot;
+    gbuf->depth_slot = depth_slot;
     gbuf->light_slot = light_slot;
     glActiveTexture(GL_TEXTURE0 + color_slot);
     glBindTexture(GL_TEXTURE_2D, gbuf->color);
     glActiveTexture(GL_TEXTURE0 + normal_slot);
     glBindTexture(GL_TEXTURE_2D, gbuf->normal);
-    glActiveTexture(GL_TEXTURE0 + pos_slot);
-    glBindTexture(GL_TEXTURE_2D, gbuf->pos);
+    glActiveTexture(GL_TEXTURE0 + depth_slot);
+    glBindTexture(GL_TEXTURE_2D, gbuf->depth);
     glActiveTexture(GL_TEXTURE0 + light_slot);
     glBindTexture(GL_TEXTURE_2D, gbuf->light);
 }
 
-static GLenum drawbufs[4] =
-    { GL_COLOR_ATTACHMENT0, GL_COLOR_ATTACHMENT1, GL_COLOR_ATTACHMENT2,
-      GL_COLOR_ATTACHMENT3 };
+static GLenum drawbufs[3] =
+    { GL_COLOR_ATTACHMENT0, GL_COLOR_ATTACHMENT1, GL_COLOR_ATTACHMENT2 };
 
 void pg_gbuffer_dst(struct pg_gbuffer* gbuf)
 {
     glBindFramebuffer(GL_FRAMEBUFFER, gbuf->frame);
     glViewport(0, 0, gbuf->w, gbuf->h);
-    glDrawBuffers(3, drawbufs);
-    glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT | GL_STENCIL_BUFFER_BIT);
+    glDrawBuffers(2, drawbufs);
+    glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 }
 
 void pg_gbuffer_begin_light(struct pg_gbuffer* gbuf, struct pg_viewer* view)
 {
     /*  Set the output buffer to the light accumulation buffer  */
     glBindFramebuffer(GL_FRAMEBUFFER, gbuf->frame);
-    glDrawBuffers(1, drawbufs + 3);
+    glDrawBuffers(1, drawbufs + 2);
     glClear(GL_COLOR_BUFFER_BIT);
     glDisable(GL_DEPTH_TEST);
     glDepthMask(0);
@@ -157,11 +156,15 @@ void pg_gbuffer_begin_light(struct pg_gbuffer* gbuf, struct pg_viewer* view)
     glUseProgram(gbuf->l_prog);
     /*  It only needs to know positions and normals for each pixel  */
     glUniform1i(gbuf->uni_normal, gbuf->normal_slot);
-    glUniform1i(gbuf->uni_pos, gbuf->pos_slot);
+    glUniform1i(gbuf->uni_depth, gbuf->depth_slot);
     mat4 projview;
     mat4_mul(projview, view->proj_matrix, view->view_matrix);
     glUniformMatrix4fv(gbuf->uni_projview, 1, GL_FALSE, *projview);
+    glUniformMatrix4fv(gbuf->uni_view, 1, GL_FALSE, *view->view_matrix);
     glUniform3f(gbuf->uni_eye_pos, view->pos[0], view->pos[1], view->pos[2]);
+    vec2 clip = { view->near_far[1] / (view->near_far[1] - view->near_far[0]),
+                  (-view->near_far[1] * view->near_far[0]) / (view->near_far[1] - view->near_far[0]) };
+    glUniform2fv(gbuf->uni_clip, 1, clip);
     /*  A dummy VAO because the light volume mesh is defined in the shader  */
     glBindVertexArray(gbuf->dummy_vao);
 }

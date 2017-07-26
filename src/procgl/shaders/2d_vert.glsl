@@ -1,8 +1,10 @@
 #version 330
 
 uniform mat4 model_matrix;
+uniform vec2 tex_offset;
+uniform vec2 tex_scale;
 
-in vec2 v_position;
+in vec3 v_position;
 in vec4 v_color;
 in vec2 v_tex_coord;
 in float v_tex_weight;
@@ -13,9 +15,9 @@ out float f_tex_weight;
 
 void main()
 {
-    gl_Position = vec4(v_position, 0, 1) * model_matrix;
+    gl_Position = model_matrix * vec4(v_position.xy, 0, 1);
     f_color = v_color;
-    f_tex_coord = v_tex_coord;
+    f_tex_coord = v_tex_coord * tex_scale + tex_offset;
     f_tex_weight = v_tex_weight;
 }
 

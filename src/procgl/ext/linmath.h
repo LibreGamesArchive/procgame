@@ -1,5 +1,5 @@
 /*  Linear math library originally by github user datenwolf, under the
-    Do What The Fuck You Want To Public License.A
+    Do What The Fuck You Want To Public License.
 
     I have also added some more functions myself for procgame   */
 
@@ -149,6 +149,15 @@ static inline void vec##n##_clamp(vec##n r, vec##n const v, \
     for(i=0; i<n; ++i) \
         r[i] = v[i] < a[i] ? a[i] : (v[i] > b[i] ? b[i] : v[i]); \
 } \
+static inline void vec##n##_swap(vec##n a, vec##n b) \
+{ \
+    int i; \
+    for(i=0; i<n; ++i) { \
+        float tmp = a[i]; \
+        a[i] = b[i]; \
+        b[i] = tmp; \
+    } \
+} \
 static inline int vec##n##_is_zero(vec##n const v) \
 { \
     int i; \
@@ -222,6 +231,13 @@ static inline void vec4_reflect(vec4 r, vec4 v, vec4 n)
     int i;
     for(i=0;i<4;++i)
         r[i] = v[i] - p*n[i];
+}
+
+static inline void spherical_to_cartesian(vec3 r, vec2 const v)
+{
+    r[0] = sin(v[1]) * cos(v[0]);
+    r[1] = sin(v[1]) * sin(v[0]);
+    r[2] = cos(v[1]);
 }
 
 typedef vec4 mat4[4];
@@ -299,12 +315,14 @@ static inline void mat4_mul(mat4 M, mat4 a, mat4 b)
 }
 static inline void mat4_mul_vec4(vec4 r, mat4 M, vec4 v)
 {
+    vec4 temp;
     int i, j;
     for(j=0; j<4; ++j) {
-        r[j] = 0.f;
+        temp[j] = 0.f;
         for(i=0; i<4; ++i)
-            r[j] += M[i][j] * v[i];
+            temp[j] += M[i][j] * v[i];
     }
+    vec4_dup(r, temp);
 }
 static inline void mat4_translate(mat4 T, float x, float y, float z)
 {
@@ -724,6 +742,12 @@ static inline void box_bound(box out, box a, box b)
     out[1][2] = MAX(MAX(a[0][2], a[1][2]), MAX(b[0][2], b[1][2]));
 }
 
+static inline void box_dup(box out, box a)
+{
+    vec3_dup(out[0], a[0]);
+    vec3_dup(out[1], a[1]);
+}
+
 static inline void box_add_vec3(box out, box a, vec3 v)
 {
     vec3_add(out[0], a[0], v);
@@ -747,5 +771,14 @@ static inline void box_div_vec3(box out, box a, vec3 v)
     vec3_div(out[0], a[0], v);
     vec3_div(out[1], a[1], v);
 }
+
+static inline int box_contains_point(box a, vec3 v)
+{
+    if(v[0] >= a[0][0] && v[0] < a[1][0]
+    && v[1] >= a[0][1] && v[1] < a[1][1]
+    && v[2] >= a[0][2] && v[2] < a[1][2]) return 1;
+    else return 0;
+}
+
 #endif
 

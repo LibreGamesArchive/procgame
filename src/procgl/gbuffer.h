@@ -1,18 +1,17 @@
 struct pg_gbuffer {
     /*  The texture units that all the buffers should be kept in    */
-    int color_slot, normal_slot, pos_slot, light_slot;
+    int color_slot, normal_slot, depth_slot, light_slot;
     /*  The shader program for rendering light volumes  */
     GLuint l_vert, l_frag, l_prog;
     GLuint dummy_vao;
-    GLint uni_projview, uni_eye_pos;
-    GLint uni_normal, uni_pos, uni_light, uni_color;
+    GLint uni_projview, uni_view, uni_eye_pos, uni_clip;
+    GLint uni_normal, uni_depth, uni_light, uni_color;
     /*  The shader program for rendering the final image    */
     GLuint f_vert, f_frag, f_prog;
     GLint f_color, f_light, f_ambient;
     /*  The G-buffer, renderbuffer for depth, and light accumulation buffer */
     GLuint color;
     GLuint normal;
-    GLuint pos;
     GLuint depth;
     GLuint light;
     GLuint frame;

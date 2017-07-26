@@ -170,8 +170,8 @@ void pg_shader_rebuild_matrices(struct pg_shader* shader)
     }
     if(shader->mat_idx[PG_MODELVIEW_MATRIX] != -1) {
         mat4_mul(shader->matrix[PG_MODELVIEW_MATRIX],
-                 shader->matrix[PG_MODEL_MATRIX],
-                 shader->matrix[PG_VIEW_MATRIX]);
+                 shader->matrix[PG_VIEW_MATRIX],
+                 shader->matrix[PG_MODEL_MATRIX]);
         glUniformMatrix4fv(shader->mat_idx[PG_MODELVIEW_MATRIX], 1, GL_FALSE,
                            *shader->matrix[PG_MODELVIEW_MATRIX]);
     }

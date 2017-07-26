@@ -156,6 +156,6 @@ void pg_texture_get_frame(struct pg_texture* tex, int frame,
     float frame_v = (float)tex->frame_h / tex->h;
     float frame_x = (float)(frame % frames_wide) * frame_u;
     float frame_y = (float)(frame / frames_wide) * frame_v;
-    vec2_set(start, frame_x, frame_y + frame_v);
-    vec2_set(end, frame_x + frame_u, frame_y);
+    if(start) vec2_set(start, frame_x, frame_y + frame_v);
+    if(end) vec2_set(end, frame_x + frame_u, frame_y);
 }

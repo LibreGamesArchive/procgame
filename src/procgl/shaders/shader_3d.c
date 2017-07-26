@@ -41,6 +41,7 @@ static void begin(struct pg_shader* shader, struct pg_viewer* view)
     }
     /*  Enable depth testing    */
     glEnable(GL_DEPTH_TEST);
+    glDisable(GL_BLEND);
     glDepthMask(1);
 }
 

@@ -1,0 +1,41 @@
+#include <stdlib.h>
+#include <limits.h>
+#include "procgl/procgl.h"
+#include "bork.h"
+#include "map_area.h"
+#include "bullet.h"
+#include "physics.h"
+
+void bork_bullet_init(struct bork_bullet* blt, vec3 pos, vec3 dir)
+{
+    *blt = (struct bork_bullet) {
+        .pos = { pos[0], pos[1], pos[2] },
+        .dir = { dir[0], dir[1], dir[2] } };
+}
+
+void bork_bullet_move(struct bork_bullet* blt, struct bork_map* map)
+{
+    struct bork_collision coll = {};
+    float curr_move = 0;
+    float max_move = 0.1;
+    float full_dist = vec3_len(blt->dir);
+    vec3 max_move_dir;
+    vec3_set_len(max_move_dir, blt->dir, max_move);
+    vec3 new_pos = { blt->pos[0], blt->pos[1], blt->pos[2] };
+    while(curr_move < full_dist) {
+        if(curr_move + max_move >= full_dist) {
+            vec3_set_len(max_move_dir, blt->dir, full_dist - curr_move);
+            curr_move = full_dist;
+        } else {
+            curr_move += max_move;
+        }
+        vec3_add(new_pos, new_pos, max_move_dir);
+        if(bork_map_collide(map, &coll, new_pos, (vec3){ 0.1, 0.1, 0.1 })) {
+            blt->dead_ticks = 10;
+            vec3_set(blt->dir, 0, 0, 0);
+            vec3_sub(blt->pos, new_pos, max_move_dir);
+            break;
+        }
+    }
+    vec3_dup(blt->pos, new_pos);
+}

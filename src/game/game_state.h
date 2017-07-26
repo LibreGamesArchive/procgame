@@ -5,6 +5,7 @@ struct pg_game_state {
     float last_tick;    /*  Time of last tick   */
     float tick_over;    /*  Time since last tick (fraction of a tick)   */
     float time;         /*  Time in seconds */
+    int running;        /*  Still running?  */
     void* data;         /*  User data   */
     void (*update)(struct pg_game_state*);
     void (*tick)(struct pg_game_state*);

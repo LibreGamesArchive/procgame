@@ -16,12 +16,12 @@ LIBS_WINDOWS := -lmingw32 -l:src/libs/win32/GL/libglew32.a \
 
 TARGET := procgame
 
-GAME := obj/game_state.o obj/bork.o obj/state_menu.o obj/state_play.o \
-    obj/map_area.o obj/physics.o obj/entity.o
+GAME := obj/game_state.o obj/bork.o obj/map_area.o obj/physics.o obj/entity.o obj/bullet.o \
+ obj/state_menu.o obj/state_play.o obj/state_edit.o 
 PROCGL := obj/procgl_base.o \
  obj/viewer.o obj/postproc.o obj/shader.o obj/gbuffer.o \
  obj/model.o obj/model_prims.o obj/marching_cubes.o \
- obj/shader_2d.o obj/shader_3d.o obj/shader_cubetex.o obj/shader_text.o \
+ obj/shader_2d.o obj/shader_3d.o obj/shader_sprite.o obj/shader_cubetex.o obj/shader_text.o \
  obj/wave.o obj/heightmap.o obj/texture.o obj/audio.o \
  obj/sdf.o obj/sdf_functions.o
 PROCGL_LIBS := obj/lodepng.o obj/noise1234.o obj/wavfile.o obj/easing.o
@@ -57,6 +57,9 @@ obj/bork.o: src/BORK_of_DOOM/bork.c src/BORK_of_DOOM/bork.h \
 obj/state_menu.o: src/BORK_of_DOOM/state_menu.c src/BORK_of_DOOM/bork.h \
  $(PROCGL) $(PROCGL_LIBS)
 	$(CC) $(CFLAGS) -o obj/state_menu.o -c src/BORK_of_DOOM/state_menu.c $(INCLUDES)
+obj/state_edit.o: src/BORK_of_DOOM/state_edit.c src/BORK_of_DOOM/bork.h \
+ $(PROCGL) $(PROCGL_LIBS)
+	$(CC) $(CFLAGS) -o obj/state_edit.o -c src/BORK_of_DOOM/state_edit.c $(INCLUDES)
 obj/state_play.o: src/BORK_of_DOOM/state_play.c src/BORK_of_DOOM/bork.h \
  $(PROCGL) $(PROCGL_LIBS)
 	$(CC) $(CFLAGS) -o obj/state_play.o -c src/BORK_of_DOOM/state_play.c $(INCLUDES)
@@ -69,6 +72,9 @@ obj/physics.o: src/BORK_of_DOOM/physics.c src/BORK_of_DOOM/map_area.h \
 obj/entity.o: src/BORK_of_DOOM/entity.c src/BORK_of_DOOM/map_area.h \
  src/BORK_of_DOOM/physics.h $(PROCGL) $(PROCGL_LIBS)
 	$(CC) $(CFLAGS) -o obj/entity.o -c src/BORK_of_DOOM/entity.c $(INCLUDES)
+obj/bullet.o: src/BORK_of_DOOM/bullet.c src/BORK_of_DOOM/map_area.h \
+ src/BORK_of_DOOM/physics.h $(PROCGL) $(PROCGL_LIBS)
+	$(CC) $(CFLAGS) -o obj/bullet.o -c src/BORK_of_DOOM/bullet.c $(INCLUDES)
 
 obj/procgl_base.o: src/procgl/procgl_base.c src/procgl/procgl_base.h
 	$(CC) $(CFLAGS) -o obj/procgl_base.o -c src/procgl/procgl_base.c $(INCLUDES)
@@ -108,6 +114,10 @@ obj/shader_3d.o: src/procgl/shaders/shader_3d.c src/procgl/ext/linmath.h \
  src/procgl/viewer.h src/procgl/shader.h \
  src/procgl/wave.h src/procgl/heightmap.h src/procgl/texture.h
 	$(CC) $(CFLAGS) -o obj/shader_3d.o -c src/procgl/shaders/shader_3d.c $(INCLUDES)
+obj/shader_sprite.o: src/procgl/shaders/shader_sprite.c src/procgl/ext/linmath.h \
+ src/procgl/viewer.h src/procgl/shader.h \
+ src/procgl/wave.h src/procgl/heightmap.h src/procgl/texture.h
+	$(CC) $(CFLAGS) -o obj/shader_sprite.o -c src/procgl/shaders/shader_sprite.c $(INCLUDES)
 obj/shader_cubetex.o: src/procgl/shaders/shader_cubetex.c \
  src/procgl/ext/linmath.h src/procgl/viewer.h src/procgl/shader.h \
  src/procgl/wave.h src/procgl/heightmap.h src/procgl/texture.h
@@ -151,6 +161,8 @@ dump_shaders: src/procgl/shaders/*.glsl
     xxd -i 2d_frag.glsl >> 2d.glsl.h && \
     xxd -i 3d_vert.glsl >> 3d.glsl.h && \
     xxd -i 3d_frag.glsl >> 3d.glsl.h && \
+    xxd -i sprite_vert.glsl >> sprite.glsl.h && \
+    xxd -i sprite_frag.glsl >> sprite.glsl.h && \
     xxd -i cubetex_vert.glsl >> cubetex.glsl.h && \
     xxd -i cubetex_frag.glsl >> cubetex.glsl.h && \
     xxd -i deferred_vert.glsl >> deferred.glsl.h && \

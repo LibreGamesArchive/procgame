@@ -1,4 +1,5 @@
 #include <stdio.h>
+#include <stdlib.h>
 #include <GL/glew.h>
 #include "procgl/ext/linmath.h"
 #include "procgl/arr.h"
@@ -14,21 +15,43 @@
 #endif
 
 struct data_2d {
+    int unis_dirty;
+    struct {
+        struct pg_texture* tex;
+        float tex_weight;
+        vec2 tex_offset;
+        vec2 tex_scale;
+        vec4 color_mod;
+    } state;
     struct {
         GLint tex_unit;
+        GLint tex_weight;
+        GLint tex_offset;
+        GLint tex_scale;
+        GLint color_mod;
     } unis;
-    struct {
-        GLint pos, color, tex_coord, tex_weight;
-    } attribs;
 };
 
 static void begin(struct pg_shader* shader, struct pg_viewer* view)
 {
+    struct data_2d* d = shader->data;
+    /*  Set the uniforms    */
+    if(d->unis_dirty) {
+        glUniform1i(d->unis.tex_unit, d->state.tex->diffuse_slot);
+        glUniform1f(d->unis.tex_weight, d->state.tex_weight);
+        glUniform2fv(d->unis.tex_offset, 1, d->state.tex_offset);
+        glUniform2fv(d->unis.tex_scale, 1, d->state.tex_scale);
+        glUniform4fv(d->unis.color_mod, 1, d->state.color_mod);
+        d->unis_dirty = 0;
+    }
+    glEnable(GL_BLEND);
+    glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
     glDisable(GL_DEPTH_TEST);
     glDepthMask(0);
 }
 
 /*  PUBLIC INTERFACE    */
+
 int pg_shader_2d(struct pg_shader* shader)
 {
 #ifdef PROCGL_STATIC_SHADERS
@@ -43,19 +66,87 @@ int pg_shader_2d(struct pg_shader* shader)
     if(!load) return 0;
     struct data_2d* d = malloc(sizeof(struct data_2d));
     pg_shader_link_matrix(shader, PG_MODEL_MATRIX, "model_matrix");
+    pg_shader_link_component(shader, PG_MODEL_COMPONENT_POSITION, "v_position");
+    pg_shader_link_component(shader, PG_MODEL_COMPONENT_UV, "v_tex_coord");
+    pg_shader_link_component(shader, PG_MODEL_COMPONENT_COLOR, "v_color");
+    pg_shader_link_component(shader, PG_MODEL_COMPONENT_HEIGHT, "v_tex_weight");
+    d->state.tex = NULL;
+    d->state.tex_weight = 1;
+    vec4_set(d->state.color_mod, 1, 1, 1, 1);
+    vec2_set(d->state.tex_offset, 0, 0);
+    vec2_set(d->state.tex_scale, 1, 1);
     d->unis.tex_unit = glGetUniformLocation(shader->prog, "tex");
-    d->attribs.pos = glGetAttribLocation(shader->prog, "v_position");
-    d->attribs.color = glGetAttribLocation(shader->prog, "v_color");
-    d->attribs.tex_coord = glGetAttribLocation(shader->prog, "v_tex_coord");
-    d->attribs.tex_weight = glGetAttribLocation(shader->prog, "v_tex_weight");
+    d->unis.tex_weight = glGetUniformLocation(shader->prog, "tex_weight");
+    d->unis.tex_offset = glGetUniformLocation(shader->prog, "tex_offset");
+    d->unis.tex_scale = glGetUniformLocation(shader->prog, "tex_scale");
+    d->unis.color_mod = glGetUniformLocation(shader->prog, "color_mod");
+    d->unis_dirty = 1;
     shader->data = d;
     shader->deinit = free;
     shader->begin = begin;
+    shader->components =
+        (PG_MODEL_COMPONENT_POSITION | PG_MODEL_COMPONENT_UV |
+         PG_MODEL_COMPONENT_COLOR | PG_MODEL_COMPONENT_HEIGHT);
     return 1;
 }
 
-void pg_shader_2d_set_texture(struct pg_shader* shader, GLint tex_unit)
+void pg_shader_2d_set_texture(struct pg_shader* shader, struct pg_texture* tex)
 {
     struct data_2d* d = shader->data;
-    glUniform1i(d->unis.tex_unit, tex_unit);
+    d->state.tex = tex;
+    if(pg_shader_is_active(shader)) {
+        glUniform1i(d->unis.tex_unit, tex->diffuse_slot);
+    } else d->unis_dirty = 1;
+}
+
+void pg_shader_2d_set_tex_weight(struct pg_shader* shader, float weight)
+{
+    struct data_2d* d = shader->data;
+    d->state.tex_weight = weight;
+    if(pg_shader_is_active(shader)) {
+        glUniform1f(d->unis.tex_weight, d->state.tex_weight);
+    } else d->unis_dirty = 1;
+}
+
+void pg_shader_2d_set_tex_offset(struct pg_shader* shader, vec2 offset)
+{
+    struct data_2d* d = shader->data;
+    vec2_dup(d->state.tex_offset, offset);
+    if(pg_shader_is_active(shader)) {
+        glUniform2fv(d->unis.tex_offset, 1, d->state.tex_offset);
+    } else d->unis_dirty = 1;
+}
+
+void pg_shader_2d_set_tex_scale(struct pg_shader* shader, vec2 scale)
+{
+    struct data_2d* d = shader->data;
+    vec2_dup(d->state.tex_scale, scale);
+    if(pg_shader_is_active(shader)) {
+        glUniform2fv(d->unis.tex_scale, 1, d->state.tex_scale);
+    } else d->unis_dirty = 1;
+}
+
+void pg_shader_2d_set_tex_frame(struct pg_shader* shader, int frame)
+{
+    struct data_2d* d = shader->data;
+    int frames_wide = d->state.tex->w / d->state.tex->frame_w;
+    float frame_u = (float)d->state.tex->frame_w / d->state.tex->w;
+    float frame_v = (float)d->state.tex->frame_h / d->state.tex->h;
+    float frame_x = (float)(frame % frames_wide) * frame_u;
+    float frame_y = (float)(frame / frames_wide) * frame_v;
+    vec2_set(d->state.tex_offset, frame_x, frame_y);
+    vec2_set(d->state.tex_scale, frame_u, frame_v);
+    if(pg_shader_is_active(shader)) {
+        glUniform2fv(d->unis.tex_offset, 1, d->state.tex_offset);
+        glUniform2fv(d->unis.tex_scale, 1, d->state.tex_scale);
+    } else d->unis_dirty = 1;
+}
+
+void pg_shader_2d_set_color_mod(struct pg_shader* shader, vec4 color)
+{
+    struct data_2d* d = shader->data;
+    vec4_dup(d->state.color_mod, color);
+    if(pg_shader_is_active(shader)) {
+        glUniform4fv(d->unis.color_mod, 1, d->state.color_mod);
+    } else d->unis_dirty = 1;
 }

@@ -635,6 +635,14 @@ void nearest_on_triangle(vec3 out, vec3 p, vec3 a, vec3 b, vec3 c)
         vec3_dup(out, b);
         return; // barycentric coordinates (0,1,0)
     }
+    // Check if P in vertex region outside C
+    vec3_sub(cp, p, c);
+    float d5 = vec3_mul_inner(ab, cp);
+    float d6 = vec3_mul_inner(ac, cp);
+    if (d6 >= 0.0f && d5 <= d6) {
+        vec3_dup(out, c);
+        return; // barycentric coordinates (0,0,1)
+    }
     // Check if P in edge region of AB, if so return projection of P onto AB
     float vc = d1*d4 - d3*d2;
     if (vc <= 0.0f && d1 >= 0.0f && d3 <= 0.0f) {
@@ -643,14 +651,6 @@ void nearest_on_triangle(vec3 out, vec3 p, vec3 a, vec3 b, vec3 c)
         vec3_scale(out, out, v);
         vec3_add(out, out, a);
         return; // barycentric coordinates (1-v,v,0)
-    }
-    // Check if P in vertex region outside C
-    vec3_sub(cp, p, c);
-    float d5 = vec3_mul_inner(ab, cp);
-    float d6 = vec3_mul_inner(ac, cp);
-    if (d6 >= 0.0f && d5 <= d6) {
-        vec3_dup(out, c);
-        return; // barycentric coordinates (0,0,1)
     }
     // Check if P in edge region of AC, if so return projection of P onto AC
     float vb = d5*d2 - d1*d6;
@@ -724,19 +724,19 @@ int pg_model_collide_ellipsoid_sub(struct pg_model* model, mat4 transform,
     int tri_idx = -1;
     int sub_end = sub_i + sub_len;
     int i;
+    vec4 ellipsoid_tx;
+    mat4 tx_inv;
+    mat4_invert(tx_inv, transform);
+    mat4_mul_vec4(ellipsoid_tx, tx_inv,
+        (vec4){ ellipsoid_pos[0], ellipsoid_pos[1], ellipsoid_pos[2], 1.0f });
     vec3 pos, tri_push, tri_norm;
-    vec3_div(pos, ellipsoid_pos, ellipsoid_r);
+    vec3_div(pos, ellipsoid_tx, ellipsoid_r);
     for(i = sub_i; i < sub_end; ++i) {
         struct pg_tri* tri = &model->tris.data[i];
-        vec4 p0 = { 0, 0, 0, 1 };
-        vec4 p1 = { 0, 0, 0, 1 };
-        vec4 p2 = { 0, 0, 0, 1 };
+        vec3 p0, p1, p2;
         vec3_dup(p0, model->pos.data[tri->t[0]].v);
         vec3_dup(p1, model->pos.data[tri->t[1]].v);
         vec3_dup(p2, model->pos.data[tri->t[2]].v);
-        mat4_mul_vec4(p0, transform, p0);
-        mat4_mul_vec4(p1, transform, p1);
-        mat4_mul_vec4(p2, transform, p2);
         vec3_div(p0, p0, ellipsoid_r);
         vec3_div(p1, p1, ellipsoid_r);
         vec3_div(p2, p2, ellipsoid_r);

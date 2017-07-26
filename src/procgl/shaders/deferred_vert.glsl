@@ -64,13 +64,16 @@ const vec3 light_verts[60] = vec3[](
     vec3(-1.000, 0.618, 0.000));
 
 uniform mat4 projview_matrix;
+uniform vec3 eye_pos;
 uniform vec4 light;
-out vec4 f_pos;
+out vec4 pos_cs;
+out vec3 view_ray;
 
 void main()
 {
-    gl_Position = projview_matrix *
-        vec4((light_verts[gl_VertexID] * light.w) + light.xyz, 1.0);
-    f_pos = gl_Position;
+    vec3 pos_ws = (light_verts[gl_VertexID]) * light.w * 1.1 + light.xyz;
+    gl_Position = projview_matrix * vec4(pos_ws, 1.0);
+    pos_cs = gl_Position;
+    view_ray = eye_pos - pos_ws;
 }
 

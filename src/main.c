@@ -12,7 +12,7 @@ int main(int argc, char *argv[])
     fscanf(config, "x:%d\ny:%d\nfullscreen:%d\nmouse:%f",
            &w, &h, &fullscreen, &mouse_sens);
     /*  Init procgame   */
-    pg_init(w, h, fullscreen, "procgame");
+    pg_init(w, h, fullscreen, "BORK of DOOM");
     glEnable(GL_CULL_FACE);
     srand(time(0));
     /*  Init BORK OF DOOM   */
@@ -21,13 +21,14 @@ int main(int argc, char *argv[])
     bork_init(&bork);
     bork_menu_start(&game, &bork);
     /*  Main loop   */
-    while(game.tick) {
+    while(game.running) {
         glEnable(GL_DEPTH_TEST);
         glDepthMask(1);
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
         float time = pg_time();
         pg_calc_framerate(time);
         pg_game_state_update(&game, time);
+        SDL_Delay(15);
         pg_game_state_draw(&game);
         pg_screen_swap();
     }

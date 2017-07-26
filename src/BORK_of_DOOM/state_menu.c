@@ -3,6 +3,7 @@
 #include "procgl/procgl.h"
 #include "procgl/wave_defs.h"
 #include "bork.h"
+#include "entity.h"
 #include "map_area.h"
 
 enum bork_menu_option {
@@ -10,6 +11,7 @@ enum bork_menu_option {
     BORK_MENU_CONTINUE,
     BORK_MENU_OPTIONS,
     BORK_MENU_CREDITS,
+    BORK_MENU_EDITOR,
     BORK_MENU_EXIT,
     BORK_MENU_COUNT
 };
@@ -19,6 +21,7 @@ const char* BORK_MENU_STRING[BORK_MENU_COUNT] = {
     "CONTINUE",
     "OPTIONS",
     "CREDITS",
+    "EDITOR",
     "EXIT" };
 
 struct bork_menu_data {
@@ -31,8 +34,6 @@ struct bork_menu_data {
 
 static void bork_menu_tick(struct pg_game_state* state);
 static void bork_menu_draw(struct pg_game_state* state);
-
-static void bork_menu_generate_map(struct bork_menu_data* d, int w, int h, int l);
 
 void bork_menu_start(struct pg_game_state* state, struct bork_game_core* core)
 {
@@ -56,7 +57,7 @@ static void bork_menu_tick(struct pg_game_state* state)
     struct bork_menu_data* d = state->data;
     SDL_Event e;
     while(SDL_PollEvent(&e)) {
-        if(e.type == SDL_QUIT) state->tick = NULL;
+        if(e.type == SDL_QUIT) state->running = 0;
         else if(e.type == SDL_KEYDOWN) {
             switch(e.key.keysym.scancode) {
             case SDL_SCANCODE_DOWN:
@@ -68,6 +69,8 @@ static void bork_menu_tick(struct pg_game_state* state)
             case SDL_SCANCODE_RETURN:
                 if(d->current_selection == BORK_MENU_NEW_GAME)
                     bork_play_start(state, d->core);
+                else if(d->current_selection == BORK_MENU_EDITOR)
+                    bork_editor_start(state, d->core);
                 break;
             default: break;
             }

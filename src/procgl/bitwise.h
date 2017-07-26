@@ -7,7 +7,8 @@ static const int debruijnposition[32] =
 #define LEAST_SIGNIFICANT_BIT(a) \
     (debruijnposition[((uint32_t)(((a) & -(a)) * 0x077CB531U)) >> 27])
 
-static inline unsigned int COUNT_SET_BITS(unsigned int i)
+#ifndef __GNUC__
+static inline unsigned int __builtin_popcount(unsigned int i)
 {
     /*  It isn't for us to understand how this works, but it returns
         the number of set bits in an integer    */
@@ -15,3 +16,4 @@ static inline unsigned int COUNT_SET_BITS(unsigned int i)
     i = (i & 0x33333333) + ((i >> 2) & 0x33333333);
     return (((i + (i >> 4)) & 0x0F0F0F0F) * 0x01010101) >> 24;
 }
+#endif

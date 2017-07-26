@@ -18,6 +18,8 @@ int pg_init(int w, int h, int fullscreen, const char* window_title)
     SDL_GL_SetAttribute(SDL_GL_CONTEXT_MAJOR_VERSION, 3);
     SDL_GL_SetAttribute(SDL_GL_CONTEXT_MINOR_VERSION, 3);
     SDL_GL_SetAttribute(SDL_GL_STENCIL_SIZE, 8);
+    printf("vsync default: %d\n", SDL_GL_GetSwapInterval());
+    SDL_GL_SetSwapInterval(0);
     SDL_DisplayMode display;
     SDL_GetDesktopDisplayMode(0, &display);
     screen_w = fullscreen ? display.w : w;

@@ -2,9 +2,9 @@
 #include <limits.h>
 #include "procgl/procgl.h"
 #include "bork.h"
+#include "entity.h"
 #include "map_area.h"
 #include "physics.h"
-#include "entity.h"
 
 void bork_entity_init(struct bork_entity* ent, vec3 size)
 {
@@ -18,12 +18,55 @@ void bork_entity_push(struct bork_entity* ent, vec3 push)
     vec3_add(ent->vel, ent->vel, push);
 }
 
+void bork_entity_move(struct bork_entity* ent, struct bork_map* map);
+void bork_entity_update(struct bork_entity* ent, struct bork_map* map)
+{
+    if(ent->dead) return;
+    switch(ent->type) {
+    case BORK_ENTITY_PLAYER:
+        bork_entity_move(ent, map);
+        break;
+    case BORK_ENTITY_ENEMY:
+        bork_entity_move(ent, map);
+        break;
+    default: break;
+    }
+}
+
+void bork_entity_begin(enum bork_entity_type type, struct bork_game_core* core)
+{
+    switch(type) {
+    case BORK_ENTITY_ENEMY:
+        pg_model_begin(&core->enemy_model, &core->shader_sprite);
+        pg_shader_sprite_set_texture(&core->shader_sprite, &core->env_atlas);
+        break;
+    default: break;
+    }
+}
+
+void bork_entity_draw_enemy(struct bork_entity* ent, struct bork_game_core* core)
+{
+    vec2 ent_to_plr;
+    vec2_sub(ent_to_plr, ent->pos, core->plr->pos);
+    float dir_adjust = 1.0f / (float)ent->dir_frames + 0.5f;
+    float angle = atan2(ent_to_plr[0], ent_to_plr[1]) + (M_PI * dir_adjust) + ent->dir[0];
+    if(angle < 0) angle += M_PI * 2;
+    else if(angle > (M_PI * 2)) angle = fmodf(angle, M_PI * 2);
+    float angle_f = angle / (M_PI * 2);
+    int frame = (int)(angle_f * (float)ent->dir_frames) + ent->front_frame;
+    pg_shader_sprite_set_tex_frame(&core->shader_sprite, frame);
+    mat4 transform;
+    mat4_translate(transform, ent->pos[0], ent->pos[1], ent->pos[2]);
+    pg_model_draw(&core->enemy_model, transform);
+}
+
 void bork_entity_move(struct bork_entity* ent, struct bork_map* map)
 {
     ent->ground = 0;
+    vec3_add(ent->vel, ent->vel, (vec3){ 0, 0, -0.02 });
     struct bork_collision coll = {};
     float curr_move = 0;
-    float max_move = vec3_vmin(ent->size) * 0.5;
+    float max_move = vec3_vmin(ent->size) * 2;
     float full_dist = vec3_len(ent->vel);
     vec3 max_move_dir;
     vec3_set_len(max_move_dir, ent->vel, max_move);
@@ -39,14 +82,12 @@ void bork_entity_move(struct bork_entity* ent, struct bork_map* map)
         } else {
             curr_move += max_move;
         }
-        vec3_add(curr_dest, new_pos, max_move_dir);
+        vec3_add(new_pos, new_pos, max_move_dir);
         steps = 0;
-        while(bork_map_collide(map, &coll, new_pos, curr_dest, ent->size)
+        while(bork_map_collide(map, &coll, new_pos, ent->size)
                 && (steps++ < 4)) {
-            vec3 coll_dir;
-            vec3_sub(coll_dir, new_pos, curr_dest);
-            vec3_dup(curr_dest, new_pos);
-            float down_angle = vec3_angle_diff(coll.norm, PG_DIR_VEC[PG_UP]);
+            vec3_add(new_pos, new_pos, coll.push);
+            float down_angle = vec3_angle_diff(coll.face_norm, PG_DIR_VEC[PG_UP]);
             if(down_angle < 0.1 * M_PI) ent->ground = 1;
             else if(coll.tile && coll.tile->type == BORK_TILE_LADDER) ladder = 1;
             ++hit;
@@ -56,7 +97,8 @@ void bork_entity_move(struct bork_entity* ent, struct bork_map* map)
     vec3_dup(ent->pos, new_pos);
     int friction = 0;
     if(ladder) {
-        ent->vel[2] = 0.1;
+        if(ent->dir[1] >= 0) ent->vel[2] = 0.1;
+        else ent->vel[2] = -0.05;
         friction = 1;
     } else if(ent->ground) {
         ent->vel[2] = 0;
