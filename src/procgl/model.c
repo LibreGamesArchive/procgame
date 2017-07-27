@@ -758,10 +758,11 @@ int pg_model_collide_ellipsoid_sub(struct pg_model* model, mat4 transform,
             tri_idx = i;
         }
     }
+    mat3_mul_vec3(tri_push, transform, tri_push);
     vec3 new_pos;
     vec3_add(new_pos, pos, tri_push);
     vec3_mul(new_pos, new_pos, ellipsoid_r);
-    if(out) vec3_sub(out, new_pos, ellipsoid_pos);
+    if(out) vec3_sub(out, new_pos, ellipsoid_tx);
     if(out_norm) vec3_dup(out_norm, tri_norm);
     return tri_idx;
 }
