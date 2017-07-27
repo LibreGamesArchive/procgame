@@ -324,6 +324,17 @@ static inline void mat4_mul_vec4(vec4 r, mat4 M, vec4 v)
     }
     vec4_dup(r, temp);
 }
+static inline void mat3_mul_vec3(vec3 r, mat4 M, vec3 v)
+{
+    vec3 temp;
+    int i, j;
+    for(j=0; j<3; ++j) {
+        temp[j] = 0.f;
+        for(i=0; i<3; ++i)
+            temp[j] += M[i][j] * v[i];
+    }
+    vec3_dup(r, temp);
+}
 static inline void mat4_translate(mat4 T, float x, float y, float z)
 {
     mat4_identity(T);
