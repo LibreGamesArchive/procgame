@@ -1,5 +1,7 @@
 struct bork_bullet {
-    unsigned dead_ticks;
+    int dead_ticks;
+    uint32_t flags;
+    vec3 light_color;
     vec3 pos;
     vec3 dir;
 };

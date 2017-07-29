@@ -17,7 +17,7 @@ int bork_map_collide(struct bork_map* map, struct bork_collision* coll_out,
         buffer area between the ellipsoid and the map which is also checked */
     mat4 transform;
     vec3 size_scaled;
-    vec3_scale(size_scaled, size, 1.1);
+    vec3_scale(size_scaled, size, 1.25);
     box bbox;
     vec3_sub(bbox[0], pos, size_scaled);
     vec3_add(bbox[1], pos, size_scaled);
@@ -26,6 +26,7 @@ int bork_map_collide(struct bork_map* map, struct bork_collision* coll_out,
                         { (int)bbox[1][0]+1, (int)bbox[1][1]+1, (int)bbox[1][2]+1 } };
     /*  First check collisions against the map  */
     int x, y, z;
+    int hits = 0;
     float deepest = 0;
     for(z = check[0][2]; z < check[1][2]; ++z) {
         enum bork_area area = bork_map_get_area(map, 0, 0, z);
@@ -58,6 +59,7 @@ int bork_map_collide(struct bork_map* map, struct bork_collision* coll_out,
                     .x = x, .y = y, .z = z, .tile = tile };
                 vec3_dup(coll_out->push, tile_push);
                 vec3_dup(coll_out->face_norm, tile_norm);
+                if(++hits > 3) return 1;
             }
         }
     }
@@ -85,6 +87,7 @@ int bork_map_collide(struct bork_map* map, struct bork_collision* coll_out,
                 .x = x, .y = y, .z = z, .tile = NULL };
             vec3_dup(coll_out->push, obj_push);
             vec3_dup(coll_out->face_norm, obj_norm);
+            if(++hits > 3) return 1;
         }
     }
     /*  Set the new position to the final pushed position   */

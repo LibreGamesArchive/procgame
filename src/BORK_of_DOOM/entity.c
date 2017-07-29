@@ -27,6 +27,7 @@ void bork_entity_update(struct bork_entity* ent, struct bork_map* map)
         bork_entity_move(ent, map);
         break;
     case BORK_ENTITY_ENEMY:
+        //printf("%f, %f, %f\n", ent->pos[0], ent->pos[1], ent->pos[2]);
         bork_entity_move(ent, map);
         break;
     default: break;
@@ -66,7 +67,7 @@ void bork_entity_move(struct bork_entity* ent, struct bork_map* map)
     vec3_add(ent->vel, ent->vel, (vec3){ 0, 0, -0.02 });
     struct bork_collision coll = {};
     float curr_move = 0;
-    float max_move = vec3_vmin(ent->size) * 2;
+    float max_move = vec3_vmin(ent->size);
     float full_dist = vec3_len(ent->vel);
     vec3 max_move_dir;
     vec3_set_len(max_move_dir, ent->vel, max_move);
@@ -85,7 +86,11 @@ void bork_entity_move(struct bork_entity* ent, struct bork_map* map)
         vec3_add(new_pos, new_pos, max_move_dir);
         steps = 0;
         while(bork_map_collide(map, &coll, new_pos, ent->size)
-                && (steps++ < 4)) {
+                && (steps++ < 10)) {
+            if(ent->type == BORK_ENTITY_ENEMY && !coll.tile) {
+                printf("%f, %f, %f\n", coll.push[0], coll.push[1], coll.push[2]);
+                printf("%f, %f, %f\n", new_pos[0], new_pos[1], new_pos[2]);
+            }
             vec3_add(new_pos, new_pos, coll.push);
             float down_angle = vec3_angle_diff(coll.face_norm, PG_DIR_VEC[PG_UP]);
             if(down_angle < 0.1 * M_PI) ent->ground = 1;

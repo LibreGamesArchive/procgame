@@ -34,6 +34,6 @@ void main()
     vec3 half_angle = normalize(frag_to_eye + light_dir);
     vec3 specular = color * shininess * pow(max(dot(norm, half_angle), 0), 32);
     vec3 diffuse = color * max(dot(norm, light_dir), 0);
-    float attenuation = 1 - dist / light.w;
+    float attenuation = pow(1 - dist / light.w, 1.7);
     frag_color = vec4(attenuation * (diffuse + specular), 0);
 }

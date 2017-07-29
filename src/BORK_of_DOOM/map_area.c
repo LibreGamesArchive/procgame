@@ -152,7 +152,11 @@ void bork_map_update_area(struct bork_map* map, enum bork_area area,
         }
     }
     struct bork_entity* ent;
-    ARR_FOREACH_PTR(map->enemies[area], ent, i) {
+    ARR_FOREACH_PTR_REV(map->enemies[area], ent, i) {
+        if(ent->dead) {
+            ARR_SWAPSPLICE(map->enemies[area], i, 1);
+            continue;
+        }
         bork_entity_update(ent, map);
     }
 }
@@ -193,12 +197,11 @@ void bork_map_draw_area(struct bork_map* map, enum bork_area area)
                          (map->area_pos[area][2] + obj->z) * 2.0f + 1.5f,
                          obj->light[3] },
                 .color = { obj->light[0], obj->light[1], obj->light[2] } };
-            /*
             vec3 light_to_plr;
             vec3_sub(light_to_plr, light.pos, map->plr->pos);
             float dist = vec3_len(light_to_plr);
             if(dist > 40) continue;
-            else if(dist > 20) light.pos[3] *= 1 - (dist - 20) / 20;*/
+            else if(dist > 20) light.pos[3] *= 1 - (dist - 20) / 20;
             ARR_PUSH(map->core->lights_buf, light);
         }
     }

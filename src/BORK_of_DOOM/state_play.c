@@ -237,8 +237,8 @@ static void bork_play_draw(struct pg_game_state* state)
         if(blt->dead_ticks) {
             struct bork_light blt_light = {
                 .pos = { blt->pos[0], blt->pos[1], blt->pos[2],
-                         ((float)blt->dead_ticks / 10.0f) * 3.0f },
-                .color = { 0.8f, 0.8f, 0 } };
+                         ((float)blt->dead_ticks / 10.0f) * 3.0f } };
+            vec3_dup(blt_light.color, blt->light_color);
             ARR_PUSH(d->core->lights_buf, blt_light);
             continue;
         }
@@ -259,7 +259,7 @@ static void bork_play_draw(struct pg_game_state* state)
         (vec4){ d->plr.pos[0], d->plr.pos[1], d->plr.pos[2], 6 },
         (vec3){ 1, 1, 1 }); */
     pg_screen_dst();
-    pg_gbuffer_finish(&d->core->gbuf, (vec3){ 0.025, 0.025, 0.025 });
+    pg_gbuffer_finish(&d->core->gbuf, (vec3){ 0.05, 0.05, 0.05 });
     /*  Overlay */
     pg_shader_begin(&d->core->shader_text, NULL);
     char bork_str[10];
