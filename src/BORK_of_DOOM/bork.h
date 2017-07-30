@@ -1,14 +1,8 @@
-struct bork_light {
-    vec4 pos;
-    vec3 color;
-};
-
 struct bork_game_core {
     /*  Rendering data  */
     int screen_size[2];
     struct pg_viewer view;
     struct pg_gbuffer gbuf;
-    ARR_T(struct bork_light) lights_buf;    /*  Updated per frame   */
     struct pg_shader shader_3d;
     struct pg_shader shader_2d;
     struct pg_shader shader_sprite;
@@ -17,6 +11,7 @@ struct bork_game_core {
     struct pg_texture env_atlas;
     struct pg_texture editor_atlas;
     struct pg_texture bullet_tex;
+    struct pg_texture item_tex;
     struct pg_texture font;
     struct pg_model bullet_model;
     struct pg_model enemy_model;

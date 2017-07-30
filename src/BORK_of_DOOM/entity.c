@@ -30,35 +30,24 @@ void bork_entity_update(struct bork_entity* ent, struct bork_map* map)
         //printf("%f, %f, %f\n", ent->pos[0], ent->pos[1], ent->pos[2]);
         bork_entity_move(ent, map);
         break;
-    default: break;
-    }
-}
-
-void bork_entity_begin(enum bork_entity_type type, struct bork_game_core* core)
-{
-    switch(type) {
-    case BORK_ENTITY_ENEMY:
-        pg_model_begin(&core->enemy_model, &core->shader_sprite);
-        pg_shader_sprite_set_texture(&core->shader_sprite, &core->env_atlas);
+    case BORK_ENTITY_ITEM: {
+        if(!ent->active) return;
+        vec3 ent_pos;
+        vec3_dup(ent_pos, ent->pos);
+        vec3 move;
+        bork_entity_move(ent, map);
+        vec3_sub(move, ent_pos, ent->pos);
+        if(vec3_len(move) < 0.01) {
+            ++ent->still_ticks;
+            if(ent->still_ticks >= 10) ent->active = 0;
+        } else {
+            ent->still_ticks = 0;
+            ent->active = 1;
+        }
         break;
+    }
     default: break;
     }
-}
-
-void bork_entity_draw_enemy(struct bork_entity* ent, struct bork_game_core* core)
-{
-    vec2 ent_to_plr;
-    vec2_sub(ent_to_plr, ent->pos, core->plr->pos);
-    float dir_adjust = 1.0f / (float)ent->dir_frames + 0.5f;
-    float angle = atan2(ent_to_plr[0], ent_to_plr[1]) + (M_PI * dir_adjust) + ent->dir[0];
-    if(angle < 0) angle += M_PI * 2;
-    else if(angle > (M_PI * 2)) angle = fmodf(angle, M_PI * 2);
-    float angle_f = angle / (M_PI * 2);
-    int frame = (int)(angle_f * (float)ent->dir_frames) + ent->front_frame;
-    pg_shader_sprite_set_tex_frame(&core->shader_sprite, frame);
-    mat4 transform;
-    mat4_translate(transform, ent->pos[0], ent->pos[1], ent->pos[2]);
-    pg_model_draw(&core->enemy_model, transform);
 }
 
 void bork_entity_move(struct bork_entity* ent, struct bork_map* map)
@@ -86,7 +75,7 @@ void bork_entity_move(struct bork_entity* ent, struct bork_map* map)
         vec3_add(new_pos, new_pos, max_move_dir);
         steps = 0;
         while(bork_map_collide(map, &coll, new_pos, ent->size)
-                && (steps++ < 10)) {
+                && (steps++ < 4)) {
             if(ent->type == BORK_ENTITY_ENEMY && !coll.tile) {
                 printf("%f, %f, %f\n", coll.push[0], coll.push[1], coll.push[2]);
                 printf("%f, %f, %f\n", new_pos[0], new_pos[1], new_pos[2]);

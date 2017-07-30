@@ -6,6 +6,7 @@ uniform mat4 proj_matrix;
 uniform mat4 model_matrix;
 uniform mat4 view_matrix;
 uniform mat4 modelview_matrix;
+uniform vec4 color_mod;
 
 /*  Distance from the viewer    */
 in float f_height;
@@ -32,7 +33,7 @@ void main()
     if(tex_color.a < 0.5) discard;
     vec4 light_tex = texture(norm, f_tex_coord);
     vec4 tex_norm = vec4(light_tex.xyz * 2 - 1, light_tex.w);
-    g_albedo = tex_color;
+    g_albedo = tex_color * color_mod;
     g_normal = vec4(tex_norm.xyz * tbn * 0.5 + 0.5, tex_norm.w);
     g_pos = vec4(f_pos.xyz, f_depth);
 }

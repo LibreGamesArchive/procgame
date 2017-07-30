@@ -9,6 +9,8 @@ struct bork_entity {
     int front_frame;
     int dir_frames;
     int dead;
+    int active;
+    int still_ticks;
     enum bork_entity_type {
         BORK_ENTITY_PLAYER,
         BORK_ENTITY_ENEMY,
@@ -18,11 +20,12 @@ struct bork_entity {
         struct {
             int health;
         } enemy;
+        struct {
+            int looked_at;
+        } item;
     };
 };
 
 void bork_entity_init(struct bork_entity* ent, vec3 size);
 void bork_entity_push(struct bork_entity* ent, vec3 push);
 void bork_entity_update(struct bork_entity* ent, struct bork_map* map);
-void bork_entity_begin(enum bork_entity_type type, struct bork_game_core* core);
-void bork_entity_draw_enemy(struct bork_entity* ent, struct bork_game_core* core);

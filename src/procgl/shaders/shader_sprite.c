@@ -19,12 +19,14 @@ struct data_sprite {
     struct {
         struct pg_texture* tex;
         vec2 tex_offset, tex_scale;
+        vec4 color_mod;
         int mode;
     } state;
     struct {
         GLint tex_unit, norm_unit;
         GLint tex_offset, tex_scale;
         GLint mode;
+        GLint color_mod;
     } unis;
 };
 
@@ -44,6 +46,7 @@ static void begin(struct pg_shader* shader, struct pg_viewer* view)
         glUniform1i(d->unis.norm_unit, d->state.tex->light_slot);
         glUniform2fv(d->unis.tex_offset, 1, d->state.tex_offset);
         glUniform2fv(d->unis.tex_scale, 1, d->state.tex_scale);
+        glUniform4fv(d->unis.color_mod, 1, d->state.color_mod);
         d->unis_dirty = 0;
     }
     /*  Enable depth testing    */
@@ -83,6 +86,8 @@ int pg_shader_sprite(struct pg_shader* shader)
     d->unis.tex_offset = glGetUniformLocation(shader->prog, "tex_offset");
     d->unis.tex_scale = glGetUniformLocation(shader->prog, "tex_scale");
     d->unis.mode = glGetUniformLocation(shader->prog, "mode");
+    d->unis.color_mod = glGetUniformLocation(shader->prog, "color_mod");
+    vec4_set(d->state.color_mod, 0, 0, 0, 0);
     d->unis_dirty = 1;
     shader->data = d;
     shader->deinit = free;
@@ -128,3 +133,11 @@ void pg_shader_sprite_set_tex_frame(struct pg_shader* shader, int frame)
 }
 
 
+void pg_shader_sprite_set_color_mod(struct pg_shader* shader, vec4 color_mod)
+{
+    struct data_sprite* d = shader->data;
+    vec4_dup(d->state.color_mod, color_mod);
+    if(pg_shader_is_active(shader)) {
+        glUniform4fv(d->unis.color_mod, 1, color_mod);
+    } else d->unis_dirty = 1;
+}

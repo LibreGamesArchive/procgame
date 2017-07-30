@@ -78,6 +78,7 @@ struct bork_map {
     struct pg_model area_model[BORK_AREA_EXTERIOR];
     ARR_T(struct bork_map_object) objects[BORK_AREA_EXTERIOR];
     ARR_T(struct bork_entity) enemies[BORK_AREA_EXTERIOR];
+    ARR_T(struct bork_entity) items[BORK_AREA_EXTERIOR];
     struct pg_model door_model;
     struct bork_game_core* core;
     struct bork_entity* plr;

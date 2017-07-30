@@ -2,7 +2,6 @@
 
 uniform mat4 model_matrix;
 uniform mat4 normal_matrix;
-uniform mat4 proj_matrix;
 uniform mat4 view_matrix;
 uniform mat4 projview_matrix;
 

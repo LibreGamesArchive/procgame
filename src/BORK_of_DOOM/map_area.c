@@ -98,6 +98,7 @@ void bork_map_init(struct bork_map* map, struct bork_game_core* core)
         map->data[i] = calloc(32 * 32 * 32, sizeof(struct bork_tile));
         ARR_INIT(map->objects[i]);
         ARR_INIT(map->enemies[i]);
+        ARR_INIT(map->items[i]);
     }
 }
 
@@ -159,20 +160,19 @@ void bork_map_update_area(struct bork_map* map, enum bork_area area,
         }
         bork_entity_update(ent, map);
     }
+    ARR_FOREACH_PTR_REV(map->items[area], ent, i) {
+        if(ent->dead) {
+            ARR_SWAPSPLICE(map->items[area], i, 1);
+            continue;
+        }
+        bork_entity_update(ent, map);
+    }
 }
 
 void bork_map_draw_area(struct bork_map* map, enum bork_area area)
 {
-    pg_shader_sprite_set_mode(&map->core->shader_sprite, PG_SPRITE_CYLINDRICAL);
-    pg_shader_begin(&map->core->shader_sprite, &map->core->view);
-    bork_entity_begin(BORK_ENTITY_ENEMY, map->core);
-    int i;
-    struct bork_entity* ent;
-    ARR_FOREACH_PTR(map->enemies[area], ent, i) {
-        if(ent->dead) continue;
-        bork_entity_draw_enemy(ent, map->core);
-    }
     pg_shader_begin(&map->core->shader_3d, &map->core->view);
+    /*  Draw the base level geometry    */
     pg_model_begin(&map->area_model[area], &map->core->shader_3d);
     mat4 model_transform;
     mat4_translate(model_transform,
@@ -180,6 +180,8 @@ void bork_map_draw_area(struct bork_map* map, enum bork_area area)
                    map->area_pos[area][1] * 2.0f,
                    map->area_pos[area][2] * 2.0f);
     pg_model_draw(&map->area_model[area], model_transform);
+    /*  Then draw the map objects (except lights)   */
+    int i;
     struct bork_map_object* obj;
     pg_model_begin(&map->door_model, &map->core->shader_3d);
     ARR_FOREACH_PTR(map->objects[area], obj, i) {
@@ -190,19 +192,6 @@ void bork_map_draw_area(struct bork_map* map, enum bork_area area)
                 (map->area_pos[area][2] + obj->z) * 2.0f + 1.0f + obj->door.pos);
             if(obj->door.dir) mat4_rotate_Z(model_transform, model_transform, M_PI * 0.5);
             pg_model_draw(&map->door_model, model_transform);
-        } else if(obj->type == BORK_MAP_OBJ_LIGHT) {
-            struct bork_light light = {
-                .pos = { (map->area_pos[area][0] + obj->x) * 2.0f + 1.0f,
-                         (map->area_pos[area][1] + obj->y) * 2.0f + 1.0f,
-                         (map->area_pos[area][2] + obj->z) * 2.0f + 1.5f,
-                         obj->light[3] },
-                .color = { obj->light[0], obj->light[1], obj->light[2] } };
-            vec3 light_to_plr;
-            vec3_sub(light_to_plr, light.pos, map->plr->pos);
-            float dist = vec3_len(light_to_plr);
-            if(dist > 40) continue;
-            else if(dist > 20) light.pos[3] *= 1 - (dist - 20) / 20;
-            ARR_PUSH(map->core->lights_buf, light);
         }
     }
 }

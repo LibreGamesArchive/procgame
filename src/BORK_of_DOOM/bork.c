@@ -15,7 +15,6 @@ void bork_init(struct bork_game_core* core)
     pg_viewer_init(&core->view, (vec3){ 0, 0, 0 }, (vec2){ 0, 0 },
         (vec2){ core->screen_size[0], core->screen_size[1] },
         (vec2){ 0.01, 200 });
-    ARR_INIT(core->lights_buf);
     /*  Set up the shaders  */
     pg_shader_3d(&core->shader_3d);
     pg_shader_2d(&core->shader_2d);
@@ -46,6 +45,9 @@ void bork_load_assets(struct bork_game_core* core)
     pg_texture_init_from_file(&core->bullet_tex, "res/bullets.png", "res/bullets_lightmap.png");
     pg_texture_set_atlas(&core->bullet_tex, 16, 16);
     pg_texture_bind(&core->bullet_tex, 9, 10);
+    pg_texture_init_from_file(&core->item_tex, "res/items.png", "res/items_lightmap.png");
+    pg_texture_set_atlas(&core->item_tex, 16, 16);
+    pg_texture_bind(&core->item_tex, 11, 12);
     /*  Generate the basic models, just quads for now   */
     mat4 transform;
     mat4_identity(transform);
