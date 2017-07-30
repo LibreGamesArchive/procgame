@@ -8,7 +8,7 @@ struct pg_gbuffer {
     GLint uni_normal, uni_depth, uni_light, uni_color;
     /*  The shader program for rendering the final image    */
     GLuint f_vert, f_frag, f_prog;
-    GLint f_color, f_light, f_ambient;
+    GLint f_color, f_light, f_norm, f_ambient;
     /*  The G-buffer, renderbuffer for depth, and light accumulation buffer */
     GLuint color;
     GLuint normal;

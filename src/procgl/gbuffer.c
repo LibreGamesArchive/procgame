@@ -46,11 +46,7 @@ void pg_gbuffer_init(struct pg_gbuffer* gbuf, int w, int h)
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
     glTexImage2D(GL_TEXTURE_2D, 0, GL_DEPTH_COMPONENT32F, w, h, 0,
                  GL_DEPTH_COMPONENT, GL_FLOAT, NULL);
-                 /*
-    glBindRenderbuffer(GL_RENDERBUFFER, gbuf->depth);
-    glRenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH24_STENCIL8, w, h);*/
     glBindFramebuffer(GL_FRAMEBUFFER, gbuf->frame);
-
     /*  Attach all the buffers. 0, 1, 2, and the depth buffer are all drawn
         in the geometry pass. 3 is the light accumulation buffer and is only
         drawn in the lighting pass; each light's pixels are additively
@@ -94,6 +90,7 @@ void pg_gbuffer_init(struct pg_gbuffer* gbuf, int w, int h)
 #endif
     gbuf->f_color = glGetUniformLocation(gbuf->f_prog, "color");
     gbuf->f_light = glGetUniformLocation(gbuf->f_prog, "light");
+    gbuf->f_norm = glGetUniformLocation(gbuf->f_prog, "norm");
     gbuf->f_ambient = glGetUniformLocation(gbuf->f_prog, "ambient_light");
     glGenVertexArrays(1, &gbuf->dummy_vao);
 }
@@ -187,6 +184,7 @@ void pg_gbuffer_finish(struct pg_gbuffer* gbuf, vec3 ambient_light)
     glUseProgram(gbuf->f_prog);
     glUniform1i(gbuf->f_color, gbuf->color_slot);
     glUniform1i(gbuf->f_light, gbuf->light_slot);
+    glUniform1i(gbuf->f_norm, gbuf->normal_slot);
     glUniform3fv(gbuf->f_ambient, 1, ambient_light);
     glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
     /*  Unbind and reset everything back to normal  */
