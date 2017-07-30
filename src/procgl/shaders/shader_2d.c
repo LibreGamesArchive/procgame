@@ -94,6 +94,8 @@ void pg_shader_2d_set_texture(struct pg_shader* shader, struct pg_texture* tex)
 {
     struct data_2d* d = shader->data;
     d->state.tex = tex;
+    pg_shader_2d_set_tex_offset(shader, (vec2){ 0, 0 });
+    pg_shader_2d_set_tex_scale(shader, (vec2){ 1, 1 });
     if(pg_shader_is_active(shader)) {
         glUniform1i(d->unis.tex_unit, tex->diffuse_slot);
     } else d->unis_dirty = 1;

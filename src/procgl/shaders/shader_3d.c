@@ -15,12 +15,14 @@
 #endif
 
 struct data_3d {
-    int tex_dirty;
+    int unis_dirty;
     struct {
-        GLint tex_unit, norm_unit;
+        struct pg_texture* tex;
+        vec2 tex_scale, tex_offset;
     } state;
     struct {
         GLint tex_unit, norm_unit;
+        GLint tex_scale, tex_offset;
     } unis;
 };
 
@@ -34,10 +36,12 @@ static void begin(struct pg_shader* shader, struct pg_viewer* view)
     pg_shader_set_matrix(shader, PG_PROJECTION_MATRIX, view->proj_matrix);
     pg_shader_set_matrix(shader, PG_PROJECTIONVIEW_MATRIX, projview);
     /*  Set the uniforms    */
-    if(d->tex_dirty) {
-        glUniform1i(d->unis.tex_unit, d->state.tex_unit);
-        glUniform1i(d->unis.norm_unit, d->state.norm_unit);
-        d->tex_dirty = 0;
+    if(d->unis_dirty) {
+        glUniform1i(d->unis.tex_unit, d->state.tex->diffuse_slot);
+        glUniform1i(d->unis.norm_unit, d->state.tex->light_slot);
+        glUniform2fv(d->unis.tex_offset, 1, d->state.tex_offset);
+        glUniform2fv(d->unis.tex_scale, 1, d->state.tex_scale);
+        d->unis_dirty = 0;
     }
     /*  Enable depth testing    */
     glEnable(GL_DEPTH_TEST);
@@ -72,7 +76,12 @@ int pg_shader_3d(struct pg_shader* shader)
     pg_shader_link_component(shader, PG_MODEL_COMPONENT_UV, "v_tex_coord");
     d->unis.tex_unit = glGetUniformLocation(shader->prog, "tex");
     d->unis.norm_unit = glGetUniformLocation(shader->prog, "norm");
-    d->tex_dirty = 1;
+    d->unis.tex_scale = glGetUniformLocation(shader->prog, "tex_scale");
+    d->unis.tex_offset = glGetUniformLocation(shader->prog, "tex_offset");
+    d->unis_dirty = 1;
+    vec2_set(d->state.tex_scale, 1, 1);
+    vec2_set(d->state.tex_offset, 0, 0);
+    d->state.tex = 0;
     shader->data = d;
     shader->deinit = free;
     shader->begin = begin;
@@ -85,11 +94,48 @@ int pg_shader_3d(struct pg_shader* shader)
 void pg_shader_3d_set_texture(struct pg_shader* shader, struct pg_texture* tex)
 {
     struct data_3d* d = shader->data;
-    d->state.tex_unit = tex->diffuse_slot;
-    d->state.norm_unit = tex->light_slot;
+    pg_shader_3d_set_tex_offset(shader, (vec2){ 0, 0 });
+    pg_shader_3d_set_tex_scale(shader, (vec2){ 1, 1 });
+    d->state.tex = tex;
     if(pg_shader_is_active(shader)) {
         glUniform1i(d->unis.tex_unit, tex->diffuse_slot);
         glUniform1i(d->unis.norm_unit, tex->light_slot);
-        d->tex_dirty = 0;
-    } else d->tex_dirty = 1;
+        d->unis_dirty = 0;
+    } else d->unis_dirty = 1;
 }
+
+void pg_shader_3d_set_tex_offset(struct pg_shader* shader, vec2 offset)
+{
+    struct data_3d* d = shader->data;
+    vec2_dup(d->state.tex_offset, offset);
+    if(pg_shader_is_active(shader)) {
+        glUniform2fv(d->unis.tex_offset, 1, d->state.tex_offset);
+    } else d->unis_dirty = 1;
+}
+
+void pg_shader_3d_set_tex_scale(struct pg_shader* shader, vec2 scale)
+{
+    struct data_3d* d = shader->data;
+    vec2_dup(d->state.tex_scale, scale);
+    if(pg_shader_is_active(shader)) {
+        glUniform2fv(d->unis.tex_scale, 1, d->state.tex_scale);
+    } else d->unis_dirty = 1;
+}
+
+void pg_shader_3d_set_tex_frame(struct pg_shader* shader, int frame)
+{
+    struct data_3d* d = shader->data;
+    int frames_wide = d->state.tex->w / d->state.tex->frame_w;
+    float frame_u = (float)d->state.tex->frame_w / d->state.tex->w;
+    float frame_v = (float)d->state.tex->frame_h / d->state.tex->h;
+    float frame_x = (float)(frame % frames_wide) * frame_u;
+    float frame_y = (float)(frame / frames_wide) * frame_v;
+    vec2_set(d->state.tex_offset, frame_x, frame_y);
+    vec2_set(d->state.tex_scale, frame_u, frame_v);
+    if(pg_shader_is_active(shader)) {
+        glUniform2fv(d->unis.tex_offset, 1, d->state.tex_offset);
+        glUniform2fv(d->unis.tex_scale, 1, d->state.tex_scale);
+    } else d->unis_dirty = 1;
+}
+
+
