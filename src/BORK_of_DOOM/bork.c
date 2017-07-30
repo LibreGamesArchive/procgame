@@ -61,6 +61,8 @@ void bork_load_assets(struct bork_game_core* core)
     pg_model_init(&core->bullet_model);
     pg_model_quad(&core->bullet_model, (vec2){ 1, 1 });
     pg_model_transform(&core->bullet_model, transform);
+    pg_model_precalc_ntb(&core->bullet_model);
     pg_shader_buffer_model(&core->shader_sprite, &core->bullet_model);
+    pg_shader_buffer_model(&core->shader_3d, &core->bullet_model);
 }
 

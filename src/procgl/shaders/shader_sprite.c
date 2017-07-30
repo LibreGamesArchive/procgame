@@ -116,6 +116,33 @@ void pg_shader_sprite_set_texture(struct pg_shader* shader, struct pg_texture* t
     } else d->unis_dirty = 1;
 }
 
+void pg_shader_sprite_set_tex_offset(struct pg_shader* shader, vec2 offset)
+{
+    struct data_sprite* d = shader->data;
+    vec2_dup(d->state.tex_offset, offset);
+    if(pg_shader_is_active(shader)) {
+        glUniform2fv(d->unis.tex_offset, 1, d->state.tex_offset);
+    } else d->unis_dirty = 1;
+}
+
+void pg_shader_sprite_set_tex_scale(struct pg_shader* shader, vec2 scale)
+{
+    struct data_sprite* d = shader->data;
+    vec2_dup(d->state.tex_scale, scale);
+    if(pg_shader_is_active(shader)) {
+        glUniform2fv(d->unis.tex_scale, 1, d->state.tex_scale);
+    } else d->unis_dirty = 1;
+}
+
+void pg_shader_sprite_mul_tex_scale(struct pg_shader* shader, vec2 scale)
+{
+    struct data_sprite* d = shader->data;
+    vec2_mul(d->state.tex_scale, d->state.tex_scale, scale);
+    if(pg_shader_is_active(shader)) {
+        glUniform2fv(d->unis.tex_scale, 1, d->state.tex_scale);
+    } else d->unis_dirty = 1;
+}
+
 void pg_shader_sprite_set_tex_frame(struct pg_shader* shader, int frame)
 {
     struct data_sprite* d = shader->data;

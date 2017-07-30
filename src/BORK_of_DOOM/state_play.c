@@ -74,6 +74,7 @@ void bork_play_start(struct pg_game_state* state, struct bork_game_core* core)
     d->map.plr = &d->plr;
     d->current_area = 0;
     ARR_INIT(d->bullets);
+    ARR_INIT(d->lights_buf);
     vec3_set(d->quad_pos, 0, 0, 0);
     /*  Assign all the pointers, and it's finished  */
     state->data = d;
@@ -223,6 +224,7 @@ static void bork_play_tick(struct pg_game_state* state)
     }
 }
 
+static void draw_weapon(struct bork_play_data* d, vec3 pos_lerp, vec2 dir_lerp);
 static void draw_enemies(struct bork_play_data* d);
 static void draw_items(struct bork_play_data* d);
 static void draw_bullets(struct bork_play_data* d);
@@ -243,6 +245,8 @@ static void bork_play_draw(struct pg_game_state* state)
     pg_viewer_set(&d->core->view, draw_pos, draw_dir);
     /*  Drawing */
     pg_gbuffer_dst(&d->core->gbuf);
+    pg_shader_begin(&d->core->shader_3d, &d->core->view);
+    draw_weapon(d, draw_pos, draw_dir);
     pg_shader_begin(&d->core->shader_sprite, &d->core->view);
     draw_enemies(d);
     draw_items(d);
@@ -262,12 +266,36 @@ static void bork_play_draw(struct pg_game_state* state)
     /*  Overlay */
     pg_shader_begin(&d->core->shader_text, NULL);
     char bork_str[10];
-    snprintf(bork_str, 10, "FPS^ %d", (int)pg_framerate());
+    snprintf(bork_str, 10, "FPS: %d", (int)pg_framerate());
     pg_shader_text_write(&d->core->shader_text, bork_str,
         (vec2){ 0, 0 }, (vec2){ 8, 8 }, 0.25);
 }
 
 /*  Draw functions for each class of game objects   */
+
+static void draw_weapon(struct bork_play_data* d, vec3 pos_lerp, vec2 dir_lerp)
+{
+    struct bork_map* map = &d->map;
+    struct pg_shader* shader = &d->core->shader_3d;
+    struct pg_model* model = &d->core->bullet_model;
+    struct pg_viewer* view = &d->core->view;
+    mat4 tx;
+    mat4_identity(tx);
+    /*
+    vec3 weapon_pos;
+    spherical_to_cartesian(weapon_pos, (vec2){ dir_lerp[0] - M_PI,
+                                               dir_lerp[1] - (M_PI * 0.5) });
+    vec3_scale(weapon_pos, weapon_pos, 0.5);
+    vec3_add(weapon_pos, weapon_pos, pos_lerp);*/
+    mat4_translate(tx, pos_lerp[0], pos_lerp[1], pos_lerp[2]);
+    mat4_rotate_Z(tx, tx, M_PI + dir_lerp[0]);
+    mat4_rotate_Y(tx, tx, -dir_lerp[1]);
+    mat4 offset;
+    mat4_translate(offset, -0.5, 0.3, -0.3);
+    mat4_mul(tx, tx, offset);
+    pg_model_begin(model, shader);
+    pg_model_draw(model, tx);
+}
 
 static void draw_enemies(struct bork_play_data* d)
 {
@@ -312,7 +340,9 @@ static void draw_items(struct bork_play_data* d)
     int current_frame = 0;
     pg_shader_sprite_set_mode(shader, PG_SPRITE_SPHERICAL);
     pg_shader_sprite_set_texture(shader, &d->core->item_tex);
-    pg_shader_sprite_set_tex_frame(shader, 0);
+    pg_shader_sprite_set_tex_frame(shader, 8);
+    pg_shader_sprite_mul_tex_scale(shader, (vec2){ 2, 1 });
+    pg_shader_sprite_set_color_mod(shader, (vec4){ 1.0f, 1.0f, 1.0f, 1.0f });
     pg_model_begin(model, shader);
     int i;
     struct bork_entity* ent;
@@ -324,7 +354,7 @@ static void draw_items(struct bork_play_data* d)
         }
         mat4 transform;
         mat4_translate(transform, ent->pos[0], ent->pos[1], ent->pos[2]);
-        mat4_scale(transform, transform, 0.5);
+        mat4_scale_aniso(transform, transform, 25, 25, 25);
         if(ent->item.looked_at) {
             pg_shader_sprite_set_color_mod(shader, (vec4){ 1.5f, 1.8f, 1.5f, 1.0f });
             pg_model_draw(model, transform);
@@ -340,6 +370,7 @@ static void draw_bullets(struct bork_play_data* d)
     pg_shader_sprite_set_texture(shader, &d->core->bullet_tex);
     pg_shader_sprite_set_tex_frame(shader, 0);
     pg_shader_sprite_set_mode(shader, PG_SPRITE_SPHERICAL);
+    pg_shader_sprite_set_color_mod(shader, (vec4){ 1.0f, 1.0f, 1.0f, 1.0f });
     pg_model_begin(model, shader);
     mat4 bullet_transform;
     struct bork_bullet* blt;

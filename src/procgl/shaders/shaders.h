@@ -9,6 +9,9 @@ void pg_shader_text_write(struct pg_shader* shader, const char* str,
 int pg_shader_sprite(struct pg_shader* shader);
 void pg_shader_sprite_set_mode(struct pg_shader* shader, int mode);
 void pg_shader_sprite_set_texture(struct pg_shader* shader, struct pg_texture* tex);
+void pg_shader_sprite_set_tex_offset(struct pg_shader* shader, vec2 offset);
+void pg_shader_sprite_set_tex_scale(struct pg_shader* shader, vec2 scale);
+void pg_shader_sprite_mul_tex_scale(struct pg_shader* shader, vec2 scale);
 void pg_shader_sprite_set_tex_frame(struct pg_shader* shader, int frame);
 void pg_shader_sprite_set_color_mod(struct pg_shader* shader, vec4 color_mod);
 
