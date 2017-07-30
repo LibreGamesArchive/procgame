@@ -61,8 +61,12 @@ void bork_load_assets(struct bork_game_core* core)
     pg_model_init(&core->bullet_model);
     pg_model_quad(&core->bullet_model, (vec2){ 1, 1 });
     pg_model_transform(&core->bullet_model, transform);
-    pg_model_precalc_ntb(&core->bullet_model);
     pg_shader_buffer_model(&core->shader_sprite, &core->bullet_model);
-    pg_shader_buffer_model(&core->shader_3d, &core->bullet_model);
+    mat4_scale_aniso(transform, transform, 1, 1, 0.5);
+    pg_model_init(&core->gun_model);
+    pg_model_quad(&core->gun_model, (vec2){ 2, 1 });
+    pg_model_transform(&core->gun_model, transform);
+    pg_model_precalc_ntb(&core->gun_model);
+    pg_shader_buffer_model(&core->shader_3d, &core->gun_model);
 }
 

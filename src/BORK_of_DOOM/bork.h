@@ -15,6 +15,7 @@ struct bork_game_core {
     struct pg_texture font;
     struct pg_model bullet_model;
     struct pg_model enemy_model;
+    struct pg_model gun_model;
     struct bork_entity* plr;
 };
 
