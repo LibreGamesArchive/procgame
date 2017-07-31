@@ -24,7 +24,7 @@ void pg_gbuffer_init(struct pg_gbuffer* gbuf, int w, int h);
 void pg_gbuffer_deinit(struct pg_gbuffer* gbuf);
 /*  All buffer slots must be bound  */
 void pg_gbuffer_bind(struct pg_gbuffer* gbuf, int color_slot,
-                     int normal_slot, int pos_slot, int light_slot);
+                     int normal_slot, int depth_slot, int light_slot);
 /*  This begins drawing to the G-buffer. Make sure to only use shaders which
     are written to output to the first three color attachments,
     (0: color buffer, 1: world-space normals, 2: world-space positions) */
