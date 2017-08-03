@@ -2,11 +2,12 @@
 
 uniform sampler2D font;
 in vec2 f_tex;
+in vec4 f_color;
 out vec4 frag_color;
 
 void main()
 {
-    vec4 f = texture(font, f_tex);
+    vec4 f = texture(font, f_tex) * f_color;
     if(f.a < 0.5) discard;
     frag_color = f;
 }
