@@ -1,13 +1,18 @@
 #include <stdarg.h>
 
-/*  Built-in wave definitions are in wave_defs.h    */
-
 struct pg_wave {
+    float phase[4], frequency[4], scale, add;
     enum {
         PG_WAVE_CONSTANT,
         PG_WAVE_FUNCTION,
         PG_WAVE_ARRAY,
-        PG_WAVE_MODIFIER } type;
+        PG_WAVE_BREAK,
+        PG_WAVE_MODIFIER_EXPAND,
+        PG_WAVE_MODIFIER_OCTAVES,
+        PG_WAVE_MODIFIER_SEAMLESS_1D,
+        PG_WAVE_MODIFIER_SEAMLESS_2D,
+        PG_WAVE_MODIFIER_MIX_FUNC,
+        PG_WAVE_MODIFIER_DISTORT } type;
     union {
         float constant;
         struct {
@@ -16,72 +21,129 @@ struct pg_wave {
             float (*func2)(float, float);
             float (*func3)(float, float, float);
             float (*func4)(float, float, float, float);
-            float frequency[4];
-            float phase[4];
-            float scale;
-            float add;
         };
+        struct { struct pg_wave* arr; unsigned len; };
         struct {
-            struct pg_wave* arr;
-            unsigned len;
+            enum { PG_WAVE_EXPAND_ADD, PG_WAVE_EXPAND_SUB, PG_WAVE_EXPAND_MUL,
+                   PG_WAVE_EXPAND_DIV, PG_WAVE_EXPAND_AVG } op;
+            enum { PG_WAVE_EXPAND_BEFORE, PG_WAVE_EXPAND_AFTER } mode;
         };
-        struct {
-            enum {
-                PG_WAVE_MOD_EXPAND,
-                PG_WAVE_MOD_OCTAVES,
-                PG_WAVE_MOD_SEAMLESS_1D,
-                PG_WAVE_MOD_SEAMLESS_2D,
-                PG_WAVE_MOD_MIX_FUNC,
-                PG_WAVE_MOD_DISTORT
-            } mod;
-            struct {
-                enum {
-                    PG_WAVE_EXPAND_ADD,
-                    PG_WAVE_EXPAND_SUB,
-                    PG_WAVE_EXPAND_MUL,
-                    PG_WAVE_EXPAND_DIV,
-                    PG_WAVE_EXPAND_AVG
-                } op;
-                enum {
-                    PG_WAVE_EXPAND_BEFORE,
-                    PG_WAVE_EXPAND_AFTER,
-                } mode;
-            };
-            union {
-                struct {
-                    int octaves;
-                    float ratio;
-                    float decay;
-                };
-                struct {
-                    vec4 dist_v;
-                    void (*distort)(vec4 out, vec4 in, vec4 dist_v);
-                };
-                float (*mix)(float a, float b);
-            };
-        };
+        struct { int octaves; float ratio; float decay; };
+        struct { vec4 dist_v; void (*distort)(vec4 out, vec4 in, vec4 dist_v); };
+        struct { float (*mix)(float a, float b, float k); float mix_k; };
     };
 };
 
-#define PG_WAVE_ARRAY(w, l) \
-    ((struct pg_wave){ .type = PG_WAVE_ARRAY, .arr = (w), .len = (l) })
-#define PG_WAVE_MODIFY(mod, ...) \
-    ((struct pg_wave){ .type = PG_WAVE_MODIFIER, .mod = __VA_ARGS__ }
-#define PG_WAVE_EXPAND(...) \
-    ((struct pg_wave){ .type = PG_WAVE_MODIFIER, .mod = PG_WAVE_MOD_EXPAND, \
-                       __VA_ARGS__  })
-#define PG_WAVE_OCTAVES(...) \
-    ((struct pg_wave){ .type = PG_WAVE_MODIFIER, .mod = PG_WAVE_MOD_OCTAVES, \
-                       __VA_ARGS__ })
-#define PG_WAVE_SEAMLESS_1D() \
-    ((struct pg_wave){ .type = PG_WAVE_MODIFIER, .mod = PG_WAVE_MOD_SEAMLESS_1D })
-#define PG_WAVE_SEAMLESS_2D() \
-    ((struct pg_wave){ .type = PG_WAVE_MODIFIER, .mod = PG_WAVE_MOD_SEAMLESS_2D })
-#define PG_WAVE_MIX_FUNC(...) \
-    ((struct pg_wave){ .type = PG_WAVE_MODIFIER, .mod = PG_WAVE_MOD_MIX_FUNC, \
-                       __VA_ARGS__ })
-#define PG_WAVE_DISTORT(d, ...) \
-    ((struct pg_wave){ .type = PG_WAVE_MODIFIER, .mod = PG_WAVE_MOD_DISTORT, \
-                       __VA_ARGS__ })
-
 float pg_wave_sample(struct pg_wave* wave, int d, vec4 p);
+
+/*  Super-hero macros   */
+/*  See readme_wave.md  */
+#define PG_WAVE_ARRAY(w, l, ...) \
+    ((struct pg_wave){ .type = PG_WAVE_ARRAY, .arr = (w), .len = (l), \
+        .frequency = { 1, 1, 1, 1 }, .scale = 1, __VA_ARGS__ })
+#define PG_WAVE_MIX(f, k, ...) \
+    ((struct pg_wave){ .type = PG_WAVE_MIX_FUNC, .mix = f, .mix_k = k, __VA_ARGS })
+#define PG_WAVE_BREAK()     ((struct pg_wave){ .type = PG_WAVE_BREAK })
+
+#define PG_WAVE_MOD_EXPAND(...) \
+    ((struct pg_wave){ .type = PG_WAVE_MODIFIER_EXPAND, \
+        .frequency = { 1, 1, 1, 1 }, .scale = 1, __VA_ARGS__ })
+#define PG_WAVE_MOD_OCTAVES(...) \
+    ((struct pg_wave){ .type = PG_WAVE_MODIFIER_OCTAVES, \
+        .frequency = { 1, 1, 1, 1 }, .scale = 1, __VA_ARGS__ })
+#define PG_WAVE_MOD_SEAMLESS_1D(...) \
+    ((struct pg_wave){ .type = PG_WAVE_MODIFIER_SEAMLESS_1D, \
+        .frequency = { 1, 1, 1, 1 }, .scale = 1, __VA_ARGS__ })
+#define PG_WAVE_MOD_SEAMLESS_2D(...) \
+    ((struct pg_wave){ .type = PG_WAVE_MODIFIER_SEAMLESS_2D, \
+        .frequency = { 1, 1, 1, 1 }, .scale = 1, __VA_ARGS__ })
+#define PG_WAVE_MOD_DISTORT(d, ...) \
+    ((struct pg_wave){ .type = PG_WAVE_MODIFIER_DISTORT, .distort = (d), __VA_ARGS__ })
+
+/*  Built-in mix functions  */
+void pg_wave_mix_sclamp(float a, float b, float k);
+void pg_wave_mix_smin(float a, float b, float k);
+void pg_wave_mix_smax(float a, float b, float k);
+void pg_wave_mix_lerp(float a, float b, float k);
+#define PG_WAVE_MIX_SCLAMP(k) \
+    ((struct pg_wave){ .type = PG_WAVE_MODIFIER, .mod = PG_WAVE_MOD_MIX_FUNC, \
+                       .mix = pg_wave_mix_sclamp, .mix_k = k })
+#define PG_WAVE_MIX_SMIN(k) \
+    ((struct pg_wave){ .type = PG_WAVE_MODIFIER, .mod = PG_WAVE_MOD_MIX_FUNC, \
+                       .mix = pg_wave_mix_smin, .mix_k = k })
+#define PG_WAVE_MIX_SMAX(k) \
+    ((struct pg_wave){ .type = PG_WAVE_MODIFIER, .mod = PG_WAVE_MOD_MIX_FUNC, \
+                       .mix = pg_wave_mix_smax, .mix_k = k })
+
+/*  Built-in primitive functions    */
+#include "ext/noise1234.h"
+#define PG_WAVE_FUNC_PERLIN(...) \
+    ( (struct pg_wave) { \
+        .type = PG_WAVE_FUNCTION, .dimension_mask = 0xF, \
+        .func1 = perlin1, .func2 = perlin2, .func3 = perlin3, .func4 = perlin4, \
+        .scale = 1, .frequency = { 1, 1, 1, 1 }, \
+        __VA_ARGS__ } )
+
+/*  Use PG_WAVE_MOD_EXPAND to get more out of these */
+float pg_wave_sin1(float x);
+#define PG_WAVE_FUNC_SINE(...) \
+    ( (struct pg_wave) { \
+        .type = PG_WAVE_FUNCTION, .dimension_mask = 0x1, \
+        .func1 = pg_wave_sin1, .scale = 1, .frequency = { 1 }, \
+        __VA_ARGS__ } )
+float pg_wave_tri1(float x);
+#define PG_WAVE_FUNC_TRIANGLE(...) \
+    ( (struct pg_wave) { \
+        .type = PG_WAVE_FUNCTION, .dimension_mask = 0x1, \
+        .func1 = pg_wave_tri1, .scale = 1, .frequency = { 1 }, \
+        __VA_ARGS__ } )
+float pg_wave_square1(float x);
+#define PG_WAVE_FUNC_SQUARE(...) \
+    ( (struct pg_wave) { \
+        .type = PG_WAVE_FUNCTION, .dimension_mask = 0x1, \
+        .func1 = pg_wave_square1, .scale = 1, .frequency = { 1 }, \
+        __VA_ARGS__ } )
+float pg_wave_saw1(float x);
+#define PG_WAVE_FUNC_SAW(...) \
+    ( (struct pg_wave) { \
+        .type = PG_WAVE_FUNCTION, .dimension_mask = 0x1, \
+        .func1 = pg_wave_saw1, .scale = 1, .frequency = { 1 }, \
+        __VA_ARGS__ } )
+
+/*  Some basic math functions for utility   */
+float pg_wave_dist1(float x);
+float pg_wave_dist2(float x, float y);
+float pg_wave_dist3(float x, float y, float z);
+float pg_wave_dist4(float x, float y, float z, float w);
+#define PG_WAVE_FUNC_DISTANCE(...) \
+    ( (struct pg_wave) { \
+        .type = PG_WAVE_FUNCTION, .dimension_mask = 0xF, \
+        .func1 = pg_wave_dist1, .func2 = pg_wave_dist2, \
+        .func3 = pg_wave_dist3, .func4 = pg_wave_dist4, \
+        .scale = 1, .frequency = { 1, 1, 1, 1 }, \
+        __VA_ARGS__ } )
+
+float pg_wave_max1(float x);
+float pg_wave_max2(float x, float y);
+float pg_wave_max3(float x, float y, float z);
+float pg_wave_max4(float x, float y, float z, float w);
+#define PG_WAVE_FUNC_MAX(...) \
+    ( (struct pg_wave) { \
+        .type = PG_WAVE_FUNCTION, .dimension_mask = 0xF, \
+        .func1 = pg_wave_max1, .func2 = pg_wave_max2, \
+        .func3 = pg_wave_max3, .func4 = pg_wave_max4, \
+        .scale = 1, .frequency = { 1, 1, 1, 1 }, \
+        __VA_ARGS__ } )
+
+float pg_wave_min1(float x);
+float pg_wave_min2(float x, float y);
+float pg_wave_min3(float x, float y, float z);
+float pg_wave_min4(float x, float y, float z, float w);
+#define PG_WAVE_FUNC_MIN(...) \
+    ( (struct pg_wave) { \
+        .type = PG_WAVE_FUNCTION, .dimension_mask = 0xF, \
+        .func1 = pg_wave_min1, .func2 = pg_wave_min2, \
+        .func3 = pg_wave_min3, .func4 = pg_wave_min4, \
+        .scale = 1, .frequency = { 1, 1, 1, 1 }, \
+        __VA_ARGS__ } )
+
