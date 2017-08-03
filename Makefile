@@ -22,6 +22,7 @@ PROCGL := obj/procgl_base.o \
  obj/viewer.o obj/postproc.o obj/shader.o obj/gbuffer.o \
  obj/model.o obj/model_prims.o obj/marching_cubes.o \
  obj/shader_2d.o obj/shader_3d.o obj/shader_sprite.o obj/shader_cubetex.o obj/shader_text.o \
+ obj/postproc_blur.o \
  obj/wave.o obj/heightmap.o obj/texture.o obj/audio.o \
  obj/sdf.o obj/sdf_functions.o
 PROCGL_LIBS := obj/lodepng.o obj/noise1234.o obj/wavfile.o obj/easing.o
@@ -126,6 +127,9 @@ obj/shader_text.o: src/procgl/shaders/shader_text.c src/procgl/ext/linmath.h \
  src/procgl/viewer.h src/procgl/shader.h src/procgl/procgl_base.h \
  src/procgl/wave.h src/procgl/heightmap.h src/procgl/texture.h
 	$(CC) $(CFLAGS) -o obj/shader_text.o -c src/procgl/shaders/shader_text.c $(INCLUDES)
+obj/postproc_blur.o: src/procgl/shaders/postproc_blur.c src/procgl/ext/linmath.h \
+ src/procgl/postproc.h
+	$(CC) $(CFLAGS) -o obj/postproc_blur.o -c src/procgl/shaders/postproc_blur.c $(INCLUDES)
 obj/wave.o: src/procgl/wave.c src/procgl/wave.h
 	$(CC) $(CFLAGS) -o obj/wave.o -c src/procgl/wave.c $(INCLUDES)
 obj/audio.o: src/procgl/audio.c src/procgl/audio.h \
