@@ -17,7 +17,7 @@ int bork_map_collide(struct bork_map* map, struct bork_collision* coll_out,
         buffer area between the ellipsoid and the map which is also checked */
     mat4 transform;
     vec3 size_scaled;
-    vec3_scale(size_scaled, size, 1.25);
+    vec3_scale(size_scaled, size, 1.5);
     box bbox;
     vec3_sub(bbox[0], pos, size_scaled);
     vec3_add(bbox[1], pos, size_scaled);

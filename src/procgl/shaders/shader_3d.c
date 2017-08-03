@@ -9,6 +9,7 @@
 #include "procgl/viewer.h"
 #include "procgl/model.h"
 #include "procgl/shader.h"
+#include "procgl/shaders/shaders.h"
 
 #ifdef PROCGL_STATIC_SHADERS
 #include "procgl/shaders/3d.glsl.h"

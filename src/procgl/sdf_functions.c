@@ -3,8 +3,6 @@
 #include "wave.h"
 #include "sdf.h"
 
-static const vec3 vec3_zero = { 0, 0, 0 };
-
 #define SDF_DEFINE_FUNC(f) \
     void f(const struct pg_sdf_tree* tree, struct pg_sdf_node* node, \
            vec3 p, vec4 out)
@@ -25,8 +23,8 @@ SDF_DEFINE_FUNC(func_box)
     vec3_abs(d, p);
     vec3_sub(d, d, node->box);
     vec3 p_max, p_min;
-    vec3_max(p_max, d, vec3_zero);
-    vec3_min(p_min, d, vec3_zero);
+    vec3_max(p_max, d, (vec3){});
+    vec3_min(p_min, d, (vec3){});
     vec4_set(out, d[0], d[1], d[2], 
         vec3_len(p_max) + vec3_vmax(p_min));
 }

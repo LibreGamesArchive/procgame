@@ -1,7 +1,6 @@
 #include <stdlib.h>
 #include <limits.h>
 #include "procgl/procgl.h"
-#include "procgl/wave_defs.h"
 #include "bork.h"
 #include "entity.h"
 #include "map_area.h"
@@ -82,37 +81,35 @@ static void bork_menu_draw(struct pg_game_state* state)
 {
     struct bork_menu_data* d = state->data;
     /*  Overlay */
-    vec2 title_size = {
-        (float)d->core->screen_size[1] * 0.0625,
-        (float)d->core->screen_size[1] * 0.25 };
-    vec2 title_coord = {
-        (float)d->core->screen_size[0] * 0.45 - (title_size[0] * 4 + title_size[0] * 3),
-        (float)d->core->screen_size[1] * 0.375 };
-    vec2 option_font_size = {
-        (float)d->core->screen_size[1] * 0.02,
-        (float)d->core->screen_size[1] * 0.1 };
-    vec2 option_block_coord = {
-        (float)d->core->screen_size[0] * 0.55,
-        (float)d->core->screen_size[1] * 0.15 };
-    float option_selected_offset = (float)d->core->screen_size[1] * 0.04;
-    float option_block_height = (float)d->core->screen_size[1] * 0.7;
-    float option_step = option_block_height / (float)BORK_MENU_COUNT;
     pg_screen_dst();
-    pg_shader_begin(&d->core->shader_text, NULL);
-    char str[128];
-    snprintf(str, 10, "FPS: %d", d->current_selection);
-    pg_shader_text_write(&d->core->shader_text, str,
-        (vec2){ 0, 0 }, (vec2){ 8, 8 }, 0.25);
-    pg_shader_text_write(&d->core->shader_text, "BORK",
-        title_coord, title_size, 0.75);
+    struct pg_shader* shader = &d->core->shader_text;
+    bork_draw_backdrop(d->core, (vec4){ 1, 1, 1, 1 },
+                       (float)state->ticks / (float)state->tick_rate);
+    /*  Using text in screen space [0,1]    */
+    pg_shader_text_resolution(shader, (vec2){ 1, 1 });
+    /*  Ratio to un-distort text in non-1:1 windows   */
+    float font_ratio = d->core->font.frame_aspect_ratio / d->core->aspect_ratio;
+    pg_shader_begin(shader, NULL);
+    pg_shader_text_transform(shader,
+        (vec2){ 0.6, 0.15 }, (vec2){ font_ratio * 0.05, 0.09 });
+    struct pg_shader_text menutext = { .use_blocks = BORK_MENU_COUNT + 1 };
     int i;
     for(i = 0; i < BORK_MENU_COUNT; ++i) {
-        pg_shader_text_write(&d->core->shader_text, BORK_MENU_STRING[i],
-            (vec2){ option_block_coord[0] + d->option_x[i] +
-                        ((d->current_selection == i) * option_selected_offset),
-                    option_block_coord[1] },
-            option_font_size, 0.75);
-        option_block_coord[1] += option_step;
+        strncpy(menutext.block[i], BORK_MENU_STRING[i], strlen(BORK_MENU_STRING[i]));
+        vec4_set(menutext.block_style[i], (d->current_selection == i) * 2, i * 1.4, 1, 1.2);
+        vec4_set(menutext.block_color[i], 1, 1, 1, 1);
     }
+    pg_shader_text_write(shader, &menutext);
+    /*  Title is drawn separately   */
+    float title_offset = 0.3 - font_ratio * 0.2 * 1.2 * 2;
+    pg_shader_text_transform(shader, (vec2){ title_offset, 0.3 }, (vec2){ 0.2 * font_ratio, 0.4 });
+    memset(menutext.block[0], 0, 64);
+    strncpy(menutext.block[0], "BORK", 4);
+    vec4_set(menutext.block_style[0], 0, 0, 1, 1.2);
+    vec4_set(menutext.block_color[0], 1, 1, 1, 0.5);
+    menutext.use_blocks = 1;
+    pg_shader_text_write(shader, &menutext);
+    pg_shader_text_resolution(shader, d->core->screen_size);
+    bork_draw_fps(d->core);
 }
 

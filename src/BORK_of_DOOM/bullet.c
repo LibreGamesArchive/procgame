@@ -59,7 +59,7 @@ void bork_bullet_move(struct bork_bullet* blt, struct bork_map* map)
             closest_ent->dead = 1;
             blt->dead_ticks = 30;
             vec3_set(blt->dir, 0, 0, 0);
-            vec3_set(blt->light_color, 1, 0.4, 0.4);
+            vec3_set(blt->light_color, 2, 0.8, 0.8);
         }
     }
     vec3_dup(blt->pos, new_pos);

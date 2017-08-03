@@ -28,7 +28,6 @@ int main(int argc, char *argv[])
         float time = pg_time();
         pg_calc_framerate(time);
         pg_game_state_update(&game, time);
-        SDL_Delay(15);
         pg_game_state_draw(&game);
         pg_screen_swap();
     }

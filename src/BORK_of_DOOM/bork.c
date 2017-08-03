@@ -1,25 +1,30 @@
 #include <stdlib.h>
 #include <limits.h>
 #include "procgl/procgl.h"
-#include "procgl/wave_defs.h"
 #include "bork.h"
 #include "entity.h"
 #include "map_area.h"
 
 void bork_init(struct bork_game_core* core)
 {
+    srand(time(NULL));
+    core->user_exit = 0;
     /*  Set up the gbuffer for deferred shading */
-    pg_screen_size(&core->screen_size[0], &core->screen_size[1]);
-    pg_gbuffer_init(&core->gbuf, core->screen_size[0], core->screen_size[0]);
+    int sw, sh;
+    pg_screen_size(&sw, &sh);
+    vec2_set(core->screen_size, sw, sh);
+    core->aspect_ratio = core->screen_size[0] / core->screen_size[1];
+    pg_gbuffer_init(&core->gbuf, sw, sh);
     pg_gbuffer_bind(&core->gbuf, 20, 21, 22, 23);
     pg_viewer_init(&core->view, (vec3){ 0, 0, 0 }, (vec2){ 0, 0 },
-        (vec2){ core->screen_size[0], core->screen_size[1] },
-        (vec2){ 0.01, 200 });
+        core->screen_size, (vec2){ 0.01, 200 });
     /*  Set up the shaders  */
     pg_shader_3d(&core->shader_3d);
     pg_shader_2d(&core->shader_2d);
     pg_shader_sprite(&core->shader_sprite);
     pg_shader_text(&core->shader_text);
+    pg_ppbuffer_init(&core->ppbuf, sw, sh, 24, 25);
+    pg_postproc_blur(&core->post_blur, PG_BLUR7);
     /*  Get the models, textures, sounds, etc.*    */
     bork_load_assets(core);
     /*  Attach the font texture to the text shader  */
@@ -28,6 +33,18 @@ void bork_init(struct bork_game_core* core)
     pg_shader_2d_set_texture(&core->shader_2d, &core->editor_atlas);
     pg_shader_sprite_set_texture(&core->shader_sprite, &core->bullet_tex);
     pg_shader_sprite_set_tex_frame(&core->shader_sprite, 0);
+    /*  Set up the controls */
+    int i;
+    for(i = 0; i < BORK_CTRL_NULL; ++i) {
+        core->ctrl_state[i] = 0;
+    }
+}
+
+static void backdrop_color_func(vec4 out, vec2 p, struct pg_wave* wave)
+{
+    float s = pg_wave_sample(wave, 2, p) * 0.5 + 0.5;
+    vec4_set(out, p[0], p[1], 0, 1);
+    vec4_set(out, s, s, s, 1);
 }
 
 void bork_load_assets(struct bork_game_core* core)
@@ -48,10 +65,25 @@ void bork_load_assets(struct bork_game_core* core)
     pg_texture_init_from_file(&core->item_tex, "res/items.png", "res/items_lightmap.png");
     pg_texture_set_atlas(&core->item_tex, 16, 16);
     pg_texture_bind(&core->item_tex, 11, 12);
+    /*  Generate the backdrop texture (cloudy reddish fog)  */
+    pg_texture_init(&core->backdrop_tex, 256, 256);
+    float d = 3;
+    float seed = (float)rand() / RAND_MAX * 1000;
+    struct pg_wave w[] = {
+        PG_WAVE_MOD_SEAMLESS_2D(),
+        PG_WAVE_MOD_OCTAVES(.octaves = 4, .ratio = 3, .decay = 0.5),
+        PG_WAVE_FUNC_PERLIN(.frequency = { 4, 4, 4, 4 }, .phase = { seed },
+                            .scale = 1, .add = -0.5) };
+    pg_texture_wave_to_colors(&core->backdrop_tex,
+                              &PG_WAVE_ARRAY(w, 3),
+                              backdrop_color_func);
+    pg_texture_bind(&core->backdrop_tex, 13, -1);
+    pg_texture_buffer(&core->backdrop_tex);
     /*  Generate the basic models, just quads for now   */
     mat4 transform;
     mat4_identity(transform);
-    mat4_rotate_X(transform, transform, M_PI * 1.5);
+    /*  Rotate the 3d sprites upward to point along the Y axis instead of Z */
+    mat4_rotate_X(transform, transform, M_PI * 0.5);
     mat4_scale(transform, transform, 2);
     pg_model_init(&core->enemy_model);
     pg_model_quad(&core->enemy_model, (vec2){ 1, 1 });
@@ -68,5 +100,129 @@ void bork_load_assets(struct bork_game_core* core)
     pg_model_transform(&core->gun_model, transform);
     pg_model_precalc_ntb(&core->gun_model);
     pg_shader_buffer_model(&core->shader_3d, &core->gun_model);
+    pg_model_init(&core->quad_2d);
+    pg_model_quad(&core->quad_2d, (vec2){ 1, 1 });
+    mat4_identity(transform);
+    mat4_scale_aniso(transform, transform, 1, -1, 0);
+    mat4_translate_in_place(transform, 0.5, -0.5, 0);
+    pg_model_transform(&core->quad_2d, transform);
+    pg_model_reserve_component(&core->quad_2d,
+        PG_MODEL_COMPONENT_COLOR | PG_MODEL_COMPONENT_HEIGHT);
+    vec4_t* color;
+    float* f;
+    int i;
+    ARR_FOREACH_PTR(core->quad_2d.height, f, i) {
+        *f = 1.0f;
+    }
+    ARR_FOREACH_PTR(core->quad_2d.color, color, i) {
+        vec4_set(color->v, 1, 1, 1, 1);
+    }
+    pg_shader_buffer_model(&core->shader_2d, &core->quad_2d);
 }
 
+void bork_poll_input(struct bork_game_core* core)
+{
+    SDL_Event e;
+    while(SDL_PollEvent(&e)) {
+        if(e.type == SDL_QUIT) core->user_exit = 1;
+        else if(e.type == SDL_MOUSEBUTTONDOWN && e.button.button == SDL_BUTTON_LEFT) {
+            if(core->ctrl_state[BORK_CTRL_FIRE] == 0) {
+                core->ctrl_state[BORK_CTRL_FIRE] = BORK_CONTROL_HIT;
+            }
+        } else if(e.type == SDL_MOUSEBUTTONUP && e.button.button == SDL_BUTTON_LEFT) {
+            core->ctrl_state[BORK_CTRL_FIRE] = BORK_CONTROL_RELEASED;
+        } else if(e.type == SDL_KEYDOWN) {
+            enum bork_control ctrl = BORK_CTRL_NULL;
+            switch(e.key.keysym.scancode) {
+            case SDL_SCANCODE_ESCAPE: ctrl = BORK_CTRL_ESCAPE; break;
+            case SDL_SCANCODE_W: ctrl = BORK_CTRL_UP; break;
+            case SDL_SCANCODE_S: ctrl = BORK_CTRL_DOWN; break;
+            case SDL_SCANCODE_A: ctrl = BORK_CTRL_LEFT; break;
+            case SDL_SCANCODE_D: ctrl = BORK_CTRL_RIGHT; break;
+            case SDL_SCANCODE_E: ctrl = BORK_CTRL_SELECT; break;
+            case SDL_SCANCODE_SPACE: ctrl = BORK_CTRL_JUMP; break;
+            case SDL_SCANCODE_1: ctrl = BORK_CTRL_BIND1; break;
+            case SDL_SCANCODE_2: ctrl = BORK_CTRL_BIND2; break;
+            case SDL_SCANCODE_3: ctrl = BORK_CTRL_BIND3; break;
+            case SDL_SCANCODE_4: ctrl = BORK_CTRL_BIND4; break;
+            default: break;
+            }
+            if(ctrl != BORK_CTRL_NULL && core->ctrl_state[ctrl] == 0) {
+                core->ctrl_state[ctrl] = BORK_CONTROL_HIT;
+            }
+        } else if(e.type == SDL_KEYUP) {
+            enum bork_control ctrl = BORK_CTRL_NULL;
+            switch(e.key.keysym.scancode) {
+            case SDL_SCANCODE_ESCAPE: ctrl = BORK_CTRL_ESCAPE; break;
+            case SDL_SCANCODE_W: ctrl = BORK_CTRL_UP; break;
+            case SDL_SCANCODE_S: ctrl = BORK_CTRL_DOWN; break;
+            case SDL_SCANCODE_A: ctrl = BORK_CTRL_LEFT; break;
+            case SDL_SCANCODE_D: ctrl = BORK_CTRL_RIGHT; break;
+            case SDL_SCANCODE_E: ctrl = BORK_CTRL_SELECT; break;
+            case SDL_SCANCODE_SPACE: ctrl = BORK_CTRL_JUMP; break;
+            case SDL_SCANCODE_1: ctrl = BORK_CTRL_BIND1; break;
+            case SDL_SCANCODE_2: ctrl = BORK_CTRL_BIND2; break;
+            case SDL_SCANCODE_3: ctrl = BORK_CTRL_BIND3; break;
+            case SDL_SCANCODE_4: ctrl = BORK_CTRL_BIND4; break;
+            default: break;
+            }
+            if(ctrl != BORK_CTRL_NULL) {
+                core->ctrl_state[ctrl] = BORK_CONTROL_RELEASED;
+            }
+        }
+    }
+}
+
+void bork_update_inputs(struct bork_game_core* core)
+{
+    int i;
+    for(i = 0; i < BORK_CTRL_NULL; ++i) {
+        switch(core->ctrl_state[i]) {
+        case BORK_CONTROL_HIT:
+            core->ctrl_state[i] = BORK_CONTROL_HELD;
+            break;
+        case BORK_CONTROL_RELEASED:
+            core->ctrl_state[i] = 0;
+            break;
+        }
+    }
+}
+
+void bork_draw_fps(struct bork_game_core* core)
+{
+    struct pg_shader_text fps_text = { .use_blocks = 1 };
+    vec4_set(fps_text.block_style[0], 0, 0, 1, 1.2);
+    vec4_set(fps_text.block_color[0], 1, 1, 1, 1);
+    snprintf(fps_text.block[0], 10, "FPS: %d", (int)pg_framerate());
+    pg_shader_text_transform(&core->shader_text, (vec2){ 0, 0 }, (vec2){ 5, 8 });
+    pg_shader_text_write(&core->shader_text, &fps_text);
+}
+
+void bork_draw_backdrop(struct bork_game_core* core, vec4 color_mod, float t)
+{
+    static vec4 colors[3] = {
+        { 1, 0, 0, 0.5},
+        { 1, 0, 0, 0.5 },
+        { 0.4, 0.4, 0.4, 0.3 } };
+    static float f[3] = { 0.3, -0.3, 0.2 };
+    static float off[3] = { 0.5, 0.3, 0.9 };
+    struct pg_shader* shader = &core->shader_2d;
+    pg_shader_2d_resolution(shader, (vec2){ 1, 1 });
+    pg_shader_2d_transform(shader, (vec2){}, (vec2){ 1 / core->aspect_ratio, core->aspect_ratio }, 0);
+    pg_shader_2d_set_texture(shader, &core->backdrop_tex);
+    pg_shader_2d_set_tex_weight(shader, 1);
+    if(!pg_shader_is_active(shader)) pg_shader_begin(shader, NULL);
+    pg_model_begin(&core->quad_2d, shader);
+    mat4 tx;
+    mat4_identity(tx);
+    int i;
+    for(i = 0; i < 3; ++i) {
+        vec4 c;
+        vec4_mul(c, colors[i], color_mod);
+        pg_shader_2d_set_color_mod(shader, c);
+        pg_shader_2d_set_tex_scale(shader, (vec2){ 1, 1 });
+        pg_shader_2d_set_tex_offset(shader,
+           (vec2){ cos(t * f[i]) * off[i], sin(t * f[i]) * off[i] });
+        pg_model_draw(&core->quad_2d, tx);
+    }
+}

@@ -74,8 +74,7 @@ void bork_entity_move(struct bork_entity* ent, struct bork_map* map)
         }
         vec3_add(new_pos, new_pos, max_move_dir);
         steps = 0;
-        while(bork_map_collide(map, &coll, new_pos, ent->size)
-                && (steps++ < 4)) {
+        while(bork_map_collide(map, &coll, new_pos, ent->size) && (steps++ < 4)) {
             if(ent->type == BORK_ENTITY_ENEMY && !coll.tile) {
                 printf("%f, %f, %f\n", coll.push[0], coll.push[1], coll.push[2]);
                 printf("%f, %f, %f\n", new_pos[0], new_pos[1], new_pos[2]);

@@ -1,7 +1,6 @@
 #include <stdlib.h>
 #include <limits.h>
 #include "procgl/procgl.h"
-#include "procgl/wave_defs.h"
 #include "bork.h"
 #include "entity.h"
 #include "map_area.h"
@@ -32,11 +31,6 @@ void bork_editor_start(struct pg_game_state* state, struct bork_game_core* core)
         .core = core,
         .kb_state = SDL_GetKeyboardState(NULL) };
     //SDL_SetRelativeMouseMode(SDL_TRUE);
-    mat4_identity(d->pixel_transform);
-    mat4_scale_aniso(d->pixel_transform, d->pixel_transform,
-        2 / (float)core->screen_size[0], -2 / (float)core->screen_size[1], 1);
-    mat4_translate_in_place(d->pixel_transform,
-        -core->screen_size[0] / 2, -core->screen_size[1] / 2, 0);
     /*  Generate the basic quad model   */
     pg_model_init(&d->tile_quad);
     pg_model_quad(&d->tile_quad, (vec2){ 1, 1 });
@@ -154,24 +148,18 @@ static void bork_editor_update(struct pg_game_state* state)
     }
 }
 
-static void pixel_transform(mat4 out, mat4 pixel_mat, vec2 pos, vec2 size)
-{
-    mat4_translate(out, pos[0], pos[1], 0);
-    mat4_scale_aniso(out, out, size[0], size[1], 1);
-    mat4_mul(out, pixel_mat, out);
-}
-
 static void bork_editor_draw(struct pg_game_state* state)
 {
     struct bork_editor_data* d = state->data;
-    /*  Overlay */
     pg_screen_dst();
-    pg_shader_begin(&d->core->shader_2d, NULL);
-    pg_model_begin(&d->tile_quad, &d->core->shader_2d);
-    mat4 transform;
-    pg_shader_2d_set_tex_weight(&d->core->shader_2d, 1.0f);
-    pg_shader_2d_set_tex_frame(&d->core->shader_2d, 2);
-    pg_shader_2d_set_color_mod(&d->core->shader_2d, (vec4){ 1, 1, 1, 1 });
+    struct pg_shader* shader = &d->core->shader_2d;
+    pg_shader_2d_resolution(shader, d->core->screen_size);
+    pg_shader_2d_set_texture(shader, &d->core->editor_atlas);
+    pg_shader_begin(shader, NULL);
+    pg_model_begin(&d->tile_quad, shader);
+    pg_shader_2d_set_tex_weight(shader, 1.0f);
+    pg_shader_2d_set_tex_frame(shader, 2);
+    pg_shader_2d_set_color_mod(shader, (vec4){ 1, 1, 1, 1 });
     int select_rect[4] = {
         MIN(d->selection[0], d->selection[2]), MIN(d->selection[1], d->selection[3]),
         MAX(d->selection[0], d->selection[2]), MAX(d->selection[1], d->selection[3]) };
@@ -188,9 +176,10 @@ static void bork_editor_draw(struct pg_game_state* state)
             } else {
                 pg_shader_2d_set_color_mod(&d->core->shader_2d, (vec4){ 1, 1, 1, 1 });
             }
-            pixel_transform(transform, d->pixel_transform,
-                (vec2){ x * 16 + 64, y * 16 + 32 }, (vec2){ 16, 16 });
-            pg_model_draw(&d->tile_quad, transform);
+            pg_shader_2d_transform(&d->core->shader_2d,
+                (vec2){x * 16 + 64, y * 16 + 32 },
+                (vec2){ 16, 16 }, 0);
+            pg_model_draw(&d->tile_quad, NULL);
         }
     }
     /*  Get the stuff for the currently selected tile   */
@@ -198,42 +187,51 @@ static void bork_editor_draw(struct pg_game_state* state)
         d->cursor[0], d->cursor[1], d->selected_level);
     const struct bork_tile_detail* detail = bork_tile_detail(tile->type);
     const struct bork_tile_detail* cursor_detail = bork_tile_detail(d->current_tile.type);
+    /*  Draw the scaled-up view of the currently selected tile in the map   */
     pg_shader_2d_set_tex_frame(&d->core->shader_2d, tile->type);
     pg_shader_2d_set_color_mod(&d->core->shader_2d, (vec4){ 1, 1, 1, 1 });
-    pixel_transform(transform, d->pixel_transform,
+    pg_shader_2d_transform(&d->core->shader_2d,
         (vec2){ d->cursor[0] * 16 + 64, d->cursor[1] * 16 + 32 },
-        (vec2){ 32, 32 });
-    pg_model_draw(&d->tile_quad, transform);
+        (vec2){ 32, 32 }, 0);
+    pg_model_draw(&d->tile_quad, NULL);
     if(detail->tile_flags & BORK_TILE_HAS_ORIENTATION) {
         int i;
         for(i = 0; i < 4; ++i) {
             if(!(tile->orientation & (1 << i))) continue;
             pg_shader_2d_set_tex_frame(&d->core->shader_2d, 252 + i);
-            pg_model_draw(&d->tile_quad, transform);
+            pg_model_draw(&d->tile_quad, NULL);
         }
     }
     /*  Draw the current "brush" tile   */
     pg_shader_2d_set_tex_frame(&d->core->shader_2d, d->current_tile.type);
-    pixel_transform(transform, d->pixel_transform,
-        (vec2){ 700, 128 }, (vec2){ 32, 32 });
-    pg_model_draw(&d->tile_quad, transform);
+    pg_shader_2d_transform(&d->core->shader_2d,
+        (vec2){ 700, 128 }, (vec2){ 32, 32 }, 0);
+    pg_model_draw(&d->tile_quad, NULL);
     if(cursor_detail->tile_flags & BORK_TILE_HAS_ORIENTATION) {
         int i;
         for(i = 0; i < 4; ++i) {
             if(!(d->current_tile.orientation & (1 << i))) continue;
             pg_shader_2d_set_tex_frame(&d->core->shader_2d, 252 + i);
-            pg_model_draw(&d->tile_quad, transform);
+            pg_model_draw(&d->tile_quad, NULL);
         }
     }
-    pg_shader_begin(&d->core->shader_text, NULL);
-    char str[128];
-    snprintf(str, 127, "Current area: %s:%d",
-        BORK_AREA_STRING[d->current_area], d->selected_level);
-    pg_shader_text_write(&d->core->shader_text, str,
-        (vec2){ 660, 64 }, (vec2){ 10, 16 }, 0.25);
-    snprintf(str, 127, "%s", cursor_detail->name);
-    pg_shader_text_write(&d->core->shader_text, str,
-        (vec2){ 750, 120 }, (vec2){ 10, 16 }, 0.25);
+    /*  Text    */
+    shader = &d->core->shader_text;
+    pg_shader_text_resolution(shader, d->core->screen_size);
+    pg_shader_begin(shader, NULL);
+    pg_shader_text_transform(shader, (vec2){ 740, 40 }, (vec2){ 10, 16 });
+    /*  Right-side UI text  */
+    struct pg_shader_text text = { .use_blocks = 2 };
+    snprintf(text.block[0], 64, "%s : %d",
+             BORK_AREA_STRING[d->current_area], d->selected_level);
+    vec4_set(text.block_style[0], 0, 0, 2, 1.2);
+    vec4_set(text.block_color[0], 1, 1, 1, 1);
+    snprintf(text.block[1], 64, "%s", cursor_detail->name);
+    vec4_set(text.block_style[1], 0, 5, 1, 1.2);
+    vec4_set(text.block_color[1], 1, 0, 0, 1);
+    pg_shader_text_write(shader, &text);
+    /*  Write the FPS   */
+    bork_draw_fps(d->core);
 }
 
 

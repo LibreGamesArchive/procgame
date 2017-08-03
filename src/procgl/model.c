@@ -145,8 +145,10 @@ void pg_model_draw(struct pg_model* model, mat4 transform)
 {
     if(model->active < 0) return;
     struct pg_shader* m_shader = model->buffers.data[model->active].shader;
-    pg_shader_set_matrix(m_shader, PG_MODEL_MATRIX, transform);
-    pg_shader_rebuild_matrices(m_shader);
+    if(transform) {
+        pg_shader_set_matrix(m_shader, PG_MODEL_MATRIX, transform);
+        pg_shader_rebuild_matrices(m_shader);
+    }
     glDrawElements(GL_TRIANGLES, model->tris.len * 3, GL_UNSIGNED_INT, 0);
 }
 

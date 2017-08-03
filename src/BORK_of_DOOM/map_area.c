@@ -152,21 +152,6 @@ void bork_map_update_area(struct bork_map* map, enum bork_area area,
             }
         }
     }
-    struct bork_entity* ent;
-    ARR_FOREACH_PTR_REV(map->enemies[area], ent, i) {
-        if(ent->dead) {
-            ARR_SWAPSPLICE(map->enemies[area], i, 1);
-            continue;
-        }
-        bork_entity_update(ent, map);
-    }
-    ARR_FOREACH_PTR_REV(map->items[area], ent, i) {
-        if(ent->dead) {
-            ARR_SWAPSPLICE(map->items[area], i, 1);
-            continue;
-        }
-        bork_entity_update(ent, map);
-    }
 }
 
 void bork_map_draw_area(struct bork_map* map, enum bork_area area)
@@ -251,7 +236,7 @@ void bork_map_load_from_file(struct bork_map* map, char* filename)
                     } else if(tile->type == BORK_TILE_EDITOR_LIGHT1) {
                         struct bork_map_object new_obj = {
                             .type = BORK_MAP_OBJ_LIGHT,
-                            .light = { 1, 1, 1, 8 },
+                            .light = { 2, 2, 2, 8 },
                             .x = x, .y = y, .z = z };
                         ARR_PUSH(map->objects[area], new_obj);
                         tile->type = BORK_TILE_ATMO;

@@ -1,7 +1,6 @@
 #include <stdlib.h>
 #include <limits.h>
 #include "procgl/procgl.h"
-#include "procgl/wave_defs.h"
 #include "bork.h"
 #include "entity.h"
 #include "map_area.h"
@@ -31,13 +30,24 @@ struct bork_light {
 
 struct bork_play_data {
     struct bork_game_core* core;
+    ARR_T(struct bork_entity) ent_pool;
     struct bork_map map;
     enum bork_area current_area;
-    const uint8_t* kb_state;
-    vec2 mouse_motion;
-    vec3 quad_pos;
     struct bork_entity plr;
     float player_speed;
+    const uint8_t* kb_state;
+    vec2 mouse_motion;
+    struct {
+        enum {
+            BORK_MENU_CLOSED,
+            BORK_MENU_INVENTORY,
+            BORK_MENU_CHARACTER,
+        } state;
+        int selection_idx;
+    } menu;
+    struct bork_entity* looked_item;
+    int looked_idx;
+    ARR_T(struct bork_entity) inventory;
     ARR_T(struct bork_bullet) bullets;
     ARR_T(struct bork_light) lights_buf;    /*  Updated per frame   */
 };
@@ -59,6 +69,7 @@ void bork_play_start(struct pg_game_state* state, struct bork_game_core* core)
     struct bork_play_data* d = malloc(sizeof(*d));
     d->core = core;
     d->kb_state = SDL_GetKeyboardState(NULL);
+    d->menu.state = BORK_MENU_CLOSED;
     SDL_SetRelativeMouseMode(SDL_TRUE);
     vec2_set(d->mouse_motion, 0, 0);
     /*  Generate the BONZ station   */
@@ -69,13 +80,12 @@ void bork_play_start(struct pg_game_state* state, struct bork_game_core* core)
     /*  Initialize the player data  */
     bork_entity_init(&d->plr, (vec3){ 0.5, 0.5, 0.9 });
     vec3_set(d->plr.pos, 32, 32, 40);
-    core->plr = &d->plr;
     d->player_speed = 0.02;
     d->map.plr = &d->plr;
     d->current_area = 0;
     ARR_INIT(d->bullets);
     ARR_INIT(d->lights_buf);
-    vec3_set(d->quad_pos, 0, 0, 0);
+    ARR_INIT(d->inventory);
     /*  Assign all the pointers, and it's finished  */
     state->data = d;
     state->update = bork_play_update;
@@ -89,52 +99,12 @@ static void bork_play_update(struct pg_game_state* state)
     struct bork_play_data* d = state->data;
     int mx, my;
     SDL_GetRelativeMouseState(&mx, &my);
-    d->mouse_motion[0] -= mx * 0.0005f;
-    d->mouse_motion[1] -= my * 0.0005f;
-    SDL_Event e;
-    while(SDL_PollEvent(&e)) {
-        if(e.type == SDL_QUIT) state->running = 0;
-        else if(e.type == SDL_MOUSEBUTTONDOWN && e.button.button == SDL_BUTTON_LEFT) {
-            vec3 bullet_dir;
-            spherical_to_cartesian(bullet_dir, (vec2){ d->plr.dir[0] - M_PI,
-                                                       d->plr.dir[1] - (M_PI * 0.5) });
-            vec3_scale(bullet_dir, bullet_dir, 1);
-            struct bork_bullet new_bullet = {};
-            vec3_dup(new_bullet.pos, d->plr.pos);
-            new_bullet.pos[0] += 0.2 * sin(d->plr.dir[0]);
-            new_bullet.pos[1] -= 0.2 * cos(d->plr.dir[0]);
-            new_bullet.pos[2] += 0.75;
-            vec3_dup(new_bullet.dir, bullet_dir);
-            ARR_PUSH(d->bullets, new_bullet);
-        } else if(e.type == SDL_KEYDOWN && e.key.keysym.scancode == SDL_SCANCODE_F) {
-            struct bork_entity new_ent = { .type = BORK_ENTITY_ENEMY };
-            vec3_dup(new_ent.pos, d->plr.pos);
-            vec3_set(new_ent.size, 1, 1, 1);
-            vec2_set(new_ent.dir, d->plr.dir[0], 0);
-            new_ent.dir_frames = 4;
-            new_ent.front_frame = 192;
-            enum bork_area area = bork_map_get_area(&d->map,
-                                                    (int)new_ent.pos[0] * 0.5,
-                                                    (int)new_ent.pos[1] * 0.5,
-                                                    (int)new_ent.pos[2] * 0.5);
-            ARR_PUSH(d->map.enemies[area], new_ent);
-        } else if(e.type == SDL_KEYDOWN && e.key.keysym.scancode == SDL_SCANCODE_G) {
-            vec3 item_dir;
-            spherical_to_cartesian(item_dir, (vec2){ d->plr.dir[0] - M_PI,
-                                                     d->plr.dir[1] - (M_PI * 0.5) });
-            vec3_scale(item_dir, item_dir, 1);
-            struct bork_entity new_item = {
-                .active = 1, .type = BORK_ENTITY_ITEM,
-                .size = { 0.5, 0.5, 0.5 } };
-            vec3_dup(new_item.pos, d->plr.pos);
-            vec3_dup(new_item.vel, item_dir);
-            new_item.pos[0] += 0.2 * sin(d->plr.dir[0]);
-            new_item.pos[1] -= 0.2 * cos(d->plr.dir[0]);
-            new_item.pos[2] += 0.75;
-            vec3_scale(new_item.vel, new_item.vel, 0.2);
-            ARR_PUSH(d->map.items[0], new_item);
-        }
+    if(d->menu.state == BORK_MENU_CLOSED) {
+        d->mouse_motion[0] -= mx * 0.0005f;
+        d->mouse_motion[1] -= my * 0.0005f;
     }
+    bork_poll_input(d->core);
+    if(d->core->user_exit) state->running = 0;
 }
 
 static struct bork_entity* plr;
@@ -152,42 +122,164 @@ static int bork_entity_sort_fn(const void* av, const void* bv)
     else return (a_dist > b_dist);
 }
 
+/*  Update code */
+static void tick_control_play(struct bork_play_data* d);
+static void tick_enemies(struct bork_play_data* d);
+static void tick_items(struct bork_play_data* d);
+static void tick_bullets(struct bork_play_data* d);
+
 static void bork_play_tick(struct pg_game_state* state)
 {
     struct bork_play_data* d = state->data;
-    if(d->kb_state[SDL_SCANCODE_SPACE] && d->plr.ground) {
+    /*  Handle input    */
+    if(d->core->ctrl_state[BORK_CTRL_ESCAPE] == BORK_CONTROL_HIT) {
+        if(d->menu.state == BORK_MENU_INVENTORY) {
+            d->menu.state = BORK_MENU_CLOSED;
+        } else {
+            d->menu.state = BORK_MENU_INVENTORY;
+        }
+    }
+    if(d->menu.state == BORK_MENU_CLOSED) tick_control_play(d);
+    bork_update_inputs(d->core);
+    /*  Player update   */
+    if(d->menu.state == BORK_MENU_CLOSED) {
+        vec2_set(d->plr.dir,
+                 d->plr.dir[0] + d->mouse_motion[0],
+                 d->plr.dir[1] + d->mouse_motion[1]);
+        d->plr.dir[0] = fmodf(d->plr.dir[0], M_PI * 2.0f);
+        vec2_set(d->mouse_motion, 0, 0);
+        bork_entity_update(&d->plr, &d->map);
+        /*  Everything else update  */
+        bork_map_update_area(&d->map, 0, &d->plr);
+        tick_bullets(d);
+        tick_enemies(d);
+        tick_items(d);
+        /*  Find the item the player is looking at, if any    */
+        vec3 look_dir, look_pos;
+        spherical_to_cartesian(look_dir, (vec2){ d->plr.dir[0] - M_PI,
+                                                 d->plr.dir[1] - (M_PI * 0.5) });
+        vec3_dup(look_pos, d->plr.pos);
+        look_pos[2] += 0.8;
+        int i;
+        d->looked_item = NULL;
+        struct bork_entity* ent;
+        float closest_angle = 0.2f, closest_dist = 2.5f;
+        ARR_FOREACH_PTR(d->map.items[d->current_area], ent, i) {
+            ent->item.looked_at = 0;
+            vec3 ent_to_plr;
+            vec3_sub(ent_to_plr, ent->pos, look_pos);
+            float dist = vec3_len(ent_to_plr);
+            if(dist >= closest_dist) continue;
+            vec3_normalize(ent_to_plr, ent_to_plr);
+            float angle = acosf(vec3_mul_inner(ent_to_plr, look_dir));
+            if(angle >= closest_angle) continue;
+            closest_dist = dist;
+            closest_angle = angle;
+            d->looked_item = ent;
+            d->looked_idx = i;
+        }
+        if(d->looked_item) {
+            d->looked_item->item.looked_at = 1;
+        }
+    }
+}
+
+static void tick_control_play(struct bork_play_data* d)
+{
+    if(d->core->ctrl_state[BORK_CTRL_SELECT] == BORK_CONTROL_HIT && d->looked_item) {
+        d->looked_item->item.looked_at = 0;
+        ARR_PUSH(d->inventory, *d->looked_item);
+        ARR_SWAPSPLICE(d->map.items[d->current_area], d->looked_idx, 1);
+    }
+    if(d->core->ctrl_state[BORK_CTRL_JUMP] == BORK_CONTROL_HIT && d->plr.ground) {
         d->plr.vel[2] = 0.3;
         d->plr.ground = 0;
     }
     float move_speed = d->player_speed * (d->plr.ground ? 1 : 0.15);
-    if(d->kb_state[SDL_SCANCODE_A]) {
+    if(d->core->ctrl_state[BORK_CTRL_LEFT]) {
         d->plr.vel[0] -= move_speed * sin(d->plr.dir[0]);
         d->plr.vel[1] += move_speed * cos(d->plr.dir[0]);
     }
-    if(d->kb_state[SDL_SCANCODE_D]) {
+    if(d->core->ctrl_state[BORK_CTRL_RIGHT]) {
         d->plr.vel[0] += move_speed * sin(d->plr.dir[0]);
         d->plr.vel[1] -= move_speed * cos(d->plr.dir[0]);
     }
-    if(d->kb_state[SDL_SCANCODE_W]) {
+    if(d->core->ctrl_state[BORK_CTRL_UP]) {
         d->plr.vel[0] += move_speed * cos(d->plr.dir[0]);
         d->plr.vel[1] += move_speed * sin(d->plr.dir[0]);
     }
-    if(d->kb_state[SDL_SCANCODE_S]) {
+    if(d->core->ctrl_state[BORK_CTRL_DOWN]) {
         d->plr.vel[0] -= move_speed * cos(d->plr.dir[0]);
         d->plr.vel[1] -= move_speed * sin(d->plr.dir[0]);
     }
-    /*  Player update   */
-    vec2_set(d->plr.dir,
-             d->plr.dir[0] + d->mouse_motion[0],
-             d->plr.dir[1] + d->mouse_motion[1]);
-    d->plr.dir[0] = fmodf(d->plr.dir[0], M_PI * 2.0f);
-    vec2_set(d->mouse_motion, 0, 0);
-    bork_entity_update(&d->plr, &d->map);
-    /*  Map update  (doors and stuff)   */
-    bork_map_update_area(&d->map, 0, &d->plr);
-    plr = &d->plr;
-    ARR_SORT(d->map.enemies[0], bork_entity_sort_fn);
-    /*  Bullets update  */
+    if(d->core->ctrl_state[BORK_CTRL_FIRE] == BORK_CONTROL_HIT) {
+        vec3 bullet_dir;
+        spherical_to_cartesian(bullet_dir, (vec2){ d->plr.dir[0] - M_PI,
+                                                   d->plr.dir[1] - (M_PI * 0.5) });
+        vec3_scale(bullet_dir, bullet_dir, 1);
+        struct bork_bullet new_bullet = {};
+        vec3_dup(new_bullet.pos, d->plr.pos);
+        new_bullet.pos[0] += 0.2 * sin(d->plr.dir[0]);
+        new_bullet.pos[1] -= 0.2 * cos(d->plr.dir[0]);
+        new_bullet.pos[2] += 0.75;
+        vec3_dup(new_bullet.dir, bullet_dir);
+        ARR_PUSH(d->bullets, new_bullet);
+    }
+    if(d->core->ctrl_state[BORK_CTRL_BIND1] == BORK_CONTROL_HIT) {
+        vec3 item_dir;
+        spherical_to_cartesian(item_dir, (vec2){ d->plr.dir[0] - M_PI,
+                                                 d->plr.dir[1] - (M_PI * 0.5) });
+        vec3_scale(item_dir, item_dir, 1);
+        struct bork_entity new_item = {
+            .active = 1, .type = BORK_ENTITY_ITEM,
+            .size = { 0.5, 0.5, 0.5 } };
+        vec3_dup(new_item.pos, d->plr.pos);
+        vec3_dup(new_item.vel, item_dir);
+        new_item.pos[0] += 0.2 * sin(d->plr.dir[0]);
+        new_item.pos[1] -= 0.2 * cos(d->plr.dir[0]);
+        new_item.pos[2] += 0.75;
+        vec3_scale(new_item.vel, new_item.vel, 0.2);
+        ARR_PUSH(d->map.items[0], new_item);
+    }
+    if(d->core->ctrl_state[BORK_CTRL_BIND2] == BORK_CONTROL_HIT) {
+         struct bork_entity new_ent = { .type = BORK_ENTITY_ENEMY };
+         vec3_dup(new_ent.pos, d->plr.pos);
+         vec3_set(new_ent.size, 1, 1, 1);
+         vec2_set(new_ent.dir, d->plr.dir[0], 0);
+         new_ent.dir_frames = 4;
+         new_ent.front_frame = 192;
+         ARR_PUSH(d->map.enemies[d->current_area], new_ent);
+    }
+}
+
+static void tick_enemies(struct bork_play_data* d)
+{
+    int i;
+    struct bork_entity* ent;
+    ARR_FOREACH_PTR_REV(d->map.enemies[d->current_area], ent, i) {
+        if(ent->dead) {
+            ARR_SWAPSPLICE(d->map.enemies[d->current_area], i, 1);
+            continue;
+        }
+        bork_entity_update(ent, &d->map);
+    }
+}
+
+static void tick_items(struct bork_play_data* d)
+{
+    int i;
+    struct bork_entity* ent;
+    ARR_FOREACH_PTR_REV(d->map.items[d->current_area], ent, i) {
+        if(ent->dead) {
+            ARR_SWAPSPLICE(d->map.items[d->current_area], i, 1);
+            continue;
+        }
+        bork_entity_update(ent, &d->map);
+    }
+}
+
+static void tick_bullets(struct bork_play_data* d)
+{
     struct bork_bullet* blt;
     int i;
     ARR_FOREACH_PTR_REV(d->bullets, blt, i) {
@@ -197,45 +289,22 @@ static void bork_play_tick(struct pg_game_state* state)
         } else if(blt->dead_ticks) --blt->dead_ticks;
         else bork_bullet_move(blt, &d->map);
     }
-    /*  Mark the looked-at item */
-    vec3 look_dir, look_pos;
-    spherical_to_cartesian(look_dir, (vec2){ d->plr.dir[0] - M_PI,
-                                             d->plr.dir[1] - (M_PI * 0.5) });
-    vec3_dup(look_pos, d->plr.pos);
-    look_pos[2] += 0.8;
-    struct bork_entity* ent;
-    struct bork_entity* closest_ent = NULL;
-    float closest_angle = 0.2f, closest_dist = 2.5f;
-    ARR_FOREACH_PTR(d->map.items[d->current_area], ent, i) {
-        ent->item.looked_at = 0;
-        vec3 ent_to_plr;
-        vec3_sub(ent_to_plr, ent->pos, look_pos);
-        float dist = vec3_len(ent_to_plr);
-        if(dist >= closest_dist) continue;
-        vec3_normalize(ent_to_plr, ent_to_plr);
-        float angle = acosf(vec3_mul_inner(ent_to_plr, look_dir));
-        if(angle >= closest_angle) continue;
-        closest_dist = dist;
-        closest_angle = angle;
-        closest_ent = ent;
-    }
-    if(closest_ent) {
-        closest_ent->item.looked_at = 1;
-    }
 }
 
+/*  Drawing */
 static void draw_weapon(struct bork_play_data* d, vec3 pos_lerp, vec2 dir_lerp);
-static void draw_enemies(struct bork_play_data* d);
-static void draw_items(struct bork_play_data* d);
-static void draw_bullets(struct bork_play_data* d);
+static void draw_enemies(struct bork_play_data* d, float lerp);
+static void draw_items(struct bork_play_data* d, float lerp);
+static void draw_bullets(struct bork_play_data* d, float lerp);
 static void draw_map_lights(struct bork_play_data* d);
 static void draw_light(struct bork_play_data* d, vec4 light, vec3 color);
+static void draw_menu_inv(struct bork_play_data* d);
 
 static void bork_play_draw(struct pg_game_state* state)
 {
     struct bork_play_data* d = state->data;
     /*  Interpolation   */
-    float t = state->tick_over;
+    float t = d->menu.state == BORK_MENU_CLOSED ? state->tick_over : 0;
     vec3 vel_lerp, draw_pos;
     vec2 draw_dir;
     vec3_scale(vel_lerp, d->plr.vel, t);
@@ -248,9 +317,9 @@ static void bork_play_draw(struct pg_game_state* state)
     pg_shader_begin(&d->core->shader_3d, &d->core->view);
     draw_weapon(d, draw_pos, draw_dir);
     pg_shader_begin(&d->core->shader_sprite, &d->core->view);
-    draw_enemies(d);
-    draw_items(d);
-    draw_bullets(d);
+    draw_enemies(d, t);
+    draw_items(d, t);
+    draw_bullets(d, t);
     pg_shader_3d_set_texture(&d->core->shader_3d, &d->core->env_atlas);
     bork_map_draw_area(&d->map, d->current_area);
     draw_map_lights(d);
@@ -262,24 +331,32 @@ static void bork_play_draw(struct pg_game_state* state)
         pg_gbuffer_draw_light(&d->core->gbuf, light->pos, light->color);
     }
     ARR_TRUNCATE(d->lights_buf, 0);
-    pg_screen_dst();
+    if(d->menu.state == BORK_MENU_CLOSED) pg_screen_dst();
+    else pg_ppbuffer_dst(&d->core->ppbuf);
     pg_gbuffer_finish(&d->core->gbuf, (vec3){ 0.05, 0.05, 0.05 });
+    if(d->menu.state != BORK_MENU_CLOSED) {
+        pg_postproc_blur_scale(&d->core->post_blur, (vec2){ 3, 3 });
+        pg_ppbuffer_swapdst(&d->core->ppbuf);
+        pg_postproc_blur_dir(&d->core->post_blur, 1);
+        pg_postproc_apply(&d->core->post_blur, &d->core->ppbuf);
+        pg_postproc_blur_dir(&d->core->post_blur, 0);
+        pg_ppbuffer_swap(&d->core->ppbuf);
+        pg_screen_dst();
+        pg_postproc_apply(&d->core->post_blur, &d->core->ppbuf);
+        pg_shader_begin(&d->core->shader_2d, NULL);
+        bork_draw_backdrop(d->core, (vec4){ 1, 1, 1, 0.7 }, (float)state->ticks / (float)state->tick_rate);
+        draw_menu_inv(d);
+    }
     /*  Overlay */
+    pg_shader_text_resolution(&d->core->shader_text, d->core->screen_size);
     pg_shader_begin(&d->core->shader_text, NULL);
-    char bork_str[10];
-    snprintf(bork_str, 10, "FPS: %d", (int)pg_framerate());
-    pg_shader_text_write(&d->core->shader_text, bork_str,
-        (vec2){ 0, 0 }, (vec2){ 8, 8 }, 0.25);
+    bork_draw_fps(d->core);
 }
-
-/*  Draw functions for each class of game objects   */
 
 static void draw_weapon(struct bork_play_data* d, vec3 pos_lerp, vec2 dir_lerp)
 {
-    struct bork_map* map = &d->map;
     struct pg_shader* shader = &d->core->shader_3d;
     struct pg_model* model = &d->core->gun_model;
-    struct pg_viewer* view = &d->core->view;
     pg_shader_3d_set_texture(shader, &d->core->item_tex);
     pg_shader_3d_set_tex_frame(shader, 8);
     mat4 tx;
@@ -294,7 +371,7 @@ static void draw_weapon(struct bork_play_data* d, vec3 pos_lerp, vec2 dir_lerp)
     pg_model_draw(model, tx);
 }
 
-static void draw_enemies(struct bork_play_data* d)
+static void draw_enemies(struct bork_play_data* d, float lerp)
 {
     struct bork_map* map = &d->map;
     struct pg_shader* shader = &d->core->shader_sprite;
@@ -310,8 +387,11 @@ static void draw_enemies(struct bork_play_data* d)
     ARR_FOREACH_PTR(map->enemies[d->current_area], ent, i) {
         if(ent->dead) continue;
         /*  Figure out which directional frame to draw  */
+        vec3 pos_lerp;
+        vec3_scale(pos_lerp, ent->vel, lerp);
+        vec3_add(pos_lerp, pos_lerp, ent->pos);
         vec2 ent_to_plr;
-        vec2_sub(ent_to_plr, ent->pos, plr_pos);
+        vec2_sub(ent_to_plr, pos_lerp, plr_pos);
         float dir_adjust = 1.0f / (float)ent->dir_frames + 0.5f;
         float angle = atan2(ent_to_plr[0], ent_to_plr[1]) + (M_PI * dir_adjust) + ent->dir[0];
         if(angle < 0) angle += M_PI * 2;
@@ -324,12 +404,12 @@ static void draw_enemies(struct bork_play_data* d)
         }
         /*  Draw the sprite */
         mat4 transform;
-        mat4_translate(transform, ent->pos[0], ent->pos[1], ent->pos[2]);
+        mat4_translate(transform, pos_lerp[0], pos_lerp[1], pos_lerp[2]);
         pg_model_draw(model, transform);
     }
 }
 
-static void draw_items(struct bork_play_data* d)
+static void draw_items(struct bork_play_data* d, float lerp)
 {
     struct bork_map* map = &d->map;
     struct pg_shader* shader = &d->core->shader_sprite;
@@ -348,8 +428,11 @@ static void draw_items(struct bork_play_data* d)
             pg_shader_sprite_set_tex_frame(shader, ent->front_frame);
             current_frame = ent->front_frame;
         }
+        vec3 pos_lerp;
+        vec3_scale(pos_lerp, ent->vel, lerp);
+        vec3_add(pos_lerp, pos_lerp, ent->pos);
         mat4 transform;
-        mat4_translate(transform, ent->pos[0], ent->pos[1], ent->pos[2]);
+        mat4_translate(transform, pos_lerp[0], pos_lerp[1], pos_lerp[2]);
         mat4_scale(transform, transform, 0.5);
         if(ent->item.looked_at) {
             pg_shader_sprite_set_color_mod(shader, (vec4){ 1.5f, 1.8f, 1.5f, 1.0f });
@@ -359,7 +442,7 @@ static void draw_items(struct bork_play_data* d)
     }
 }
 
-static void draw_bullets(struct bork_play_data* d)
+static void draw_bullets(struct bork_play_data* d, float lerp)
 {
     struct pg_shader* shader = &d->core->shader_sprite;
     struct pg_model* model = &d->core->bullet_model;
@@ -378,10 +461,10 @@ static void draw_bullets(struct bork_play_data* d)
                           blt->light_color);
             continue;
         }
-        vec3 blt_lerp = {};
-        //vec3_scale(blt_lerp, blt->dir, state->tick_over);
-        vec3_add(blt_lerp, blt_lerp, blt->pos);
-        mat4_translate(bullet_transform, blt->pos[0], blt->pos[1], blt->pos[2]);
+        vec3 pos_lerp;
+        vec3_scale(pos_lerp, blt->dir, lerp);
+        vec3_add(pos_lerp, pos_lerp, blt->pos);
+        mat4_translate(bullet_transform, pos_lerp[0], pos_lerp[1], pos_lerp[2]);
         pg_model_draw(model, bullet_transform);
     }
 }
@@ -409,4 +492,26 @@ static void draw_light(struct bork_play_data* d, vec4 light, vec3 color)
         .pos = { light[0], light[1], light[2], light[3] },
         .color = { color[0], color[1], color[2] } };
     ARR_PUSH(d->lights_buf, new_light);
+}
+
+static void draw_menu_inv(struct bork_play_data* d)
+{
+    struct pg_shader* shader = &d->core->shader_2d;
+    shader = &d->core->shader_text;
+    pg_shader_text_resolution(shader, (vec2){ 1, 1 });
+    float font_ratio = d->core->font.frame_aspect_ratio / d->core->aspect_ratio;
+    if(!pg_shader_is_active(shader)) pg_shader_begin(shader, NULL);
+    pg_shader_text_transform(shader,
+        (vec2){ 0.2, 0.1 }, (vec2){ font_ratio * 0.05, 0.05 });
+    struct pg_shader_text text = { .use_blocks = 12 };
+    int i;
+    for(i = 0; i < 11; ++i) {
+        strncpy(text.block[i], "BORK!?", 64);
+        vec4_set(text.block_style[i], 2, 2 + 1.3 * i, 1, 1.2);
+        vec4_set(text.block_color[i], 0.8, 0.8, 1, 0.9);
+    }
+    strncpy(text.block[i], "INVENTORY", 64);
+    vec4_set(text.block_style[i], 0, 0, 1.5, 1.2);
+    vec4_set(text.block_color[i], 0.8, 0.8, 1, 0.9);
+    pg_shader_text_write(shader, &text);
 }

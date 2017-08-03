@@ -9,6 +9,7 @@
 #include "procgl/viewer.h"
 #include "procgl/model.h"
 #include "procgl/shader.h"
+#include "procgl/shaders/shaders.h"
 
 #ifdef PROCGL_STATIC_SHADERS
 #include "procgl/shaders/2d.glsl.h"
@@ -65,7 +66,7 @@ int pg_shader_2d(struct pg_shader* shader)
 #endif
     if(!load) return 0;
     struct data_2d* d = malloc(sizeof(struct data_2d));
-    pg_shader_link_matrix(shader, PG_MODEL_MATRIX, "model_matrix");
+    pg_shader_link_matrix(shader, PG_MODELVIEW_MATRIX, "transform");
     pg_shader_link_component(shader, PG_MODEL_COMPONENT_POSITION, "v_position");
     pg_shader_link_component(shader, PG_MODEL_COMPONENT_UV, "v_tex_coord");
     pg_shader_link_component(shader, PG_MODEL_COMPONENT_COLOR, "v_color");
@@ -88,6 +89,36 @@ int pg_shader_2d(struct pg_shader* shader)
         (PG_MODEL_COMPONENT_POSITION | PG_MODEL_COMPONENT_UV |
          PG_MODEL_COMPONENT_COLOR | PG_MODEL_COMPONENT_HEIGHT);
     return 1;
+}
+
+void pg_shader_2d_resolution(struct pg_shader* shader, vec2 resolution)
+{
+    mat4 tx;
+    mat4_identity(tx);
+    mat4_scale_aniso(tx, tx,
+        2 / resolution[0], -2 / resolution[1], 1);
+    mat4_translate_in_place(tx,
+        -resolution[0] / 2, -resolution[1] / 2, 0);
+    pg_shader_set_matrix(shader, PG_VIEW_MATRIX, tx);
+}
+
+void pg_shader_2d_ndc(struct pg_shader* shader)
+{
+    mat4 tx;
+    mat4_identity(tx);
+    mat4_scale_aniso(tx, tx, 1, -1, 0);
+    pg_shader_set_matrix(shader, PG_VIEW_MATRIX, tx);
+}
+
+void pg_shader_2d_transform(struct pg_shader* shader, vec2 pos, vec2 size,
+                            float rotation)
+{
+    mat4 tx;
+    mat4_translate(tx, pos[0], pos[1], 0);
+    mat4_scale_aniso(tx, tx, size[0], size[1], 1);
+    mat4_rotate_Z(tx, tx, rotation);
+    pg_shader_set_matrix(shader, PG_MODEL_MATRIX, tx);
+    pg_shader_rebuild_matrices(shader);
 }
 
 void pg_shader_2d_set_texture(struct pg_shader* shader, struct pg_texture* tex)
