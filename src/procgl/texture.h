@@ -14,6 +14,7 @@ struct pg_texture {
     int diffuse_slot, light_slot;
     int w, h;
     int frame_h, frame_w;
+    float frame_aspect_ratio;
 };
 
 struct pg_texture_cube {
@@ -26,8 +27,14 @@ void pg_texture_init_from_file(struct pg_texture* tex, const char* diffuse_file,
 void pg_texture_init(struct pg_texture* tex, int w, int h);
 void pg_texture_deinit(struct pg_texture* tex);
 void pg_texture_bind(struct pg_texture* tex, int diffuse_slot, int light_slot);
-void pg_texture_generate_normals(struct pg_texture* tex,
-                                 struct pg_heightmap* hmap, float intensity);
+void pg_texture_hmap_to_colors(struct pg_texture* tex, struct pg_heightmap* hmap,
+        void (*func)(vec2 out, vec2 s, struct pg_heightmap* hmap));
+void pg_texture_wave_to_colors(struct pg_texture* tex, struct pg_wave* wave,
+        void (*func)(vec4 out, vec2 s, struct pg_wave* wave));
+void pg_texture_hmap_to_normals(struct pg_texture* tex,
+                                struct pg_heightmap* hmap, float intensity);
+void pg_texture_wave_to_normals(struct pg_texture* tex,
+                                struct pg_heightmap* hmap, float intensity);
 void pg_texture_generate_mipmaps(struct pg_texture* tex);
 void pg_texture_buffer(struct pg_texture* tex);
 void pg_texture_set_atlas(struct pg_texture* tex, int frame_w, int frame_h);

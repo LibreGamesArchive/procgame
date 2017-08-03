@@ -119,8 +119,29 @@ void pg_texture_buffer(struct pg_texture* tex)
     }
 }
 
-void pg_texture_generate_normals(struct pg_texture* tex,
-                                 struct pg_heightmap* hmap, float intensity)
+void pg_texture_wave_to_colors(struct pg_texture* tex, struct pg_wave* wave,
+        void (*func)(vec4 out, vec2 s, struct pg_wave* wave))
+{
+    if(!tex->diffuse) return;
+    int x, y;
+    for(x = 0; x < tex->w; ++x) {
+        for(y = 0; y < tex->h; ++y) {
+            vec2 p = { (float)x / (float)tex->w,
+                       (float)y / (float)tex->h };
+            vec4 color;
+            func(color, p, wave);
+            vec4_max(color, color, (vec4){});
+            vec4_min(color, color, (vec4){1,1,1,1});
+            vec4_scale(color, color, 255.0f);
+            pg_texel_set(tex->diffuse[x + y * tex->w],
+                color[0], color[1], color[2], color[3]);
+        }
+    }
+}
+
+
+void pg_texture_hmap_to_normals(struct pg_texture* tex,
+                                struct pg_heightmap* hmap, float intensity)
 {
     if(!tex->light) return;
     int x, y;
@@ -146,6 +167,7 @@ void pg_texture_set_atlas(struct pg_texture* tex, int frame_w, int frame_h)
 {
     tex->frame_w = frame_w;
     tex->frame_h = frame_h;
+    tex->frame_aspect_ratio = (float)frame_w / (float)frame_h;
 }
 
 void pg_texture_get_frame(struct pg_texture* tex, int frame,
