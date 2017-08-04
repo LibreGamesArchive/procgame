@@ -29,7 +29,7 @@ static float pg_wave_sample_array(struct pg_wave* wave, int* end_idx, int n,
     struct pg_wave* iter = wave;
     for(i = 0; i < n; i += sub_len, iter = wave + i) {
         vec4 iter_p = {};
-        if(iter->type == PG_WAVE_END) {
+        if(iter->type == PG_WAVE_POP) {
             sub_len = 2;
             break;
         } else sub_len = 1;
@@ -37,12 +37,38 @@ static float pg_wave_sample_array(struct pg_wave* wave, int* end_idx, int n,
         case PG_WAVE_CONSTANT: {
             s += iter->constant * iter->scale + iter->add;
             break;
-        case PG_WAVE_TRANSFORM: {
+        } case PG_WAVE_PUSH: {
             p_transform(iter_p, p_, iter->phase, iter->frequency);
             s += pg_wave_sample_array(iter + 1, &sub_len, n - i - 1, d, iter_p)
                 * iter->scale + iter->add;
             break;
-        }
+        } case PG_WAVE_SWIZZ: {
+            iter_p[0] = p_[iter->swizzle_x];
+            iter_p[1] = p_[iter->swizzle_y];
+            iter_p[2] = p_[iter->swizzle_z];
+            iter_p[3] = p_[iter->swizzle_w];
+            p_transform(p_, iter_p, iter->phase, iter->frequency);
+            break;
+        } case PG_WAVE_FM: {
+            p_transform(iter_p, p_, iter->phase, (vec4){1,1,1,1});
+            vec4 fm = {};
+            int j;
+            for(j = 0; j < 4; ++j) {
+                fm[j] = pg_wave_sample_array(iter + 1, &sub_len, n - i - 1, 4, iter_p);
+            }
+            vec4_mul(p_, iter_p, fm);
+            vec4_mul(p_, p_, iter->frequency);
+            break;
+        } case PG_WAVE_PM: {
+            p_transform(iter_p, p_, (vec4){}, iter->frequency);
+            vec4 pm = {};
+            int j;
+            for(j = 0; j < 4; ++j) {
+                pm[j] = pg_wave_sample_array(iter + 1, &sub_len, n - i - 1, 4, iter_p);
+            }
+            vec4_add(p_, iter_p, pm);
+            vec4_add(p_, p_, iter->phase);
+            break;
         } case PG_WAVE_ARRAY: {
             p_transform(iter_p, p_, iter->phase, iter->frequency);
             s += pg_wave_sample_array(iter->arr, NULL, iter->len, d, iter_p) * iter->scale + iter->add;

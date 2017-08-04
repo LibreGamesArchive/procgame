@@ -39,7 +39,7 @@ struct bork_game_core {
     struct pg_texture font;
     /*  Generated assets    */
     struct pg_texture backdrop_tex;
-    struct pg_texture radial_vignette_tex;
+    struct pg_texture menu_vignette;
     struct pg_model quad_2d;
     struct pg_model bullet_model;
     struct pg_model enemy_model;
@@ -59,3 +59,4 @@ void bork_editor_start(struct pg_game_state* state, struct bork_game_core* core)
 
 void bork_draw_fps(struct bork_game_core* core);
 void bork_draw_backdrop(struct bork_game_core* core, vec4 color_mod, float t);
+void bork_draw_linear_vignette(struct bork_game_core* core, vec4 color_mod);

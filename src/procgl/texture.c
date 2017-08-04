@@ -126,8 +126,8 @@ void pg_texture_wave_to_colors(struct pg_texture* tex, struct pg_wave* wave,
     int x, y;
     for(x = 0; x < tex->w; ++x) {
         for(y = 0; y < tex->h; ++y) {
-            vec2 p = { (float)x / (float)tex->w,
-                       (float)y / (float)tex->h };
+            vec2 p = { (float)x / (float)tex->w * 2 - 1,
+                       (float)y / (float)tex->h * 2 - 1};
             vec4 color;
             func(color, p, wave);
             vec4_max(color, color, (vec4){});

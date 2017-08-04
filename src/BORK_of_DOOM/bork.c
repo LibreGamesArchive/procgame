@@ -42,9 +42,14 @@ void bork_init(struct bork_game_core* core)
 
 static void backdrop_color_func(vec4 out, vec2 p, struct pg_wave* wave)
 {
-    float s = pg_wave_sample(wave, 2, p) * 0.5 + 0.5;
-    vec4_set(out, p[0], p[1], 0, 1);
+    float s = pg_wave_sample(wave, 2, p);
     vec4_set(out, s, s, s, 1);
+}
+
+static void vignette_color_func(vec4 out, vec2 p, struct pg_wave* wave)
+{
+    float s = pg_wave_sample(wave, 2, p);
+    vec4_set(out, 1, 1, 1, s);
 }
 
 void bork_load_assets(struct bork_game_core* core)
@@ -67,18 +72,27 @@ void bork_load_assets(struct bork_game_core* core)
     pg_texture_bind(&core->item_tex, 11, 12);
     /*  Generate the backdrop texture (cloudy reddish fog)  */
     pg_texture_init(&core->backdrop_tex, 256, 256);
-    float d = 3;
-    float seed = (float)rand() / RAND_MAX * 1000;
-    struct pg_wave w[] = {
-        PG_WAVE_MOD_SEAMLESS_2D(),
-        PG_WAVE_MOD_OCTAVES(.octaves = 4, .ratio = 3, .decay = 0.5),
-        PG_WAVE_FUNC_PERLIN(.frequency = { 4, 4, 4, 4 }, .phase = { seed },
-                            .scale = 1, .add = -0.5) };
-    pg_texture_wave_to_colors(&core->backdrop_tex,
-                              &PG_WAVE_ARRAY(w, 3),
-                              backdrop_color_func);
+    pg_texture_init(&core->menu_vignette, 256, 256);
     pg_texture_bind(&core->backdrop_tex, 13, -1);
+    pg_texture_bind(&core->menu_vignette, 14, -1);
+    float seed = (float)rand() / RAND_MAX * 1000;
+    struct pg_wave backdrop_wave[8] = {
+        PG_WAVE_MOD_SEAMLESS_2D(.scale = 0.5),
+        PG_WAVE_MOD_OCTAVES(.octaves = 5, .ratio = 3, .decay = 0.5),
+        PG_WAVE_FUNC_PERLIN(.frequency = { 4, 4, 4, 4 }, .phase = { seed }),
+    };
+    struct pg_wave vignette_wave[8] = {
+        PG_WAVE_MODULATE_PHASE(),
+            PG_WAVE_FUNC_PERLIN(.frequency = { 1, 1 }, .phase = { seed }, .scale = 1),
+            PG_WAVE_POP(),
+        PG_WAVE_FUNC_DISTANCE(.frequency = {1, 1}, .scale = 10, .add = -9),
+    };
+    pg_texture_wave_to_colors(&core->backdrop_tex, &PG_WAVE_ARRAY(backdrop_wave, 8),
+                              backdrop_color_func);
+    pg_texture_wave_to_colors(&core->menu_vignette, &PG_WAVE_ARRAY(vignette_wave, 8),
+                              vignette_color_func);
     pg_texture_buffer(&core->backdrop_tex);
+    pg_texture_buffer(&core->menu_vignette);
     /*  Generate the basic models, just quads for now   */
     mat4 transform;
     mat4_identity(transform);
@@ -201,20 +215,19 @@ void bork_draw_fps(struct bork_game_core* core)
 void bork_draw_backdrop(struct bork_game_core* core, vec4 color_mod, float t)
 {
     static vec4 colors[3] = {
-        { 1, 0, 0, 0.5},
-        { 1, 0, 0, 0.5 },
-        { 0.4, 0.4, 0.4, 0.3 } };
-    static float f[3] = { 0.3, -0.3, 0.2 };
-    static float off[3] = { 0.5, 0.3, 0.9 };
+        { 0.8, 0, 0, 0.7 },
+        { 0.4, 0.4, 0.4, 0.3 },
+        { 0.8, 0, 0, 0.3 },
+    };
+    static float f[3] = { 0.01, -0.05, 0.1 };
+    static float off[3] = { 2, 0.3, 0.5 };
     struct pg_shader* shader = &core->shader_2d;
     pg_shader_2d_resolution(shader, (vec2){ 1, 1 });
-    pg_shader_2d_transform(shader, (vec2){}, (vec2){ 1 / core->aspect_ratio, core->aspect_ratio }, 0);
+    pg_shader_2d_transform(shader, (vec2){}, (vec2){ 1, core->aspect_ratio }, 0);
     pg_shader_2d_set_texture(shader, &core->backdrop_tex);
     pg_shader_2d_set_tex_weight(shader, 1);
     if(!pg_shader_is_active(shader)) pg_shader_begin(shader, NULL);
     pg_model_begin(&core->quad_2d, shader);
-    mat4 tx;
-    mat4_identity(tx);
     int i;
     for(i = 0; i < 3; ++i) {
         vec4 c;
@@ -223,6 +236,18 @@ void bork_draw_backdrop(struct bork_game_core* core, vec4 color_mod, float t)
         pg_shader_2d_set_tex_scale(shader, (vec2){ 1, 1 });
         pg_shader_2d_set_tex_offset(shader,
            (vec2){ cos(t * f[i]) * off[i], sin(t * f[i]) * off[i] });
-        pg_model_draw(&core->quad_2d, tx);
+        pg_model_draw(&core->quad_2d, NULL);
     }
+}
+
+void bork_draw_linear_vignette(struct bork_game_core* core, vec4 color_mod)
+{
+    struct pg_shader* shader = &core->shader_2d;
+    pg_shader_2d_transform(shader, (vec2){}, (vec2){ 1, 1 }, 0);
+    pg_shader_2d_resolution(shader, (vec2){ 1, 1 });
+    pg_shader_2d_set_texture(shader, &core->menu_vignette);
+    pg_shader_2d_set_color_mod(shader, color_mod);
+    if(!pg_shader_is_active(shader)) pg_shader_begin(shader, NULL);
+    pg_model_begin(&core->quad_2d, shader);
+    pg_model_draw(&core->quad_2d, NULL);
 }

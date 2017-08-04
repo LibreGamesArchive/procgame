@@ -3,9 +3,11 @@
 struct pg_wave {
     float phase[4], frequency[4], scale, add;
     enum {
-        PG_WAVE_END = 0,
+        PG_WAVE_POP = 0,
         PG_WAVE_CONSTANT,
-        PG_WAVE_TRANSFORM,
+        PG_WAVE_PUSH,
+        PG_WAVE_SWIZZ,
+        PG_WAVE_FM, PG_WAVE_PM, PG_WAVE_AM,
         PG_WAVE_FUNCTION,
         PG_WAVE_ARRAY,
         PG_WAVE_MIX_FUNC,
@@ -16,6 +18,7 @@ struct pg_wave {
         PG_WAVE_MODIFIER_DISTORT } type;
     union {
         float constant;
+        struct { int swizzle_x, swizzle_y, swizzle_z, swizzle_w; };
         struct {
             unsigned dimension_mask;
             float (*func1)(float);
@@ -42,15 +45,25 @@ float pg_wave_sample(struct pg_wave* wave, int d, vec4 p);
 #define PG_WAVE_CONSTANT(c, ...) \
     ((struct pg_wave){ .type = PG_WAVE_CONSTANT, .constant = c, \
         .frequency = { 1, 1, 1, 1 }, .scale = 1, __VA_ARGS__ })
-#define PG_WAVE_TRANSFORM(...) \
-    ((struct pg_wave){ .type = PG_WAVE_TRANSFORM, \
+#define PG_WAVE_SWIZZLE(x, y, z, w, ...) \
+    ((struct pg_wave){ .type = PG_WAVE_SWIZZ, \
+        .swizzle_x = x, .swizzle_y = y, .swizzle_z = z, .swizzle_w = w, \
+        .frequency = { 1, 1, 1, 1 }, .scale = 1, __VA_ARGS__ })
+#define PG_WAVE_PUSH(...) \
+    ((struct pg_wave){ .type = PG_WAVE_PUSH, \
         .frequency = { 1, 1, 1, 1 }, .scale = 1, __VA_ARGS__ })
 #define PG_WAVE_ARRAY(w, l, ...) \
     ((struct pg_wave){ .type = PG_WAVE_ARRAY, .arr = (w), .len = (l), \
         .frequency = { 1, 1, 1, 1 }, .scale = 1, __VA_ARGS__ })
+#define PG_WAVE_MODULATE_FREQUENCY(...) \
+    ((struct pg_wave){ .type = PG_WAVE_FM, \
+        .frequency = { 1, 1, 1, 1 }, .scale = 1, __VA_ARGS__ })
+#define PG_WAVE_MODULATE_PHASE(...) \
+    ((struct pg_wave){ .type = PG_WAVE_PM, \
+        .frequency = { 1, 1, 1, 1 }, .scale = 1, __VA_ARGS__ })
 #define PG_WAVE_MIX(f, k, ...) \
     ((struct pg_wave){ .type = PG_WAVE_MIX_FUNC, .mix = f, .mix_k = k, __VA_ARGS })
-#define PG_WAVE_END()     ((struct pg_wave){ .type = PG_WAVE_END })
+#define PG_WAVE_POP()     ((struct pg_wave){ .type = PG_WAVE_POP })
 
 #define PG_WAVE_MOD_EXPAND(o, m, ...) \
     ((struct pg_wave){ .type = PG_WAVE_MODIFIER_EXPAND, .op = o, .mode = m, \

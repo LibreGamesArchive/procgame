@@ -298,7 +298,7 @@ static void draw_items(struct bork_play_data* d, float lerp);
 static void draw_bullets(struct bork_play_data* d, float lerp);
 static void draw_map_lights(struct bork_play_data* d);
 static void draw_light(struct bork_play_data* d, vec4 light, vec3 color);
-static void draw_menu_inv(struct bork_play_data* d);
+static void draw_menu_inv(struct bork_play_data* d, float t);
 
 static void bork_play_draw(struct pg_game_state* state)
 {
@@ -344,8 +344,7 @@ static void bork_play_draw(struct pg_game_state* state)
         pg_screen_dst();
         pg_postproc_apply(&d->core->post_blur, &d->core->ppbuf);
         pg_shader_begin(&d->core->shader_2d, NULL);
-        bork_draw_backdrop(d->core, (vec4){ 1, 1, 1, 0.7 }, (float)state->ticks / (float)state->tick_rate);
-        draw_menu_inv(d);
+        draw_menu_inv(d, (float)state->ticks / (float)state->tick_rate);
     }
     /*  Overlay */
     pg_shader_text_resolution(&d->core->shader_text, d->core->screen_size);
@@ -494,24 +493,27 @@ static void draw_light(struct bork_play_data* d, vec4 light, vec3 color)
     ARR_PUSH(d->lights_buf, new_light);
 }
 
-static void draw_menu_inv(struct bork_play_data* d)
+static void draw_menu_inv(struct bork_play_data* d, float t)
 {
     struct pg_shader* shader = &d->core->shader_2d;
+    bork_draw_backdrop(d->core, (vec4){ 1, 1, 1, 0.5 }, t);
+    bork_draw_linear_vignette(d->core, (vec4){ 0, 0, 0, 0.8 });
     shader = &d->core->shader_text;
     pg_shader_text_resolution(shader, (vec2){ 1, 1 });
     float font_ratio = d->core->font.frame_aspect_ratio / d->core->aspect_ratio;
     if(!pg_shader_is_active(shader)) pg_shader_begin(shader, NULL);
     pg_shader_text_transform(shader,
-        (vec2){ 0.2, 0.1 }, (vec2){ font_ratio * 0.05, 0.05 });
+        (vec2){ 0.1, 0.1 }, (vec2){ font_ratio * 0.05, 0.05 });
     struct pg_shader_text text = { .use_blocks = 12 };
     int i;
     for(i = 0; i < 11; ++i) {
         strncpy(text.block[i], "BORK!?", 64);
         vec4_set(text.block_style[i], 2, 2 + 1.3 * i, 1, 1.2);
-        vec4_set(text.block_color[i], 0.8, 0.8, 1, 0.9);
+        vec4_set(text.block_color[i], 1, 1, 1, 0.5);
     }
     strncpy(text.block[i], "INVENTORY", 64);
     vec4_set(text.block_style[i], 0, 0, 1.5, 1.2);
-    vec4_set(text.block_color[i], 0.8, 0.8, 1, 0.9);
+    vec4_set(text.block_color[i], 1, 1, 1, 0.5);
     pg_shader_text_write(shader, &text);
+
 }

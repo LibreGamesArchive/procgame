@@ -85,6 +85,7 @@ static void bork_menu_draw(struct pg_game_state* state)
     struct pg_shader* shader = &d->core->shader_text;
     bork_draw_backdrop(d->core, (vec4){ 1, 1, 1, 1 },
                        (float)state->ticks / (float)state->tick_rate);
+    bork_draw_linear_vignette(d->core, (vec4){ 0.25, 0, 0, 0.5 });
     /*  Using text in screen space [0,1]    */
     pg_shader_text_resolution(shader, (vec2){ 1, 1 });
     /*  Ratio to un-distort text in non-1:1 windows   */
