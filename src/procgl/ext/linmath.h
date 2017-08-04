@@ -19,6 +19,9 @@
 #ifndef MOD
 #define MOD(a, b) ((a) % (b) < 0 ? ((a) % (b)) + b : (a) % (b))
 #endif
+#ifndef SGN
+#define SGN(a)  (a < 0 ? -1 : 1)
+#endif
 
 #define SATURATE(x) clamp(x, 0, 1)
 static inline float clamp(float f, float a, float b)
