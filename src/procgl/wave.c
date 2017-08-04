@@ -11,6 +11,7 @@ static inline void p_transform(vec4 out, vec4 in, vec4 phase, vec4 freq)
     vec4_add(out, out, phase);
 }
 
+/*  TODO: Make this non-recursive   */
 static float pg_wave_sample_array(struct pg_wave* wave, int* end_idx, int n,
                                   unsigned d, float* p)
 {
@@ -28,14 +29,20 @@ static float pg_wave_sample_array(struct pg_wave* wave, int* end_idx, int n,
     struct pg_wave* iter = wave;
     for(i = 0; i < n; i += sub_len, iter = wave + i) {
         vec4 iter_p = {};
-        if(iter->type == PG_WAVE_BREAK) {
+        if(iter->type == PG_WAVE_END) {
             sub_len = 2;
             break;
         } else sub_len = 1;
         switch(iter->type) {
         case PG_WAVE_CONSTANT: {
-            s += iter->constant;
+            s += iter->constant * iter->scale + iter->add;
             break;
+        case PG_WAVE_TRANSFORM: {
+            p_transform(iter_p, p_, iter->phase, iter->frequency);
+            s += pg_wave_sample_array(iter + 1, &sub_len, n - i - 1, d, iter_p)
+                * iter->scale + iter->add;
+            break;
+        }
         } case PG_WAVE_ARRAY: {
             p_transform(iter_p, p_, iter->phase, iter->frequency);
             s += pg_wave_sample_array(iter->arr, NULL, iter->len, d, iter_p) * iter->scale + iter->add;
@@ -53,6 +60,11 @@ static float pg_wave_sample_array(struct pg_wave* wave, int* end_idx, int n,
             default: break;
             }
             s += s_ * iter->scale + iter->add;
+            break;
+        } case PG_WAVE_MIX_FUNC: {
+            p_transform(iter_p, p_, iter->phase, iter->frequency);
+            float s_ = pg_wave_sample_array(iter + 1, &sub_len, n - i - 1, d, iter_p);
+            s = iter->mix(s, s_, iter->mix_k) * iter->scale + iter->add;
             break;
         } case PG_WAVE_MODIFIER_OCTAVES: {
             p_transform(iter_p, p_, iter->phase, iter->frequency);
@@ -77,16 +89,12 @@ static float pg_wave_sample_array(struct pg_wave* wave, int* end_idx, int n,
             break;
         } case PG_WAVE_MODIFIER_SEAMLESS_2D: {
             if(d < 2) return 0;
-            vec4_set(iter_p, cos(p_[0] * 2 * M_PI), sin(p_[0] * 2 * M_PI),
-                             cos(p_[1] * 2 * M_PI), sin(p_[1] * 2 * M_PI));
+            vec4_set(iter_p, cos((p_[0] + 1) * M_PI), sin((p_[0] + 1)* M_PI),
+                             cos((p_[1] + 1) * M_PI), sin((p_[1] + 1) * M_PI));
             p_transform(iter_p, iter_p, iter->phase, iter->frequency);
             vec4_scale(iter_p, iter_p, 1 / (M_PI * 2));
             s += pg_wave_sample_array(iter + 1, &sub_len, n - i - 1,
                                       4, iter_p) * iter->scale + iter->add;
-            break;
-        } case PG_WAVE_MODIFIER_MIX_FUNC: {
-            float s_ = pg_wave_sample_array(iter + 1, &sub_len, n - i - 1, d, p_);
-            s = iter->mix(s, s_, iter->mix_k) * iter->scale + iter->add;
             break;
         } case PG_WAVE_MODIFIER_EXPAND: {
             if(d == 1) continue;
@@ -152,6 +160,36 @@ float pg_wave_sample(struct pg_wave* wave, int d, vec4 p)
     return pg_wave_sample_array(wave, &a, 1, d, p);
 }
 
+/*  Built-in mixing functions   */
+float pg_wave_mix_min(float a, float b, float k)
+{
+    return MIN(a, b);
+}
+float pg_wave_mix_min_abs(float a, float b, float k)
+{
+    return MIN(fabsf(a), fabsf(b)) * SGN(a);
+}
+float pg_wave_mix_smin(float a, float b, float k)
+{
+    return smin(a, b, k);
+}
+float pg_wave_mix_smin_abs(float a, float b, float k)
+{
+    return smin(fabsf(a), fabsf(b), k) * SGN(a);
+}
+float pg_wave_mix_max(float a, float b, float k)
+{
+    return MAX(a, b);
+}
+float pg_wave_mix_max_abs(float a, float b, float k)
+{
+    return MAX(fabsf(a), fabsf(b)) * SGN(a);
+}
+float pg_wave_mix_lerp(float a, float b, float k)
+{
+    return lerp(a, b, k);
+}
+
 /*  Function definitions for the built-in waves */
 float pg_wave_sin1(float x)
 {
@@ -186,6 +224,7 @@ float pg_wave_dist4(float x, float y, float z, float w)
 {
     return sqrtf(x*x + y*y + z*z + w*w);
 }
+
 float pg_wave_max1(float x)
 {
     return fabs(x);

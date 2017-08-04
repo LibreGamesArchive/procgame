@@ -3,15 +3,16 @@
 struct pg_wave {
     float phase[4], frequency[4], scale, add;
     enum {
+        PG_WAVE_END = 0,
         PG_WAVE_CONSTANT,
+        PG_WAVE_TRANSFORM,
         PG_WAVE_FUNCTION,
         PG_WAVE_ARRAY,
-        PG_WAVE_BREAK,
+        PG_WAVE_MIX_FUNC,
         PG_WAVE_MODIFIER_EXPAND,
         PG_WAVE_MODIFIER_OCTAVES,
         PG_WAVE_MODIFIER_SEAMLESS_1D,
         PG_WAVE_MODIFIER_SEAMLESS_2D,
-        PG_WAVE_MODIFIER_MIX_FUNC,
         PG_WAVE_MODIFIER_DISTORT } type;
     union {
         float constant;
@@ -38,15 +39,21 @@ float pg_wave_sample(struct pg_wave* wave, int d, vec4 p);
 
 /*  Super-hero macros   */
 /*  See readme_wave.md  */
+#define PG_WAVE_CONSTANT(c, ...) \
+    ((struct pg_wave){ .type = PG_WAVE_CONSTANT, .constant = c, \
+        .frequency = { 1, 1, 1, 1 }, .scale = 1, __VA_ARGS__ })
+#define PG_WAVE_TRANSFORM(...) \
+    ((struct pg_wave){ .type = PG_WAVE_TRANSFORM, \
+        .frequency = { 1, 1, 1, 1 }, .scale = 1, __VA_ARGS__ })
 #define PG_WAVE_ARRAY(w, l, ...) \
     ((struct pg_wave){ .type = PG_WAVE_ARRAY, .arr = (w), .len = (l), \
         .frequency = { 1, 1, 1, 1 }, .scale = 1, __VA_ARGS__ })
 #define PG_WAVE_MIX(f, k, ...) \
     ((struct pg_wave){ .type = PG_WAVE_MIX_FUNC, .mix = f, .mix_k = k, __VA_ARGS })
-#define PG_WAVE_BREAK()     ((struct pg_wave){ .type = PG_WAVE_BREAK })
+#define PG_WAVE_END()     ((struct pg_wave){ .type = PG_WAVE_END })
 
-#define PG_WAVE_MOD_EXPAND(...) \
-    ((struct pg_wave){ .type = PG_WAVE_MODIFIER_EXPAND, \
+#define PG_WAVE_MOD_EXPAND(o, m, ...) \
+    ((struct pg_wave){ .type = PG_WAVE_MODIFIER_EXPAND, .op = o, .mode = m, \
         .frequency = { 1, 1, 1, 1 }, .scale = 1, __VA_ARGS__ })
 #define PG_WAVE_MOD_OCTAVES(...) \
     ((struct pg_wave){ .type = PG_WAVE_MODIFIER_OCTAVES, \
@@ -61,19 +68,41 @@ float pg_wave_sample(struct pg_wave* wave, int d, vec4 p);
     ((struct pg_wave){ .type = PG_WAVE_MODIFIER_DISTORT, .distort = (d), __VA_ARGS__ })
 
 /*  Built-in mix functions  */
-void pg_wave_mix_sclamp(float a, float b, float k);
-void pg_wave_mix_smin(float a, float b, float k);
-void pg_wave_mix_smax(float a, float b, float k);
-void pg_wave_mix_lerp(float a, float b, float k);
-#define PG_WAVE_MIX_SCLAMP(k) \
-    ((struct pg_wave){ .type = PG_WAVE_MODIFIER, .mod = PG_WAVE_MOD_MIX_FUNC, \
-                       .mix = pg_wave_mix_sclamp, .mix_k = k })
-#define PG_WAVE_MIX_SMIN(k) \
-    ((struct pg_wave){ .type = PG_WAVE_MODIFIER, .mod = PG_WAVE_MOD_MIX_FUNC, \
-                       .mix = pg_wave_mix_smin, .mix_k = k })
-#define PG_WAVE_MIX_SMAX(k) \
-    ((struct pg_wave){ .type = PG_WAVE_MODIFIER, .mod = PG_WAVE_MOD_MIX_FUNC, \
-                       .mix = pg_wave_mix_smax, .mix_k = k })
+float pg_wave_mix_min(float a, float b, float k);
+float pg_wave_mix_min_abs(float a, float b, float k);
+float pg_wave_mix_smin(float a, float b, float k);
+float pg_wave_mix_smin_abs(float a, float b, float k);
+float pg_wave_mix_max(float a, float b, float k);
+#define PG_WAVE_MIX_MIN(...) \
+    ((struct pg_wave){ .type = PG_WAVE_MIX_FUNC, \
+                       .mix = pg_wave_mix_min, \
+                       .frequency = { 1, 1, 1, 1 }, .scale = 1, __VA_ARGS__ })
+#define PG_WAVE_MIX_MIN_ABS(...) \
+    ((struct pg_wave){ .type = PG_WAVE_MIX_FUNC, \
+                       .mix = pg_wave_mix_min_abs, \
+                       .frequency = { 1, 1, 1, 1 }, .scale = 1, __VA_ARGS__ })
+#define PG_WAVE_MIX_SMIN(...) \
+    ((struct pg_wave){ .type = PG_WAVE_MIX_FUNC, \
+                       .mix = pg_wave_mix_smin, \
+                       .frequency = { 1, 1, 1, 1 }, .scale = 1, __VA_ARGS__ })
+#define PG_WAVE_MIX_SMIN_ABS(k, ...) \
+    ((struct pg_wave){ .type = PG_WAVE_MIX_FUNC, .mix_k = k \
+                       .mix = pg_wave_mix_smin_abs,\
+                       .frequency = { 1, 1, 1, 1 }, .scale = 1, __VA_ARGS__ })
+#define PG_WAVE_MIX_MAX(...) \
+    ((struct pg_wave){ .type = PG_WAVE_MIX_FUNC, \
+                       .mix = pg_wave_mix_max, \
+                       .frequency = { 1, 1, 1, 1 }, .scale = 1, __VA_ARGS__ })
+#define PG_WAVE_MIX_MAX_ABS(...) \
+    ((struct pg_wave){ .type = PG_WAVE_MIX_FUNC, \
+                       .mix = pg_wave_mix_max_abs,\
+                       .frequency = { 1, 1, 1, 1 }, .scale = 1, __VA_ARGS__ })
+
+float pg_wave_mix_lerp(float a, float b, float k);
+#define PG_WAVE_MIX_LERP(...) \
+    ((struct pg_wave){ .type = PG_WAVE_MIX_FUNC, \
+                       .mix = pg_wave_mix_lerp, .mix_k = 0.5f,\
+                       .frequency = { 1, 1, 1, 1 }, .scale = 1, __VA_ARGS__ })
 
 /*  Built-in primitive functions    */
 #include "ext/noise1234.h"
@@ -84,7 +113,7 @@ void pg_wave_mix_lerp(float a, float b, float k);
         .scale = 1, .frequency = { 1, 1, 1, 1 }, \
         __VA_ARGS__ } )
 
-/*  Use PG_WAVE_MOD_EXPAND to get more out of these */
+/*  The 1D functions (use PG_WAVE_MOD_EXPAND to get more out of these)   */
 float pg_wave_sin1(float x);
 #define PG_WAVE_FUNC_SINE(...) \
     ( (struct pg_wave) { \
