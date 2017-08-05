@@ -55,8 +55,8 @@ static void vignette_color_func(vec4 out, vec2 p, struct pg_wave* wave)
 void bork_load_assets(struct bork_game_core* core)
 {
     /*  Loading the textures and setting the atlas dimensions   */
-    pg_texture_init_from_file(&core->font, "font_5x8.png", NULL);
-    pg_texture_set_atlas(&core->font, 5, 8);
+    pg_texture_init_from_file(&core->font, "font_8x8.png", NULL);
+    pg_texture_set_atlas(&core->font, 8, 8);
     pg_texture_bind(&core->font, 3, 4);
     pg_texture_init_from_file(&core->env_atlas, "res/env_atlas.png", "res/env_atlas_lightmap.png");
     pg_texture_set_atlas(&core->env_atlas, 32, 32);
@@ -82,10 +82,7 @@ void bork_load_assets(struct bork_game_core* core)
         PG_WAVE_FUNC_PERLIN(.frequency = { 4, 4, 4, 4 }, .phase = { seed }),
     };
     struct pg_wave vignette_wave[8] = {
-        PG_WAVE_MODULATE_PHASE(),
-            PG_WAVE_FUNC_PERLIN(.frequency = { 1, 1 }, .phase = { seed }, .scale = 1),
-            PG_WAVE_POP(),
-        PG_WAVE_FUNC_DISTANCE(.frequency = {1, 1}, .scale = 10, .add = -9),
+        PG_WAVE_FUNC_MAX(.frequency = {0.5, 1.4}, .scale = 10, .add = -9),
     };
     pg_texture_wave_to_colors(&core->backdrop_tex, &PG_WAVE_ARRAY(backdrop_wave, 8),
                               backdrop_color_func);

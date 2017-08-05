@@ -11,7 +11,7 @@ struct pg_shader_text {
 
 int pg_shader_text(struct pg_shader* shader);
 void pg_shader_text_resolution(struct pg_shader* shader, vec2 resolution);
-void pg_shader_text_ndc(struct pg_shader* shader);
+void pg_shader_text_ndc(struct pg_shader* shader, vec2 scale);
 void pg_shader_text_transform(struct pg_shader* shader, vec2 pos, vec2 size);
 void pg_shader_text_set_font(struct pg_shader* shader, struct pg_texture* tex);
 void pg_shader_text_write(struct pg_shader* shader, struct pg_shader_text* text);

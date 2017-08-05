@@ -43,7 +43,7 @@ struct bork_play_data {
             BORK_MENU_INVENTORY,
             BORK_MENU_CHARACTER,
         } state;
-        int selection_idx;
+        int selection_idx, scroll_idx;
     } menu;
     struct bork_entity* looked_item;
     int looked_idx;
@@ -124,6 +124,7 @@ static int bork_entity_sort_fn(const void* av, const void* bv)
 
 /*  Update code */
 static void tick_control_play(struct bork_play_data* d);
+static void tick_control_inv_menu(struct bork_play_data* d);
 static void tick_enemies(struct bork_play_data* d);
 static void tick_items(struct bork_play_data* d);
 static void tick_bullets(struct bork_play_data* d);
@@ -140,6 +141,7 @@ static void bork_play_tick(struct pg_game_state* state)
         }
     }
     if(d->menu.state == BORK_MENU_CLOSED) tick_control_play(d);
+    else if(d->menu.state == BORK_MENU_INVENTORY) tick_control_inv_menu(d);
     bork_update_inputs(d->core);
     /*  Player update   */
     if(d->menu.state == BORK_MENU_CLOSED) {
@@ -230,7 +232,7 @@ static void tick_control_play(struct bork_play_data* d)
         spherical_to_cartesian(item_dir, (vec2){ d->plr.dir[0] - M_PI,
                                                  d->plr.dir[1] - (M_PI * 0.5) });
         vec3_scale(item_dir, item_dir, 1);
-        struct bork_entity new_item = {
+        struct bork_entity new_item = { .name = "Test item",
             .active = 1, .type = BORK_ENTITY_ITEM,
             .size = { 0.5, 0.5, 0.5 } };
         vec3_dup(new_item.pos, d->plr.pos);
@@ -493,27 +495,92 @@ static void draw_light(struct bork_play_data* d, vec4 light, vec3 color)
     ARR_PUSH(d->lights_buf, new_light);
 }
 
+static void tick_control_inv_menu(struct bork_play_data* d)
+{
+    if(d->core->ctrl_state[BORK_CTRL_DOWN] == BORK_CONTROL_HIT) {
+        d->menu.selection_idx = MIN(d->menu.selection_idx + 1, d->inventory.len - 1);
+        if(d->menu.selection_idx >= d->menu.scroll_idx + 10) ++d->menu.scroll_idx;
+    }
+    if(d->core->ctrl_state[BORK_CTRL_UP] == BORK_CONTROL_HIT) {
+        d->menu.selection_idx = MAX(d->menu.selection_idx - 1, 0);
+        if(d->menu.selection_idx < d->menu.scroll_idx) --d->menu.scroll_idx;
+    }
+    if(d->core->ctrl_state[BORK_CTRL_BIND1] == BORK_CONTROL_HIT) {
+    }
+    if(d->core->ctrl_state[BORK_CTRL_BIND2] == BORK_CONTROL_HIT) {
+    }
+
+}
+
+static void fill_quickfetch_text(struct bork_play_data* d,
+                                 struct pg_shader_text* t, int tw, int th)
+{
+    *t = (struct pg_shader_text){
+        .use_blocks = 6,
+        .block = {
+            "QUICK", "FETCH",
+            "1", "2", "3", "4",
+        },
+        .block_style = {
+            { tw - 8, th - 4, 1, 1.25 }, { tw - 8, th - 2.5, 1, 1.25 },
+            { tw - 6, th - 8, 1, 1 }, { tw - 8, th - 7, 1, 1 },
+            { tw - 4, th - 7, 1, 1 }, { tw - 6, th - 6, 1, 1 },
+        },
+        .block_color = {
+            { 1, 1, 1, 1 }, { 1, 1, 1, 1 },
+            { 1, 1, 1, 1 }, { 1, 1, 1, 1 }, { 1, 1, 1, 1 }, { 1, 1, 1, 1 },
+        },
+    };
+};
+
+static void fill_inventory_text(struct bork_play_data* d,
+                                struct pg_shader_text* t, int tw, int th)
+{
+    int inv_len = MIN(10, d->inventory.len);
+    int inv_start = d->menu.scroll_idx;
+    *t = (struct pg_shader_text){
+        .use_blocks = inv_len + 1,
+        .block = {
+            "INVENTORY",
+        },
+        .block_style = {
+            { 3.5, 2.5, 2, 1.25 },
+        },
+        .block_color = {
+            { 1, 1, 1, 0.7 },
+        },
+    };
+    /*  Draw the inventory items by text    */
+    int i;
+    int ti = 1;
+    for(i = 0; i < inv_len; ++i, ++ti) {
+        struct bork_entity* item = &d->inventory.data[i + inv_start];
+        strncpy(t->block[ti], item->name, 64);
+        vec4_set(t->block_style[ti], 5, 7 + 2 * i, 1, 1.2);
+        vec4_set(t->block_color[ti], 1, 1, 1, 0.5);
+        if(i + inv_start == d->menu.selection_idx) t->block_style[ti][0] += 2;
+    }
+}
+
 static void draw_menu_inv(struct bork_play_data* d, float t)
 {
     struct pg_shader* shader = &d->core->shader_2d;
-    bork_draw_backdrop(d->core, (vec4){ 1, 1, 1, 0.5 }, t);
+    bork_draw_backdrop(d->core, (vec4){ 0.7, 0.7, 0.7, 0.7 }, t);
     bork_draw_linear_vignette(d->core, (vec4){ 0, 0, 0, 0.8 });
     shader = &d->core->shader_text;
-    pg_shader_text_resolution(shader, (vec2){ 1, 1 });
-    float font_ratio = d->core->font.frame_aspect_ratio / d->core->aspect_ratio;
+    struct pg_shader_text text = {};
+    pg_shader_text_resolution(shader, d->core->screen_size);
     if(!pg_shader_is_active(shader)) pg_shader_begin(shader, NULL);
-    pg_shader_text_transform(shader,
-        (vec2){ 0.1, 0.1 }, (vec2){ font_ratio * 0.05, 0.05 });
-    struct pg_shader_text text = { .use_blocks = 12 };
-    int i;
-    for(i = 0; i < 11; ++i) {
-        strncpy(text.block[i], "BORK!?", 64);
-        vec4_set(text.block_style[i], 2, 2 + 1.3 * i, 1, 1.2);
-        vec4_set(text.block_color[i], 1, 1, 1, 0.5);
-    }
-    strncpy(text.block[i], "INVENTORY", 64);
-    vec4_set(text.block_style[i], 0, 0, 1.5, 1.2);
-    vec4_set(text.block_color[i], 1, 1, 1, 0.5);
+    /*  Draw the QUICK-FETCH UI */
+    int text_res[2] = { floor(32 * d->core->aspect_ratio), 32 };
+    int screen_res[2] = { floor(d->core->screen_size[0] / text_res[0]),
+                          floor(d->core->screen_size[1] / text_res[1]) };
+    pg_shader_text_transform(shader, (vec2){ 0, 0 },
+                                     (vec2){ screen_res[0], screen_res[1] });
+    fill_quickfetch_text(d, &text, text_res[0], text_res[1]);
     pg_shader_text_write(shader, &text);
+    fill_inventory_text(d, &text, text_res[0], text_res[1]);
+    pg_shader_text_write(shader, &text);
+    //struct pg_shader_text text = { .use_blocks = 12 };
 
 }

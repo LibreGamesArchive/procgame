@@ -77,6 +77,36 @@ static void bork_menu_tick(struct pg_game_state* state)
     }
 }
 
+static struct pg_shader_text main_menu_text = {
+    .use_blocks = 9,
+    .block = {
+        "NEW GAME",
+        "CONTINUE",
+        "OPTIONS",
+        "CREDITS",
+        "EDITOR",
+        "EXIT",
+        "BORK", "OF", "DOOM!",
+    },
+    .block_style = {
+        {0.3, -0.5, 0.05, 1.2},
+        {0.3, -0.3, 0.05, 1.2},
+        {0.3, -0.1, 0.05, 1.2},
+        {0.3, 0.1, 0.05, 1.2},
+        {0.3, 0.3, 0.05, 1.2},
+        {0.3, 0.5, 0.05, 1.2},
+        /*  BORK OF DOOOOOM */
+        { -0.95, -0.1, 0.2, 1.1 },
+        { -0.9, 0.16, 0.05, 1.1 },
+        { -0.7, 0.12, 0.12, 1.1 },
+    },
+    .block_color = {
+        { 1, 1, 1, 1 }, { 1, 1, 1, 1 }, { 1, 1, 1, 1 },
+        { 1, 1, 1, 1 }, { 1, 1, 1, 1 }, { 1, 1, 1, 1 },
+        { 1, 1, 1, 0.7 }, { 1, 1, 1, 0.6 }, { 1, 0, 0, 1 },
+    },
+};
+
 static void bork_menu_draw(struct pg_game_state* state)
 {
     struct bork_menu_data* d = state->data;
@@ -85,31 +115,23 @@ static void bork_menu_draw(struct pg_game_state* state)
     struct pg_shader* shader = &d->core->shader_text;
     bork_draw_backdrop(d->core, (vec4){ 1, 1, 1, 1 },
                        (float)state->ticks / (float)state->tick_rate);
-    bork_draw_linear_vignette(d->core, (vec4){ 0.25, 0, 0, 0.5 });
-    /*  Using text in screen space [0,1]    */
-    pg_shader_text_resolution(shader, (vec2){ 1, 1 });
+    bork_draw_linear_vignette(d->core, (vec4){ 0, 0, 0, 1 });
+    pg_shader_text_ndc(shader, (vec2){d->core->aspect_ratio, 1});
     /*  Ratio to un-distort text in non-1:1 windows   */
-    float font_ratio = d->core->font.frame_aspect_ratio / d->core->aspect_ratio;
-    pg_shader_begin(shader, NULL);
-    pg_shader_text_transform(shader,
-        (vec2){ 0.6, 0.15 }, (vec2){ font_ratio * 0.05, 0.09 });
-    struct pg_shader_text menutext = { .use_blocks = BORK_MENU_COUNT + 1 };
+    float font_ratio = d->core->aspect_ratio / d->core->font.frame_aspect_ratio;
+    if(!pg_shader_is_active(shader)) pg_shader_begin(shader, NULL);
+    pg_shader_text_transform(shader, (vec2){ 0, 0 },
+                                     (vec2){ 1 / font_ratio, font_ratio });
     int i;
     for(i = 0; i < BORK_MENU_COUNT; ++i) {
-        strncpy(menutext.block[i], BORK_MENU_STRING[i], strlen(BORK_MENU_STRING[i]));
-        vec4_set(menutext.block_style[i], (d->current_selection == i) * 2, i * 1.4, 1, 1.2);
-        vec4_set(menutext.block_color[i], 1, 1, 1, 1);
+    //    strncpy(main_menu_text.block[i], BORK_MENU_STRING[i], strlen(BORK_MENU_STRING[i]));
+        vec4_set(main_menu_text.block_style[i],
+            (d->current_selection == i) * 0.15 + 0.1,
+            i * 0.1 - 0.25, 0.05, 1.2);
+        vec4_set(main_menu_text.block_color[i], 1, 1, 1, 1);
     }
-    pg_shader_text_write(shader, &menutext);
+    pg_shader_text_write(shader, &main_menu_text);
     /*  Title is drawn separately   */
-    float title_offset = 0.3 - font_ratio * 0.2 * 1.2 * 2;
-    pg_shader_text_transform(shader, (vec2){ title_offset, 0.3 }, (vec2){ 0.2 * font_ratio, 0.4 });
-    memset(menutext.block[0], 0, 64);
-    strncpy(menutext.block[0], "BORK", 4);
-    vec4_set(menutext.block_style[0], 0, 0, 1, 1.2);
-    vec4_set(menutext.block_color[0], 1, 1, 1, 0.5);
-    menutext.use_blocks = 1;
-    pg_shader_text_write(shader, &menutext);
     pg_shader_text_resolution(shader, d->core->screen_size);
     bork_draw_fps(d->core);
 }

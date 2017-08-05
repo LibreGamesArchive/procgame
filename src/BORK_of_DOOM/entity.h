@@ -1,6 +1,7 @@
 struct bork_map;
 
 struct bork_entity {
+    char name[32];
     vec3 pos;
     vec3 size;
     vec3 vel;
