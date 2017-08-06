@@ -44,9 +44,12 @@ void bork_bullet_move(struct bork_bullet* blt, struct bork_map* map)
         if(area >= BORK_AREA_EXTERIOR) continue;
         float closest = 100;
         struct bork_entity* closest_ent = NULL;
-        struct bork_entity* ent;
         int i;
-        ARR_FOREACH_PTR(map->enemies[area], ent, i) {
+        bork_entity_t ent_id;
+        struct bork_entity* ent;
+        ARR_FOREACH(map->enemies[area], ent_id, i) {
+            ent = bork_entity_get(ent_id);
+            if(!ent) continue;
             vec3 blt_to_ent;
             vec3_sub(blt_to_ent, blt->pos, ent->pos);
             float dist = vec3_len(blt_to_ent);
@@ -56,7 +59,7 @@ void bork_bullet_move(struct bork_bullet* blt, struct bork_map* map)
             }
         }
         if(closest_ent) {
-            closest_ent->dead = 1;
+            closest_ent->flags |= BORK_ENTFLAG_DEAD;
             blt->dead_ticks = 30;
             vec3_set(blt->dir, 0, 0, 0);
             vec3_set(blt->light_color, 2, 0.8, 0.8);

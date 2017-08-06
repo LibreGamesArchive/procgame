@@ -28,11 +28,11 @@ void bork_init(struct bork_game_core* core)
     /*  Get the models, textures, sounds, etc.*    */
     bork_load_assets(core);
     /*  Attach the font texture to the text shader  */
-    pg_shader_text_set_font(&core->shader_text, &core->font);
-    pg_shader_3d_set_texture(&core->shader_3d, &core->env_atlas);
-    pg_shader_2d_set_texture(&core->shader_2d, &core->editor_atlas);
-    pg_shader_sprite_set_texture(&core->shader_sprite, &core->bullet_tex);
-    pg_shader_sprite_set_tex_frame(&core->shader_sprite, 0);
+    pg_shader_text_font(&core->shader_text, &core->font);
+    pg_shader_3d_texture(&core->shader_3d, &core->env_atlas);
+    pg_shader_2d_texture(&core->shader_2d, &core->editor_atlas);
+    pg_shader_sprite_texture(&core->shader_sprite, &core->bullet_tex);
+    pg_shader_sprite_tex_frame(&core->shader_sprite, 0);
     /*  Set up the controls */
     int i;
     for(i = 0; i < BORK_CTRL_NULL; ++i) {
@@ -107,15 +107,15 @@ void bork_load_assets(struct bork_game_core* core)
     pg_shader_buffer_model(&core->shader_sprite, &core->bullet_model);
     mat4_scale_aniso(transform, transform, 1, 1, 0.5);
     pg_model_init(&core->gun_model);
-    pg_model_quad(&core->gun_model, (vec2){ 2, 1 });
+    pg_model_quad(&core->gun_model, (vec2){ 1, 1 });
     pg_model_transform(&core->gun_model, transform);
     pg_model_precalc_ntb(&core->gun_model);
     pg_shader_buffer_model(&core->shader_3d, &core->gun_model);
+    /*  Our basic 2d quad for drawing images   */
     pg_model_init(&core->quad_2d);
     pg_model_quad(&core->quad_2d, (vec2){ 1, 1 });
     mat4_identity(transform);
-    mat4_scale_aniso(transform, transform, 1, -1, 0);
-    mat4_translate_in_place(transform, 0.5, -0.5, 0);
+    mat4_scale_aniso(transform, transform, 2, -2, 0);
     pg_model_transform(&core->quad_2d, transform);
     pg_model_reserve_component(&core->quad_2d,
         PG_MODEL_COMPONENT_COLOR | PG_MODEL_COMPONENT_HEIGHT);
@@ -202,10 +202,12 @@ void bork_update_inputs(struct bork_game_core* core)
 void bork_draw_fps(struct bork_game_core* core)
 {
     struct pg_shader_text fps_text = { .use_blocks = 1 };
+    struct pg_shader* shader = &core->shader_text;
+    pg_shader_text_resolution(shader, core->screen_size);
     vec4_set(fps_text.block_style[0], 0, 0, 1, 1.2);
     vec4_set(fps_text.block_color[0], 1, 1, 1, 1);
     snprintf(fps_text.block[0], 10, "FPS: %d", (int)pg_framerate());
-    pg_shader_text_transform(&core->shader_text, (vec2){ 0, 0 }, (vec2){ 5, 8 });
+    pg_shader_text_transform(&core->shader_text, (vec2){ 0, 0 }, (vec2){ 8, 8 });
     pg_shader_text_write(&core->shader_text, &fps_text);
 }
 
@@ -219,19 +221,18 @@ void bork_draw_backdrop(struct bork_game_core* core, vec4 color_mod, float t)
     static float f[3] = { 0.01, -0.05, 0.1 };
     static float off[3] = { 2, 0.3, 0.5 };
     struct pg_shader* shader = &core->shader_2d;
-    pg_shader_2d_resolution(shader, (vec2){ 1, 1 });
-    pg_shader_2d_transform(shader, (vec2){}, (vec2){ 1, core->aspect_ratio }, 0);
-    pg_shader_2d_set_texture(shader, &core->backdrop_tex);
-    pg_shader_2d_set_tex_weight(shader, 1);
+    pg_shader_2d_resolution(shader, (vec2){ core->aspect_ratio, 1 });
+    pg_shader_2d_texture(shader, &core->backdrop_tex);
+    pg_shader_2d_tex_weight(shader, 1);
     if(!pg_shader_is_active(shader)) pg_shader_begin(shader, NULL);
+    pg_shader_2d_transform(shader, (vec2){}, (vec2){ core->aspect_ratio, 1 }, 0);
     pg_model_begin(&core->quad_2d, shader);
     int i;
     for(i = 0; i < 3; ++i) {
         vec4 c;
         vec4_mul(c, colors[i], color_mod);
-        pg_shader_2d_set_color_mod(shader, c);
-        pg_shader_2d_set_tex_scale(shader, (vec2){ 1, 1 });
-        pg_shader_2d_set_tex_offset(shader,
+        pg_shader_2d_color_mod(shader, c);
+        pg_shader_2d_tex_transform(shader, (vec2){ core->aspect_ratio, 1 },
            (vec2){ cos(t * f[i]) * off[i], sin(t * f[i]) * off[i] });
         pg_model_draw(&core->quad_2d, NULL);
     }
@@ -240,10 +241,10 @@ void bork_draw_backdrop(struct bork_game_core* core, vec4 color_mod, float t)
 void bork_draw_linear_vignette(struct bork_game_core* core, vec4 color_mod)
 {
     struct pg_shader* shader = &core->shader_2d;
-    pg_shader_2d_transform(shader, (vec2){}, (vec2){ 1, 1 }, 0);
-    pg_shader_2d_resolution(shader, (vec2){ 1, 1 });
-    pg_shader_2d_set_texture(shader, &core->menu_vignette);
-    pg_shader_2d_set_color_mod(shader, color_mod);
+    pg_shader_2d_ndc(shader, (vec2){ core->aspect_ratio, 1 });
+    pg_shader_2d_transform(shader, (vec2){}, (vec2){ core->aspect_ratio, 1 }, 0);
+    pg_shader_2d_texture(shader, &core->menu_vignette);
+    pg_shader_2d_color_mod(shader, color_mod);
     if(!pg_shader_is_active(shader)) pg_shader_begin(shader, NULL);
     pg_model_begin(&core->quad_2d, shader);
     pg_model_draw(&core->quad_2d, NULL);

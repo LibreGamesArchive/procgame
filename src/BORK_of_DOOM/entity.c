@@ -6,10 +6,39 @@
 #include "map_area.h"
 #include "physics.h"
 
+
+static ARR_T(struct bork_entity) ent_pool = {};
+
+bork_entity_t bork_entity_new(int n)
+{
+    int run = 1;
+    int i = 0;
+    int alloc = 0;
+    for(i = 0; i < ent_pool.cap; ++i) {
+        if(!(ent_pool.data[i].flags & BORK_ENTFLAG_DEAD)) continue;
+        run = 1;
+        while(run < n && run + i < ent_pool.cap
+        && (ent_pool.data[run + i].flags & BORK_ENTFLAG_DEAD)) ++run;
+        if(run < n) i += run - 1;
+        else break;
+    }
+    alloc = i + run - 1;
+    if(i == ent_pool.cap) ARR_RESERVE(ent_pool, ent_pool.cap + n);
+    for(i = 0; i < n; ++i) ent_pool.data[alloc + i].flags = 0;
+    return alloc;
+}
+
+struct bork_entity* bork_entity_get(bork_entity_t ent)
+{
+    if(ent >= ent_pool.cap || (ent_pool.data[ent].flags & BORK_ENTFLAG_DEAD) || ent < 0) return NULL;
+    return &ent_pool.data[ent];
+}
+
 void bork_entity_init(struct bork_entity* ent, vec3 size)
 {
     *ent = (struct bork_entity) {
         .size = { size[0], size[1], size[2] },
+        .sprite_tx = { 1, 1, 0, 0 }
     };
 }
 
@@ -21,7 +50,7 @@ void bork_entity_push(struct bork_entity* ent, vec3 push)
 void bork_entity_move(struct bork_entity* ent, struct bork_map* map);
 void bork_entity_update(struct bork_entity* ent, struct bork_map* map)
 {
-    if(ent->dead) return;
+    if(ent->flags & BORK_ENTFLAG_DEAD) return;
     switch(ent->type) {
     case BORK_ENTITY_PLAYER:
         bork_entity_move(ent, map);
@@ -31,7 +60,7 @@ void bork_entity_update(struct bork_entity* ent, struct bork_map* map)
         bork_entity_move(ent, map);
         break;
     case BORK_ENTITY_ITEM: {
-        if(!ent->active) return;
+        if(!(ent->flags & BORK_ENTFLAG_ACTIVE)) return;
         vec3 ent_pos;
         vec3_dup(ent_pos, ent->pos);
         vec3 move;
@@ -39,10 +68,10 @@ void bork_entity_update(struct bork_entity* ent, struct bork_map* map)
         vec3_sub(move, ent_pos, ent->pos);
         if(vec3_len(move) < 0.01) {
             ++ent->still_ticks;
-            if(ent->still_ticks >= 10) ent->active = 0;
+            if(ent->still_ticks >= 10) ent->flags &= ~BORK_ENTFLAG_ACTIVE;
         } else {
             ent->still_ticks = 0;
-            ent->active = 1;
+            ent->flags |= BORK_ENTFLAG_ACTIVE;
         }
         break;
     }
@@ -52,7 +81,7 @@ void bork_entity_update(struct bork_entity* ent, struct bork_map* map)
 
 void bork_entity_move(struct bork_entity* ent, struct bork_map* map)
 {
-    ent->ground = 0;
+    ent->flags &= ~BORK_ENTFLAG_GROUND;
     vec3_add(ent->vel, ent->vel, (vec3){ 0, 0, -0.02 });
     struct bork_collision coll = {};
     float curr_move = 0;
@@ -81,7 +110,7 @@ void bork_entity_move(struct bork_entity* ent, struct bork_map* map)
             }
             vec3_add(new_pos, new_pos, coll.push);
             float down_angle = vec3_angle_diff(coll.face_norm, PG_DIR_VEC[PG_UP]);
-            if(down_angle < 0.1 * M_PI) ent->ground = 1;
+            if(down_angle < 0.1 * M_PI) ent->flags |= BORK_ENTFLAG_GROUND;
             else if(coll.tile && coll.tile->type == BORK_TILE_LADDER) ladder = 1;
             ++hit;
         }
@@ -93,7 +122,7 @@ void bork_entity_move(struct bork_entity* ent, struct bork_map* map)
         if(ent->dir[1] >= 0) ent->vel[2] = 0.1;
         else ent->vel[2] = -0.05;
         friction = 1;
-    } else if(ent->ground) {
+    } else if(ent->flags & BORK_ENTFLAG_GROUND) {
         ent->vel[2] = 0;
         friction = 1;
     }

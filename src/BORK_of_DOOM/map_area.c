@@ -236,7 +236,7 @@ void bork_map_load_from_file(struct bork_map* map, char* filename)
                     } else if(tile->type == BORK_TILE_EDITOR_LIGHT1) {
                         struct bork_map_object new_obj = {
                             .type = BORK_MAP_OBJ_LIGHT,
-                            .light = { 2, 2, 2, 8 },
+                            .light = { 2, 2, 1.8, 8 },
                             .x = x, .y = y, .z = z };
                         ARR_PUSH(map->objects[area], new_obj);
                         tile->type = BORK_TILE_ATMO;
