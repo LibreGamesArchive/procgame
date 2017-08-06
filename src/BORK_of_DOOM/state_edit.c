@@ -7,13 +7,20 @@
 
 struct bork_editor_data {
     struct bork_game_core* core;
+    int userexit;
     const uint8_t* kb_state;
-    struct pg_model tile_quad;
     mat4 pixel_transform;
     struct bork_map map;
     enum bork_area current_area;
     struct bork_tile current_tile;
-    int select_mode;
+    enum {
+        BORK_EDIT_MAP,
+        BORK_EDIT_TILE_ITEMS,
+        BORK_EDIT_ITEM,
+    } edit_mode;
+
+    int item_selection;
+    int select_mode;    /*  Whether the selection is being drawn    */
     int selected_level;
     int selection[4];
     int cursor[2];
@@ -25,27 +32,12 @@ static void bork_editor_draw(struct pg_game_state* state);
 void bork_editor_start(struct pg_game_state* state, struct bork_game_core* core)
 {
     /*  Set up the game state, 60 ticks per second, keyboard input   */
-    pg_game_state_init(state, pg_time(), 0, 0);
+    pg_game_state_init(state, pg_time(), 60, 3);
     struct bork_editor_data* d = malloc(sizeof(*d));
     *d = (struct bork_editor_data) {
         .core = core,
         .kb_state = SDL_GetKeyboardState(NULL) };
     //SDL_SetRelativeMouseMode(SDL_TRUE);
-    /*  Generate the basic quad model   */
-    pg_model_init(&d->tile_quad);
-    pg_model_quad(&d->tile_quad, (vec2){ 1, 1 });
-    pg_model_reserve_component(&d->tile_quad,
-        PG_MODEL_COMPONENT_COLOR | PG_MODEL_COMPONENT_HEIGHT);
-    vec4_t* color;
-    float* f;
-    int i;
-    ARR_FOREACH_PTR(d->tile_quad.height, f, i) {
-        *f = 1.0f;
-    }
-    ARR_FOREACH_PTR(d->tile_quad.color, color, i) {
-        vec4_set(color->v, 1, 1, 1, 1);
-    }
-    pg_shader_buffer_model(&core->shader_2d, &d->tile_quad);
     /*  Init the map    */
     bork_map_init(&d->map, core);
     /*  Assign all the pointers, and it's finished  */
@@ -55,12 +47,11 @@ void bork_editor_start(struct pg_game_state* state, struct bork_game_core* core)
     state->deinit = free;
 }
 
-static void bork_editor_update(struct pg_game_state* state)
+static void bork_editor_update_map(struct bork_editor_data* d)
 {
-    struct bork_editor_data* d = state->data;
     SDL_Event e;
     while(SDL_PollEvent(&e)) {
-        if(e.type == SDL_QUIT) state->running = 0;
+        if(e.type == SDL_QUIT) d->userexit = 1;
         else if(e.type == SDL_KEYDOWN) {
             switch(e.key.keysym.scancode) {
             case SDL_SCANCODE_H:
@@ -138,6 +129,8 @@ static void bork_editor_update(struct pg_game_state* state)
                     }
                 }
                 break;
+            case SDL_SCANCODE_I:
+                
             default: break;
             }
         }
@@ -148,18 +141,69 @@ static void bork_editor_update(struct pg_game_state* state)
     }
 }
 
+static void bork_editor_update_tile_items(struct bork_editor_data* d)
+{
+    SDL_Event e;
+    while(SDL_PollEvent(&e)) {
+        if(e.type == SDL_QUIT) d->userexit = 1;
+        else if(e.type == SDL_KEYDOWN) {
+            switch(e.key.keysym.scancode) {
+            case SDL_SCANCODE_H:
+                break;
+            case SDL_SCANCODE_L:
+                break;
+            case SDL_SCANCODE_J:
+                d->item_selection = 0;
+                break;
+            case SDL_SCANCODE_K:
+                break;
+            case SDL_SCANCODE_V:
+                break;
+            case SDL_SCANCODE_U:
+                break;
+            case SDL_SCANCODE_D:
+                break;
+            case SDL_SCANCODE_W:
+                break;
+            case SDL_SCANCODE_SPACE:
+                break;
+            case SDL_SCANCODE_I:
+                break;
+            default: break;
+            }
+        }
+    }
+}
+
+static void bork_editor_update(struct pg_game_state* state)
+{
+    struct bork_editor_data* d = state->data;
+    switch(d->edit_mode) {
+    case BORK_EDIT_MAP: bork_editor_update_map(d); break;
+    case BORK_EDIT_TILE_ITEMS: bork_editor_update_tile_items(d); break;
+    //case BORK_EDIT_ITEM: bork_editor_update_item(d);
+    }
+    if(d->userexit) state->running = 0;
+}
+
 static void bork_editor_draw(struct pg_game_state* state)
 {
     struct bork_editor_data* d = state->data;
-    pg_screen_dst();
     struct pg_shader* shader = &d->core->shader_2d;
-    pg_shader_2d_resolution(shader, d->core->screen_size);
-    pg_shader_2d_set_texture(shader, &d->core->editor_atlas);
+    pg_screen_dst();
     pg_shader_begin(shader, NULL);
-    pg_model_begin(&d->tile_quad, shader);
-    pg_shader_2d_set_tex_weight(shader, 1.0f);
-    pg_shader_2d_set_tex_frame(shader, 2);
-    pg_shader_2d_set_color_mod(shader, (vec4){ 1, 1, 1, 1 });
+    bork_draw_backdrop(d->core, (vec4){ 1, 1, 1, 0.5 },
+        (float)state->ticks / (float)state->tick_rate);
+    bork_draw_linear_vignette(d->core, (vec4){ 0, 0, 0, 0.8 });
+    /*  Draw the map slice  */
+    shader = &d->core->shader_2d;
+    pg_shader_begin(shader, NULL);
+    pg_model_begin(&d->core->quad_2d, shader);
+    pg_shader_2d_resolution(shader, (vec2){ d->core->aspect_ratio, 1 });
+    pg_shader_2d_texture(shader, &d->core->editor_atlas);
+    pg_shader_2d_tex_weight(shader, 1.0f);
+    pg_shader_2d_tex_frame(shader, 2);
+    pg_shader_2d_color_mod(shader, (vec4){ 1, 1, 1, 1 });
     int select_rect[4] = {
         MIN(d->selection[0], d->selection[2]), MIN(d->selection[1], d->selection[3]),
         MAX(d->selection[0], d->selection[2]), MAX(d->selection[1], d->selection[3]) };
@@ -169,17 +213,17 @@ static void bork_editor_draw(struct pg_game_state* state)
             if(x == d->cursor[0] && y == d->cursor[1]) continue;
             struct bork_tile* tile = bork_map_tile_ptr(&d->map,
                 d->current_area, x, y, d->selected_level);
-            pg_shader_2d_set_tex_frame(&d->core->shader_2d, tile->type);
+            pg_shader_2d_tex_frame(&d->core->shader_2d, tile->type);
             if(x >= select_rect[0] && x <= select_rect[2]
             && y >= select_rect[1] && y <= select_rect[3]) {
-                pg_shader_2d_set_color_mod(&d->core->shader_2d, (vec4){ 1, 1, 1, 0.5 });
+                pg_shader_2d_color_mod(&d->core->shader_2d, (vec4){ 1, 1, 1, 0.5 });
             } else {
-                pg_shader_2d_set_color_mod(&d->core->shader_2d, (vec4){ 1, 1, 1, 1 });
+                pg_shader_2d_color_mod(&d->core->shader_2d, (vec4){ 1, 1, 1, 1 });
             }
             pg_shader_2d_transform(&d->core->shader_2d,
-                (vec2){x * 16 + 64, y * 16 + 32 },
-                (vec2){ 16, 16 }, 0);
-            pg_model_draw(&d->tile_quad, NULL);
+                (vec2){ 0.2 + 0.02 * x, 0.2 + 0.02 * y },
+                (vec2){ 0.01, 0.01 }, 0);
+            pg_model_draw(&d->core->quad_2d, NULL);
         }
     }
     /*  Get the stuff for the currently selected tile   */
@@ -188,50 +232,62 @@ static void bork_editor_draw(struct pg_game_state* state)
     const struct bork_tile_detail* detail = bork_tile_detail(tile->type);
     const struct bork_tile_detail* cursor_detail = bork_tile_detail(d->current_tile.type);
     /*  Draw the scaled-up view of the currently selected tile in the map   */
-    pg_shader_2d_set_tex_frame(&d->core->shader_2d, tile->type);
-    pg_shader_2d_set_color_mod(&d->core->shader_2d, (vec4){ 1, 1, 1, 1 });
+    pg_shader_2d_tex_frame(&d->core->shader_2d, d->current_tile.type);
+    pg_shader_2d_color_mod(&d->core->shader_2d, (vec4){ 1, 1, 1, 1 });
     pg_shader_2d_transform(&d->core->shader_2d,
-        (vec2){ d->cursor[0] * 16 + 64, d->cursor[1] * 16 + 32 },
-        (vec2){ 32, 32 }, 0);
-    pg_model_draw(&d->tile_quad, NULL);
+        (vec2){ d->cursor[0] * 0.02 + 0.2, d->cursor[1] * 0.02 + 0.2 },
+        (vec2){ 0.02, 0.02 }, 0);
+    pg_model_draw(&d->core->quad_2d, NULL);
     if(detail->tile_flags & BORK_TILE_HAS_ORIENTATION) {
         int i;
         for(i = 0; i < 4; ++i) {
             if(!(tile->orientation & (1 << i))) continue;
-            pg_shader_2d_set_tex_frame(&d->core->shader_2d, 252 + i);
-            pg_model_draw(&d->tile_quad, NULL);
+            pg_shader_2d_tex_frame(&d->core->shader_2d, 252 + i);
+            pg_model_draw(&d->core->quad_2d, NULL);
         }
     }
     /*  Draw the current "brush" tile   */
-    pg_shader_2d_set_tex_frame(&d->core->shader_2d, d->current_tile.type);
+    pg_shader_2d_tex_frame(&d->core->shader_2d, tile->type);
     pg_shader_2d_transform(&d->core->shader_2d,
-        (vec2){ 700, 128 }, (vec2){ 32, 32 }, 0);
-    pg_model_draw(&d->tile_quad, NULL);
+        (vec2){ 0.95, 0.2 }, (vec2){ 0.03, 0.03 }, 0);
+    pg_model_draw(&d->core->quad_2d, NULL);
     if(cursor_detail->tile_flags & BORK_TILE_HAS_ORIENTATION) {
         int i;
         for(i = 0; i < 4; ++i) {
             if(!(d->current_tile.orientation & (1 << i))) continue;
-            pg_shader_2d_set_tex_frame(&d->core->shader_2d, 252 + i);
-            pg_model_draw(&d->tile_quad, NULL);
+            pg_shader_2d_tex_frame(&d->core->shader_2d, 252 + i);
+            pg_model_draw(&d->core->quad_2d, NULL);
         }
     }
-    /*  Text    */
+    /*  Text UI */
     shader = &d->core->shader_text;
-    pg_shader_text_resolution(shader, d->core->screen_size);
     pg_shader_begin(shader, NULL);
-    pg_shader_text_transform(shader, (vec2){ 740, 40 }, (vec2){ 10, 16 });
+    pg_shader_text_resolution(shader, (vec2){ d->core->aspect_ratio, 1 });
+    pg_shader_text_transform(shader, (vec2){ 1, 1 }, (vec2){});
     /*  Right-side UI text  */
-    struct pg_shader_text text = { .use_blocks = 2 };
-    snprintf(text.block[0], 64, "%s : %d",
-             BORK_AREA_STRING[d->current_area], d->selected_level);
-    vec4_set(text.block_style[0], 0, 0, 2, 1.2);
+    struct pg_shader_text text = { .use_blocks = 7 };
+    snprintf(text.block[0], 64, "LEVEL: %d", d->selected_level);
+    vec4_set(text.block_style[0], 0.25, 0.1, 0.02, 1.2);
     vec4_set(text.block_color[0], 1, 1, 1, 1);
-    snprintf(text.block[1], 64, "%s", cursor_detail->name);
-    vec4_set(text.block_style[1], 0, 5, 1, 1.2);
-    vec4_set(text.block_color[1], 1, 0, 0, 1);
+    snprintf(text.block[1], 64, "TILE DETAIL: %s", detail->name);
+    vec4_set(text.block_style[1], 1, 0.2, 0.02, 1.2);
+    vec4_set(text.block_color[1], 1, 1, 1, 1);
+    snprintf(text.block[2], 64, "ITEMS: %d", 0);
+    vec4_set(text.block_style[2], 1, 0.23, 0.02, 1.2);
+    vec4_set(text.block_color[2], 1, 1, 1, 1);
+    snprintf(text.block[3], 64, "[HJKL] MOVE CURSOR        [U/D] CHANGE CURSOR TILE");
+    vec4_set(text.block_style[3], 0.25, 0.85, 0.02, 1.2);
+    vec4_set(text.block_color[3], 1, 1, 1, 1);
+    snprintf(text.block[4], 64, "[V] START/END SELECT      [SPACE] PLACE TILES");
+    vec4_set(text.block_style[4], 0.25, 0.88, 0.02, 1.2);
+    vec4_set(text.block_color[4], 1, 1, 1, 1);
+    snprintf(text.block[5], 64, "[CTRL-HJKL] SET DIRECTION [CTRL-SHIFT-HJKL] ADD DIRECTION");
+    vec4_set(text.block_style[5], 0.25, 0.91, 0.02, 1.2);
+    vec4_set(text.block_color[5], 1, 1, 1, 1);
+    snprintf(text.block[6], 64, "[CTRL-U/D] CHANGE LEVEL   [I] EDIT ITEMS");
+    vec4_set(text.block_style[6], 0.25, 0.94, 0.02, 1.2);
+    vec4_set(text.block_color[6], 1, 1, 1, 1);
     pg_shader_text_write(shader, &text);
-    /*  Write the FPS   */
     bork_draw_fps(d->core);
 }
-
 

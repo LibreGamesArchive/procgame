@@ -118,16 +118,13 @@ static void bork_menu_draw(struct pg_game_state* state)
     bork_draw_linear_vignette(d->core, (vec4){ 0, 0, 0, 1 });
     pg_shader_text_ndc(shader, (vec2){d->core->aspect_ratio, 1});
     /*  Ratio to un-distort text in non-1:1 windows   */
-    float font_ratio = d->core->aspect_ratio / d->core->font.frame_aspect_ratio;
     if(!pg_shader_is_active(shader)) pg_shader_begin(shader, NULL);
-    pg_shader_text_transform(shader, (vec2){ 0, 0 },
-                                     (vec2){ 1 / font_ratio, font_ratio });
+    pg_shader_text_transform(shader, (vec2){ 1, 1 }, (vec2){});
     int i;
     for(i = 0; i < BORK_MENU_COUNT; ++i) {
-    //    strncpy(main_menu_text.block[i], BORK_MENU_STRING[i], strlen(BORK_MENU_STRING[i]));
         vec4_set(main_menu_text.block_style[i],
             (d->current_selection == i) * 0.15 + 0.1,
-            i * 0.1 - 0.25, 0.05, 1.2);
+            i * 0.2 - 0.6, 0.075, 1.2);
         vec4_set(main_menu_text.block_color[i], 1, 1, 1, 1);
     }
     pg_shader_text_write(shader, &main_menu_text);
