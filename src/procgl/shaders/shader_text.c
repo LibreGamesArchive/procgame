@@ -69,14 +69,6 @@ int pg_shader_text(struct pg_shader* shader)
 
 void pg_shader_text_resolution(struct pg_shader* shader, vec2 resolution)
 {
-/*
-    mat4 tx;
-    mat4_identity(tx);
-    mat4_scale_aniso(tx, tx,
-        2 / resolution[0], -2 / resolution[1], 1);
-    mat4_translate_in_place(tx,
-        -resolution[0] / 2, -resolution[1] / 2, 0);
-    pg_shader_set_matrix(shader, PG_VIEW_MATRIX, tx);*/
     mat4 tx;
     mat4_ortho(tx, 0, resolution[0], resolution[1], 0, 0, 1);
     pg_shader_set_matrix(shader, PG_VIEW_MATRIX, tx);
@@ -85,21 +77,20 @@ void pg_shader_text_resolution(struct pg_shader* shader, vec2 resolution)
 void pg_shader_text_ndc(struct pg_shader* shader, vec2 scale)
 {
     mat4 tx;
-    mat4_identity(tx);
-    mat4_scale_aniso(tx, tx, scale[0], -scale[1], 0);
+    mat4_ortho(tx, -scale[0], scale[0], scale[1], -scale[1], 0, 1);
     pg_shader_set_matrix(shader, PG_VIEW_MATRIX, tx);
 }
 
-void pg_shader_text_transform(struct pg_shader* shader, vec2 pos, vec2 size)
+void pg_shader_text_transform(struct pg_shader* shader, vec2 scale, vec2 offset)
 {
     mat4 tx;
-    mat4_translate(tx, pos[0], pos[1], 0);
-    mat4_scale_aniso(tx, tx, size[0], size[1], 1);
+    mat4_translate(tx, offset[0], offset[1], 0);
+    mat4_scale_aniso(tx, tx, scale[0], scale[1], 1);
     pg_shader_set_matrix(shader, PG_MODEL_MATRIX, tx);
     pg_shader_rebuild_matrices(shader);
 }
 
-void pg_shader_text_set_font(struct pg_shader* shader, struct pg_texture* tex)
+void pg_shader_text_font(struct pg_shader* shader, struct pg_texture* tex)
 {
     struct data* d = shader->data;
     d->font = tex;

@@ -19,11 +19,11 @@ struct data_3d {
     int unis_dirty;
     struct {
         struct pg_texture* tex;
-        vec2 tex_scale, tex_offset;
+        vec4 tex_tx;
     } state;
     struct {
         GLint tex_unit, norm_unit;
-        GLint tex_scale, tex_offset;
+        GLint tex_tx;
     } unis;
 };
 
@@ -40,8 +40,7 @@ static void begin(struct pg_shader* shader, struct pg_viewer* view)
     if(d->unis_dirty) {
         glUniform1i(d->unis.tex_unit, d->state.tex->diffuse_slot);
         glUniform1i(d->unis.norm_unit, d->state.tex->light_slot);
-        glUniform2fv(d->unis.tex_offset, 1, d->state.tex_offset);
-        glUniform2fv(d->unis.tex_scale, 1, d->state.tex_scale);
+        glUniform4fv(d->unis.tex_tx, 1, d->state.tex_tx);
         d->unis_dirty = 0;
     }
     /*  Enable depth testing    */
@@ -77,11 +76,9 @@ int pg_shader_3d(struct pg_shader* shader)
     pg_shader_link_component(shader, PG_MODEL_COMPONENT_UV, "v_tex_coord");
     d->unis.tex_unit = glGetUniformLocation(shader->prog, "tex");
     d->unis.norm_unit = glGetUniformLocation(shader->prog, "norm");
-    d->unis.tex_scale = glGetUniformLocation(shader->prog, "tex_scale");
-    d->unis.tex_offset = glGetUniformLocation(shader->prog, "tex_offset");
+    d->unis.tex_tx = glGetUniformLocation(shader->prog, "tex_tx");
     d->unis_dirty = 1;
-    vec2_set(d->state.tex_scale, 1, 1);
-    vec2_set(d->state.tex_offset, 0, 0);
+    vec4_set(d->state.tex_tx, 1, 1, 0, 0);
     d->state.tex = 0;
     shader->data = d;
     shader->deinit = free;
@@ -92,11 +89,10 @@ int pg_shader_3d(struct pg_shader* shader)
     return 1;
 }
 
-void pg_shader_3d_set_texture(struct pg_shader* shader, struct pg_texture* tex)
+void pg_shader_3d_texture(struct pg_shader* shader, struct pg_texture* tex)
 {
     struct data_3d* d = shader->data;
-    pg_shader_3d_set_tex_offset(shader, (vec2){ 0, 0 });
-    pg_shader_3d_set_tex_scale(shader, (vec2){ 1, 1 });
+    pg_shader_3d_tex_transform(shader, (vec2){ 1, 1 }, (vec2){ 0, 0 });
     d->state.tex = tex;
     if(pg_shader_is_active(shader)) {
         glUniform1i(d->unis.tex_unit, tex->diffuse_slot);
@@ -105,25 +101,26 @@ void pg_shader_3d_set_texture(struct pg_shader* shader, struct pg_texture* tex)
     } else d->unis_dirty = 1;
 }
 
-void pg_shader_3d_set_tex_offset(struct pg_shader* shader, vec2 offset)
+void pg_shader_3d_tex_transform(struct pg_shader* shader, vec2 scale, vec2 offset)
 {
     struct data_3d* d = shader->data;
-    vec2_dup(d->state.tex_offset, offset);
+    vec4_set(d->state.tex_tx, scale[0], scale[1], offset[0], offset[1]);
     if(pg_shader_is_active(shader)) {
-        glUniform2fv(d->unis.tex_offset, 1, d->state.tex_offset);
+        glUniform4fv(d->unis.tex_tx, 1, d->state.tex_tx);
     } else d->unis_dirty = 1;
 }
 
-void pg_shader_3d_set_tex_scale(struct pg_shader* shader, vec2 scale)
+void pg_shader_3d_add_tex_tx(struct pg_shader* shader, vec2 scale, vec2 offset)
 {
     struct data_3d* d = shader->data;
-    vec2_dup(d->state.tex_scale, scale);
+    vec2_mul(d->state.tex_tx, d->state.tex_tx, scale);
+    vec2_add(d->state.tex_tx + 2, d->state.tex_tx + 2, offset);
     if(pg_shader_is_active(shader)) {
-        glUniform2fv(d->unis.tex_scale, 1, d->state.tex_scale);
+        glUniform4fv(d->unis.tex_tx, 1, d->state.tex_tx);
     } else d->unis_dirty = 1;
 }
 
-void pg_shader_3d_set_tex_frame(struct pg_shader* shader, int frame)
+void pg_shader_3d_tex_frame(struct pg_shader* shader, int frame)
 {
     struct data_3d* d = shader->data;
     int frames_wide = d->state.tex->w / d->state.tex->frame_w;
@@ -131,11 +128,9 @@ void pg_shader_3d_set_tex_frame(struct pg_shader* shader, int frame)
     float frame_v = (float)d->state.tex->frame_h / d->state.tex->h;
     float frame_x = (float)(frame % frames_wide) * frame_u;
     float frame_y = (float)(frame / frames_wide) * frame_v;
-    vec2_set(d->state.tex_offset, frame_x, frame_y);
-    vec2_set(d->state.tex_scale, frame_u, frame_v);
+    vec4_set(d->state.tex_tx, frame_u, frame_v, frame_x, frame_y);
     if(pg_shader_is_active(shader)) {
-        glUniform2fv(d->unis.tex_offset, 1, d->state.tex_offset);
-        glUniform2fv(d->unis.tex_scale, 1, d->state.tex_scale);
+        glUniform4fv(d->unis.tex_tx, 1, d->state.tex_tx);
     } else d->unis_dirty = 1;
 }
 

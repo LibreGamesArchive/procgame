@@ -4,8 +4,7 @@ uniform mat4 model_matrix;
 uniform mat4 normal_matrix;
 uniform mat4 view_matrix;
 uniform mat4 projview_matrix;
-uniform vec2 tex_scale;
-uniform vec2 tex_offset;
+uniform vec4 tex_tx;
 
 in vec3 v_position;
 in vec3 v_normal;
@@ -25,6 +24,6 @@ void main()
     f_normal = mat3(normal_matrix) * v_normal;
     f_tangent = mat3(normal_matrix) * v_tangent;
     f_bitangent = mat3(normal_matrix) * v_bitangent;
-    f_tex_coord = v_tex_coord * tex_scale + tex_offset;
+    f_tex_coord = v_tex_coord * tex_tx.xy + tex_tx.zw;
 }
 

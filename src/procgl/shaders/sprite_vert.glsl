@@ -6,8 +6,9 @@
 uniform mat4 view_matrix;
 uniform mat4 proj_matrix;
 uniform mat4 modelview_matrix;
-uniform vec2 tex_scale;
-uniform vec2 tex_offset;
+/*  Texture transformation, and sprite transformation (on screen)   */
+uniform vec4 sp_tx;
+uniform vec4 tex_tx;
 uniform int mode;
 
 in vec3 v_position;
@@ -41,8 +42,10 @@ void main()
         f_tangent = normalize(vec3(f_tangent.xy, 0));
         f_bitangent = vec3(0, 0, -1);
     }
-    gl_Position = proj_matrix * sprite_modelview * vec4(v_position, 1.0);
-    f_tex_coord = v_tex_coord * tex_scale + tex_offset;
+    gl_Position = proj_matrix * sprite_modelview *
+        vec4(v_position.x * sp_tx.x + sp_tx.z, 0.0,
+             v_position.z * sp_tx.y + sp_tx.w, 1.0);
+    f_tex_coord = v_tex_coord * tex_tx.xy + tex_tx.zw;
 }
 
 

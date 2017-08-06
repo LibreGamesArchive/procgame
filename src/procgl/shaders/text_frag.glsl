@@ -8,6 +8,5 @@ out vec4 frag_color;
 void main()
 {
     vec4 f = texture(font, f_tex) * f_color;
-    if(f.a < 0.5) discard;
     frag_color = f;
 }

@@ -20,15 +20,13 @@ struct data_2d {
     struct {
         struct pg_texture* tex;
         float tex_weight;
-        vec2 tex_offset;
-        vec2 tex_scale;
+        vec4 tex_tx;
         vec4 color_mod;
     } state;
     struct {
         GLint tex_unit;
         GLint tex_weight;
-        GLint tex_offset;
-        GLint tex_scale;
+        GLint tex_tx;
         GLint color_mod;
     } unis;
 };
@@ -40,8 +38,7 @@ static void begin(struct pg_shader* shader, struct pg_viewer* view)
     if(d->unis_dirty) {
         glUniform1i(d->unis.tex_unit, d->state.tex->diffuse_slot);
         glUniform1f(d->unis.tex_weight, d->state.tex_weight);
-        glUniform2fv(d->unis.tex_offset, 1, d->state.tex_offset);
-        glUniform2fv(d->unis.tex_scale, 1, d->state.tex_scale);
+        glUniform4fv(d->unis.tex_tx, 1, d->state.tex_tx);
         glUniform4fv(d->unis.color_mod, 1, d->state.color_mod);
         d->unis_dirty = 0;
     }
@@ -74,12 +71,10 @@ int pg_shader_2d(struct pg_shader* shader)
     d->state.tex = NULL;
     d->state.tex_weight = 1;
     vec4_set(d->state.color_mod, 1, 1, 1, 1);
-    vec2_set(d->state.tex_offset, 0, 0);
-    vec2_set(d->state.tex_scale, 1, 1);
+    vec4_set(d->state.tex_tx, 1, 1, 0, 0);
     d->unis.tex_unit = glGetUniformLocation(shader->prog, "tex");
     d->unis.tex_weight = glGetUniformLocation(shader->prog, "tex_weight");
-    d->unis.tex_offset = glGetUniformLocation(shader->prog, "tex_offset");
-    d->unis.tex_scale = glGetUniformLocation(shader->prog, "tex_scale");
+    d->unis.tex_tx = glGetUniformLocation(shader->prog, "tex_tx");
     d->unis.color_mod = glGetUniformLocation(shader->prog, "color_mod");
     d->unis_dirty = 1;
     shader->data = d;
@@ -94,45 +89,42 @@ int pg_shader_2d(struct pg_shader* shader)
 void pg_shader_2d_resolution(struct pg_shader* shader, vec2 resolution)
 {
     mat4 tx;
-    mat4_identity(tx);
-    mat4_scale_aniso(tx, tx,
-        2 / resolution[0], -2 / resolution[1], 1);
-    mat4_translate_in_place(tx,
-        -resolution[0] / 2, -resolution[1] / 2, 0);
+    mat4_ortho(tx, 0, resolution[0], resolution[1], 0, 0, 1);
     pg_shader_set_matrix(shader, PG_VIEW_MATRIX, tx);
 }
 
-void pg_shader_2d_ndc(struct pg_shader* shader)
+void pg_shader_2d_ndc(struct pg_shader* shader, vec2 scale)
 {
     mat4 tx;
-    mat4_identity(tx);
-    mat4_scale_aniso(tx, tx, 1, -1, 0);
+    mat4_ortho(tx, -scale[0], scale[0], scale[1], -scale[1], 0, 1);
     pg_shader_set_matrix(shader, PG_VIEW_MATRIX, tx);
 }
 
 void pg_shader_2d_transform(struct pg_shader* shader, vec2 pos, vec2 size,
                             float rotation)
 {
+    struct data_2d* d = shader->data;
     mat4 tx;
     mat4_translate(tx, pos[0], pos[1], 0);
     mat4_scale_aniso(tx, tx, size[0], size[1], 1);
     mat4_rotate_Z(tx, tx, rotation);
     pg_shader_set_matrix(shader, PG_MODEL_MATRIX, tx);
-    pg_shader_rebuild_matrices(shader);
+    if(pg_shader_is_active(shader)) {
+        pg_shader_rebuild_matrices(shader);
+    };
 }
 
-void pg_shader_2d_set_texture(struct pg_shader* shader, struct pg_texture* tex)
+void pg_shader_2d_texture(struct pg_shader* shader, struct pg_texture* tex)
 {
     struct data_2d* d = shader->data;
     d->state.tex = tex;
-    pg_shader_2d_set_tex_offset(shader, (vec2){ 0, 0 });
-    pg_shader_2d_set_tex_scale(shader, (vec2){ 1, 1 });
+    pg_shader_2d_tex_transform(shader, (vec2){ 1, 1 }, (vec2){});
     if(pg_shader_is_active(shader)) {
         glUniform1i(d->unis.tex_unit, tex->diffuse_slot);
     } else d->unis_dirty = 1;
 }
 
-void pg_shader_2d_set_tex_weight(struct pg_shader* shader, float weight)
+void pg_shader_2d_tex_weight(struct pg_shader* shader, float weight)
 {
     struct data_2d* d = shader->data;
     d->state.tex_weight = weight;
@@ -141,25 +133,26 @@ void pg_shader_2d_set_tex_weight(struct pg_shader* shader, float weight)
     } else d->unis_dirty = 1;
 }
 
-void pg_shader_2d_set_tex_offset(struct pg_shader* shader, vec2 offset)
+void pg_shader_2d_tex_transform(struct pg_shader* shader, vec2 scale, vec2 offset)
 {
     struct data_2d* d = shader->data;
-    vec2_dup(d->state.tex_offset, offset);
+    vec4_set(d->state.tex_tx, scale[0], scale[1], offset[0], offset[1]);
     if(pg_shader_is_active(shader)) {
-        glUniform2fv(d->unis.tex_offset, 1, d->state.tex_offset);
+        glUniform4fv(d->unis.tex_tx, 1, d->state.tex_tx);
     } else d->unis_dirty = 1;
 }
 
-void pg_shader_2d_set_tex_scale(struct pg_shader* shader, vec2 scale)
+void pg_shader_2d_add_tex_tx(struct pg_shader* shader, vec2 scale, vec2 offset)
 {
     struct data_2d* d = shader->data;
-    vec2_dup(d->state.tex_scale, scale);
+    vec2_mul(d->state.tex_tx, d->state.tex_tx, scale);
+    vec2_add(d->state.tex_tx + 2, d->state.tex_tx + 2, offset);
     if(pg_shader_is_active(shader)) {
-        glUniform2fv(d->unis.tex_scale, 1, d->state.tex_scale);
+        glUniform4fv(d->unis.tex_tx, 1, d->state.tex_tx);
     } else d->unis_dirty = 1;
 }
 
-void pg_shader_2d_set_tex_frame(struct pg_shader* shader, int frame)
+void pg_shader_2d_tex_frame(struct pg_shader* shader, int frame)
 {
     struct data_2d* d = shader->data;
     int frames_wide = d->state.tex->w / d->state.tex->frame_w;
@@ -167,15 +160,13 @@ void pg_shader_2d_set_tex_frame(struct pg_shader* shader, int frame)
     float frame_v = (float)d->state.tex->frame_h / d->state.tex->h;
     float frame_x = (float)(frame % frames_wide) * frame_u;
     float frame_y = (float)(frame / frames_wide) * frame_v;
-    vec2_set(d->state.tex_offset, frame_x, frame_y);
-    vec2_set(d->state.tex_scale, frame_u, frame_v);
+    vec4_set(d->state.tex_tx, frame_u, frame_v, frame_x, frame_y);
     if(pg_shader_is_active(shader)) {
-        glUniform2fv(d->unis.tex_offset, 1, d->state.tex_offset);
-        glUniform2fv(d->unis.tex_scale, 1, d->state.tex_scale);
+        glUniform4fv(d->unis.tex_tx, 1, d->state.tex_tx);
     } else d->unis_dirty = 1;
 }
 
-void pg_shader_2d_set_color_mod(struct pg_shader* shader, vec4 color)
+void pg_shader_2d_color_mod(struct pg_shader* shader, vec4 color)
 {
     struct data_2d* d = shader->data;
     vec4_dup(d->state.color_mod, color);
