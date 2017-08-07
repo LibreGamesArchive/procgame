@@ -6,6 +6,7 @@
 #include "map_area.h"
 #include "bullet.h"
 #include "physics.h"
+#include "game_states.h"
 
 /*  The Big Orbital Nonhuman Zone or "BONZ" consists of some main parts:
     Microgravity Utility Transit Tunnel (MUTT)
@@ -23,39 +24,6 @@
     widths based on the shape of the overall station, except for the MUTT
     which runs all the way along the length of the station on the inside. */
 
-struct bork_light {
-    vec4 pos;
-    vec3 color;
-};
-
-struct bork_play_data {
-    /*  Core data   */
-    struct bork_game_core* core;
-    ARR_T(struct bork_light) lights_buf;    /*  Updated per frame   */
-    /*  Gameplay data   */
-    struct bork_map map;
-    enum bork_area current_area;
-    struct bork_entity plr;
-    float player_speed;
-    int held_item;
-    int quick_item[4];
-    ARR_T(bork_entity_t) inventory;
-    ARR_T(struct bork_bullet) bullets;
-    /*  Input states    */
-    const uint8_t* kb_state;
-    vec2 mouse_motion;
-    struct {
-        enum {
-            BORK_MENU_CLOSED,
-            BORK_MENU_INVENTORY,
-            BORK_MENU_CHARACTER,
-        } state;
-        int selection_idx, scroll_idx;
-    } menu;
-    bork_entity_t looked_item;
-    int looked_idx;
-};
-
 static void bork_play_update(struct pg_game_state* state);
 static void bork_play_tick(struct pg_game_state* state);
 static void bork_play_draw(struct pg_game_state* state);
@@ -66,6 +34,7 @@ static void bork_play_deinit(void* data)
     bork_map_deinit(&d->map);
     free(d);
 }
+
 void bork_play_start(struct pg_game_state* state, struct bork_game_core* core)
 {
     /*  Set up the game state, 60 ticks per second, keyboard input   */
@@ -76,11 +45,9 @@ void bork_play_start(struct pg_game_state* state, struct bork_game_core* core)
         .kb_state = SDL_GetKeyboardState(NULL),
         .menu.state = BORK_MENU_CLOSED,
         .player_speed = 0.02,
-        .current_area = 0,
         .held_item = -1,
         .quick_item = { -1, -1, -1, -1 },
     };
-    SDL_SetRelativeMouseMode(SDL_TRUE);
     /*  Initialize the player   */
     bork_entity_init(&d->plr, (vec3){ 0.5, 0.5, 0.9 });
     ARR_INIT(d->bullets);
@@ -88,9 +55,10 @@ void bork_play_start(struct pg_game_state* state, struct bork_game_core* core)
     ARR_INIT(d->inventory);
     vec3_set(d->plr.pos, 32, 32, 40);
     /*  Generate the BONZ station   */
-    bork_map_init(&d->map, core);
-    bork_map_load_from_file(&d->map, "test.bork_map");
-    bork_map_init_model(&d->map);
+    struct bork_editor_map ed_map = {};
+    bork_editor_load_map(&ed_map, "test.bork_map");
+    bork_editor_complete_map(&d->map, &ed_map);
+    bork_map_init_model(&d->map, core);
     pg_shader_buffer_model(&d->core->shader_sprite, &d->map.door_model);
     d->map.plr = &d->plr,
     /*  Initialize the player data  */
@@ -100,6 +68,7 @@ void bork_play_start(struct pg_game_state* state, struct bork_game_core* core)
     state->tick = bork_play_tick;
     state->draw = bork_play_draw;
     state->deinit = bork_play_deinit;
+    SDL_SetRelativeMouseMode(SDL_TRUE);
 }
 
 static void bork_play_update(struct pg_game_state* state)
@@ -160,7 +129,7 @@ static void bork_play_tick(struct pg_game_state* state)
         vec2_set(d->mouse_motion, 0, 0);
         bork_entity_update(&d->plr, &d->map);
         /*  Everything else update  */
-        bork_map_update_area(&d->map, 0, &d->plr);
+        bork_map_update(&d->map, &d->plr);
         tick_bullets(d);
         tick_enemies(d);
         tick_items(d);
@@ -175,7 +144,7 @@ static void bork_play_tick(struct pg_game_state* state)
         bork_entity_t ent_id;
         struct bork_entity* ent;
         float closest_angle = 0.2f, closest_dist = 2.5f;
-        ARR_FOREACH(d->map.items[d->current_area], ent_id, i) {
+        ARR_FOREACH(d->map.items, ent_id, i) {
             ent = bork_entity_get(ent_id);
             if(!ent) continue;
             ent->flags &= ~BORK_ENTFLAG_LOOKED_AT;
@@ -206,7 +175,7 @@ static void tick_control_play(struct bork_play_data* d)
         if(item) {
             item->flags &= ~BORK_ENTFLAG_LOOKED_AT;
             ARR_PUSH(d->inventory, d->looked_item);
-            ARR_SWAPSPLICE(d->map.items[d->current_area], d->looked_idx, 1);
+            ARR_SWAPSPLICE(d->map.items, d->looked_idx, 1);
         }
     }
     if(d->core->ctrl_state[BORK_CTRL_JUMP] == BORK_CONTROL_HIT && d->plr.flags & BORK_ENTFLAG_GROUND) {
@@ -230,7 +199,7 @@ static void tick_control_play(struct bork_play_data* d)
                 .pos = { d->plr.pos[0], d->plr.pos[1], d->plr.pos[2] },
             };
         }
-        ARR_PUSH(d->map.items[d->current_area], new_id);
+        ARR_PUSH(d->map.items, new_id);
     }
     float move_speed = d->player_speed * (d->plr.flags & BORK_ENTFLAG_GROUND ? 1 : 0.15);
     if(d->core->ctrl_state[BORK_CTRL_LEFT]) {
@@ -278,10 +247,10 @@ static void tick_enemies(struct bork_play_data* d)
     int i;
     bork_entity_t ent_id;
     struct bork_entity* ent;
-    ARR_FOREACH_REV(d->map.enemies[d->current_area], ent_id, i) {
+    ARR_FOREACH_REV(d->map.enemies, ent_id, i) {
         ent = bork_entity_get(ent_id);
         if(!ent) {
-            ARR_SWAPSPLICE(d->map.enemies[d->current_area], i, 1);
+            ARR_SWAPSPLICE(d->map.enemies, i, 1);
             continue;
         }
         bork_entity_update(ent, &d->map);
@@ -293,10 +262,10 @@ static void tick_items(struct bork_play_data* d)
     int i;
     bork_entity_t ent_id;
     struct bork_entity* ent;
-    ARR_FOREACH_REV(d->map.items[d->current_area], ent_id, i) {
+    ARR_FOREACH_REV(d->map.items, ent_id, i) {
         ent = bork_entity_get(ent_id);
         if(!ent) {
-            ARR_SWAPSPLICE(d->map.items[d->current_area], i, 1);
+            ARR_SWAPSPLICE(d->map.items, i, 1);
             continue;
         }
         bork_entity_update(ent, &d->map);
@@ -350,7 +319,7 @@ static void bork_play_draw(struct pg_game_state* state)
     draw_items(d, t);
     draw_bullets(d, t);
     pg_shader_3d_texture(&d->core->shader_3d, &d->core->env_atlas);
-    bork_map_draw_area(&d->map, d->current_area);
+    bork_map_draw(&d->map, d->core);
     draw_map_lights(d);
     /*  Lighting    */
     pg_gbuffer_begin_light(&d->core->gbuf, &d->core->view);
@@ -416,13 +385,13 @@ static void draw_enemies(struct bork_play_data* d, float lerp)
     vec3_dup(plr_pos, d->plr.pos);
     pg_shader_sprite_mode(shader, PG_SPRITE_CYLINDRICAL);
     pg_shader_sprite_transform(shader, (vec2){ 1, 1 }, (vec2){ 0, 0 });
-    pg_shader_sprite_texture(shader, &map->core->env_atlas);
+    pg_shader_sprite_texture(shader, &d->core->env_atlas);
     pg_model_begin(model, shader);
     int current_frame = 0;
     int i;
     struct bork_entity* ent;
     bork_entity_t ent_id;
-    ARR_FOREACH(map->enemies[d->current_area], ent_id, i) {
+    ARR_FOREACH(map->enemies, ent_id, i) {
         ent = bork_entity_get(ent_id);
         if(ent->flags & BORK_ENTFLAG_DEAD) continue;
         /*  Figure out which directional frame to draw  */
@@ -464,7 +433,7 @@ static void draw_items(struct bork_play_data* d, float lerp)
     int i;
     struct bork_entity* ent;
     bork_entity_t ent_id;
-    ARR_FOREACH(map->items[d->current_area], ent_id, i) {
+    ARR_FOREACH(map->items, ent_id, i) {
         ent = bork_entity_get(ent_id);
         if(ent->flags & BORK_ENTFLAG_DEAD) continue;
         if(ent->front_frame != current_frame) {
@@ -519,7 +488,7 @@ static void draw_map_lights(struct bork_play_data* d)
 {
     int i;
     struct bork_map_object* obj;
-    ARR_FOREACH_PTR(d->map.objects[d->current_area], obj, i) {
+    ARR_FOREACH_PTR(d->map.objects, obj, i) {
         vec4 light = { obj->x * 2.0f + 1.0f,
                        obj->y * 2.0f + 1.0f,
                        obj->z * 2.0f + 1.5f, obj->light[3] };

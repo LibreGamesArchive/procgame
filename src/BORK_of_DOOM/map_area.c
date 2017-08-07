@@ -5,29 +5,14 @@
 #include "bork.h"
 #include "entity.h"
 #include "map_area.h"
+#include "game_states.h"
 
 #define BORK_AREA_FLAG_SQUARE   (1 << 0)
 
-/*  Area generation range definitions   */
-static struct bork_area_detail {
-    uint32_t flags;
-    int w[2];   /*  range of lateral sizes in tiles */
-    int h[2];   /*  range of heights in FLOORS (2-3 tile height)    */
-} BORK_AREA_DETAILS[] = {
-    [BORK_AREA_PETS] = {            .w = { 12, 16 }, .h = { 3, 5 },
-        .flags = BORK_AREA_FLAG_SQUARE },
-    [BORK_AREA_WAREHOUSE] = {       .w = { 26, 30 }, .h = { 4, 6 } },
-    [BORK_AREA_CAFETERIA] = {       .w = { 20, 24 }, .h = { 4, 6 } },
-    [BORK_AREA_REC_CENTER] = {      .w = { 20, 24 }, .h = { 2, 3 } },
-    [BORK_AREA_INFIRMARY] = {       .w = { 14, 18 }, .h = { 2, 3 } },
-    [BORK_AREA_SCIENCE_LABS] = {    .w = { 14, 18 }, .h = { 2, 3 } },
-    [BORK_AREA_COMMAND] = {         .w = { 12, 16 }, .h = { 2, 3 },
-        .flags = BORK_AREA_FLAG_SQUARE }
-};
-
-/*  Tile model generation function declarations */
-static void bork_map_generate_area_model(struct bork_map* map, enum bork_area area);
-static int tile_model_basic(struct bork_map*, enum bork_area, struct bork_tile*, int, int, int);
+static int tile_model_basic(struct bork_map*, struct pg_texture*,
+                            struct bork_tile*, int, int, int);
+static void bork_map_generate_model(struct bork_map* map,
+                                    struct pg_texture* env_atlas);
 
 /*  Tile details */
 struct bork_tile_detail BORK_TILE_DETAILS[] = {
@@ -87,59 +72,47 @@ const struct bork_tile_detail* bork_tile_detail(enum bork_tile_type type)
 }
 
 /*  Public interface    */
-void bork_map_init(struct bork_map* map, struct bork_game_core* core)
+void bork_map_init(struct bork_map* map)
 {
-    map->core = core;
-    int i;
-    for(i = 0; i < BORK_AREA_EXTERIOR; ++i) {
-        map->area_pos[i][0] = 0;
-        map->area_pos[i][1] = 0;
-        map->area_pos[i][2] = i * 32;
-        map->data[i] = calloc(32 * 32 * 32, sizeof(struct bork_tile));
-        ARR_INIT(map->objects[i]);
-        ARR_INIT(map->enemies[i]);
-        ARR_INIT(map->items[i]);
-    }
+    *map = (struct bork_map){};
 }
 
-void bork_map_init_model(struct bork_map* map)
+void bork_map_init_model(struct bork_map* map, struct bork_game_core* core)
 {
-    int i;
-    for(i = 0; i < BORK_AREA_EXTERIOR; ++i) {
-        pg_model_init(&map->area_model[i]);
-        bork_map_generate_area_model(map, i);
-        pg_shader_buffer_model(&map->core->shader_3d, &map->area_model[i]);
-    }
+    /*  Generate the map model  */
+    pg_model_init(&map->model);
+    bork_map_generate_model(map, &core->env_atlas);
+    pg_shader_buffer_model(&core->shader_3d, &map->model);
+    /*  And the door model  */
     pg_model_init(&map->door_model);
+    int i;
     vec4 face_uv[6];
     for(i = 0; i < 6; ++i) {
-        pg_texture_get_frame(&map->core->env_atlas, 2, face_uv[i], face_uv[i] + 2);
+        pg_texture_get_frame(&core->env_atlas, 2, face_uv[i], face_uv[i] + 2);
     }
     pg_model_rect_prism(&map->door_model, (vec3){ 1, 0.1, 1 }, face_uv);
     pg_model_precalc_ntb(&map->door_model);
-    pg_shader_buffer_model(&map->core->shader_3d, &map->door_model);
+    pg_shader_buffer_model(&core->shader_3d, &map->door_model);
 }
 
 void bork_map_deinit(struct bork_map* map)
 {
-    int i;
-    for(i = 0; i < BORK_AREA_EXTERIOR; ++i) {
-        free(map->data[i]);
-        pg_model_deinit(&map->area_model[i]);
-    }
+    pg_model_deinit(&map->model);
+    pg_model_deinit(&map->door_model);
+    ARR_DEINIT(map->objects);
+    ARR_DEINIT(map->enemies);
+    ARR_DEINIT(map->items);
 }
 
-void bork_map_update_area(struct bork_map* map, enum bork_area area,
-                          struct bork_entity* plr)
+void bork_map_update(struct bork_map* map, struct bork_entity* plr)
 {
     struct bork_map_object* obj;
     int i;
-    ARR_FOREACH_PTR(map->objects[area], obj, i) {
+    ARR_FOREACH_PTR(map->objects, obj, i) {
         if(obj->type == BORK_MAP_OBJ_DOOR) {
-            vec3 obj_pos = {
-                (map->area_pos[area][0] + obj->x) * 2.0f + 1.0f,
-                (map->area_pos[area][1] + obj->y) * 2.0f + 1.0f,
-                (map->area_pos[area][2] + obj->z) * 2.0f + 1.0f };
+            vec3 obj_pos = { obj->x * 2.0f + 1.0f,
+                             obj->y * 2.0f + 1.0f,
+                             obj->z * 2.0f + 1.0f };
             vec3 plr_to_door;
             vec3_sub(plr_to_door, obj_pos, plr->pos);
             float dist = vec3_len(plr_to_door);
@@ -154,120 +127,67 @@ void bork_map_update_area(struct bork_map* map, enum bork_area area,
     }
 }
 
-void bork_map_draw_area(struct bork_map* map, enum bork_area area)
+void bork_map_draw(struct bork_map* map, struct bork_game_core* core)
 {
-    pg_shader_begin(&map->core->shader_3d, &map->core->view);
+    pg_shader_begin(&core->shader_3d, &core->view);
     /*  Draw the base level geometry    */
-    pg_model_begin(&map->area_model[area], &map->core->shader_3d);
+    pg_model_begin(&map->model, &core->shader_3d);
     mat4 model_transform;
-    mat4_translate(model_transform,
-                   map->area_pos[area][0] * 2.0f,
-                   map->area_pos[area][1] * 2.0f,
-                   map->area_pos[area][2] * 2.0f);
-    pg_model_draw(&map->area_model[area], model_transform);
+    mat4_translate(model_transform, 0, 0, 0);
+    pg_model_draw(&map->model, model_transform);
     /*  Then draw the map objects (except lights)   */
     int i;
     struct bork_map_object* obj;
-    pg_model_begin(&map->door_model, &map->core->shader_3d);
-    ARR_FOREACH_PTR(map->objects[area], obj, i) {
+    pg_model_begin(&map->door_model, &core->shader_3d);
+    ARR_FOREACH_PTR(map->objects, obj, i) {
         if(obj->type == BORK_MAP_OBJ_DOOR) {
             mat4_translate(model_transform,
-                (map->area_pos[area][0] + obj->x) * 2.0f + 1.0f,
-                (map->area_pos[area][1] + obj->y) * 2.0f + 1.0f,
-                (map->area_pos[area][2] + obj->z) * 2.0f + 1.0f + obj->door.pos);
+                           obj->x * 2.0f + 1.0f,
+                           obj->y * 2.0f + 1.0f,
+                           obj->z * 2.0f + 1.0f + obj->door.pos);
             if(obj->door.dir) mat4_rotate_Z(model_transform, model_transform, M_PI * 0.5);
             pg_model_draw(&map->door_model, model_transform);
         }
     }
 }
 
-enum bork_area bork_map_get_area(struct bork_map* map, int x, int y, int z)
+struct bork_tile* bork_map_tile_ptr(struct bork_map* map, vec3 pos)
 {
-    int i;
-    for(i = 0; i < BORK_AREA_EXTERIOR; ++i) {
-        if(x >= map->area_pos[i][0] && x < map->area_pos[i][0] + 32
-        && y >= map->area_pos[i][1] && y < map->area_pos[i][1] + 32
-        && z >= map->area_pos[i][2] && z < map->area_pos[i][2] + 32)
-            return i;
-    }
-    return BORK_AREA_EXTERIOR;
-}
-
-struct bork_tile* bork_map_tile_ptr(struct bork_map* map, enum bork_area area,
-                                    int x, int y, int z)
-{
+    int x = (int)(pos[0] * 0.5f);
+    int y = (int)(pos[1] * 0.5f);
+    int z = (int)(pos[2] * 0.5f);
     if(x >= 0 && x < 32 && y >= 0 && y < 32 && z >= 0 && z < 32)
-        return &map->data[area][x + y * 32 + z * 32 * 32];
+        return &map->data[x][y][z];
     else return NULL;
 }
 
-void bork_map_write_to_file(struct bork_map* map, char* filename)
+struct bork_tile* bork_map_tile_ptri(struct bork_map* map, int x, int y, int z)
 {
-    FILE* file = fopen(filename, "w");
-    if(!file) {
-        printf("BORK map writing error: could not open file %s\n", filename);
-    }
-    int area;
-    for(area = 0; area < BORK_AREA_EXTERIOR; ++area) {
-        fwrite(map->data[area], sizeof(struct bork_tile), 32 * 32 *32, file);
-    }
-    fclose(file);
-}
-
-void bork_map_load_from_file(struct bork_map* map, char* filename)
-{
-    FILE* file = fopen(filename, "r");
-    if(!file) {
-        printf("BORK map loading error: could not open file %s\n", filename);
-    }
-    int area, x, y, z;
-    for(area = 0; area < BORK_AREA_EXTERIOR; ++area) {
-        fread(map->data[area], sizeof(struct bork_tile), 32 * 32 * 32, file);
-        for(x = 0; x < 32; ++x) {
-            for(y = 0; y < 32; ++y) {
-                for(z = 0; z < 32; ++z) {
-                    struct bork_tile* tile = bork_map_tile_ptr(map, area, x, y, z);
-                    if(tile->type == BORK_TILE_EDITOR_DOOR) {
-                        struct bork_map_object new_obj = {
-                            .type = BORK_MAP_OBJ_DOOR, .x = x, .y = y, .z = z };
-                        if(tile->orientation & ((1 << PG_LEFT) | (1 << PG_RIGHT))) new_obj.door.dir = 1;
-                        ARR_PUSH(map->objects[area], new_obj);
-                        tile->type = BORK_TILE_ATMO;
-                    } else if(tile->type == BORK_TILE_EDITOR_LIGHT1) {
-                        struct bork_map_object new_obj = {
-                            .type = BORK_MAP_OBJ_LIGHT,
-                            .light = { 2, 2, 1.8, 8 },
-                            .x = x, .y = y, .z = z };
-                        ARR_PUSH(map->objects[area], new_obj);
-                        tile->type = BORK_TILE_ATMO;
-                    }
-                }
-            }
-        }
-    }
-    fclose(file);
+    if(x >= 0 && x < 32 && y >= 0 && y < 32 && z >= 0 && z < 32)
+        return &map->data[x][y][z];
+    else return NULL;
 }
 
 /*  Model generation code   */
 
-static void bork_map_generate_area_model(struct bork_map* map, enum bork_area area)
+static void bork_map_generate_model(struct bork_map* map, struct pg_texture* env_atlas)
 {
-    pg_model_reset(&map->area_model[area]);
-    map->area_model[area].components = PG_MODEL_COMPONENT_POSITION | PG_MODEL_COMPONENT_UV;
+    pg_model_init(&map->model);
+    map->model.components = PG_MODEL_COMPONENT_POSITION | PG_MODEL_COMPONENT_UV;
     struct bork_tile* tile;
     int x, y, z;
     for(x = 0; x < 32; ++x) {
         for(y = 0; y < 32; ++y) {
             for(z = 0; z < 32; ++z) {
-                tile = bork_map_tile_ptr(map, area, x, y, z);
+                tile = &map->data[x][y][z];
                 if(!tile || tile->type < 2) continue;
                 struct bork_tile_detail* detail = &BORK_TILE_DETAILS[tile->type];
-                tile->model_tri_idx = map->area_model[area].tris.len;
-                tile->num_tris = detail->add_model(map, area, tile, x, y, z);
+                tile->model_tri_idx = map->model.tris.len;
+                tile->num_tris = detail->add_model(map, env_atlas, tile, x, y, z);
             }
         }
     }
-    pg_model_precalc_ntb(&map->area_model[area]);
+    pg_model_precalc_ntb(&map->model);
 }
 
 /*  Generating geometry for individual tiles    */
@@ -298,7 +218,7 @@ static const vec3 vert_pos[6][4] = {
       { -0.5, 0.5, -0.5 },
       { 0.5, 0.5, -0.5 } } };
 
-static int tile_face_basic(struct bork_map* map, enum bork_area area,
+static int tile_face_basic(struct bork_map* map, struct pg_texture* env_atlas,
                            struct bork_tile* tile, int x, int y, int z,
                            enum pg_direction dir)
 {
@@ -309,7 +229,7 @@ static int tile_face_basic(struct bork_map* map, enum bork_area area,
     if(!(face_flags & BORK_FACE_HAS_SURFACE)) return 0; /*  Tile has no face here   */
     /*  Get details for the opposing face   */
     int opp[3] = { x + PG_DIR_VEC[dir][0], y + PG_DIR_VEC[dir][1], z + PG_DIR_VEC[dir][2] };
-    struct bork_tile* opp_tile = bork_map_tile_ptr(map, area, opp[0], opp[1], opp[2]);
+    struct bork_tile* opp_tile = bork_map_tile_ptri(map, opp[0], opp[1], opp[2]);
     struct bork_tile_detail* opp_detail = opp_tile ?
         &BORK_TILE_DETAILS[opp_tile->type] : &BORK_TILE_DETAILS[0];
     uint32_t opp_flags = opp_detail->face_flags[PG_DIR_OPPOSITE[dir]];
@@ -323,13 +243,13 @@ static int tile_face_basic(struct bork_map* map, enum bork_area area,
     } else if((tile_flags & BORK_TILE_FACE_ORIENTED) && !(tile->orientation & (1 << dir))) {
         return 0;
     }
-    struct pg_model* model = &map->area_model[area];
+    struct pg_model* model = &map->model;
     /*  Calculate the base info for this face   */
     int num_tris = 0;
     vec3 inset_dir;
     vec3_scale(inset_dir, PG_DIR_VEC[dir], detail->face_inset[dir]);
     vec2 tex_frame[2];
-    pg_texture_get_frame(&map->core->env_atlas, detail->tex_tile[dir],
+    pg_texture_get_frame(env_atlas, detail->tex_tile[dir],
                          tex_frame[0], tex_frame[1]);
     unsigned vert_idx = model->v_count;
     /*  Generate the geometry   */
@@ -375,14 +295,22 @@ static int tile_face_basic(struct bork_map* map, enum bork_area area,
     return num_tris;
 }
 
-static int tile_model_basic(struct bork_map* map, enum bork_area area,
+static int tile_model_basic(struct bork_map* map, struct pg_texture* env_atlas,
                             struct bork_tile* tile, int x, int y, int z)
 {
     int tri_count = 0;
     int s;
     for(s = 0; s < 6; ++s) {
-        tri_count += tile_face_basic(map, area, tile, x, y, z, s);
+        tri_count += tile_face_basic(map, env_atlas, tile, x, y, z, s);
     }
     return tri_count;
 }
 
+int bork_map_load_editor_map(struct bork_map* map, char* filename)
+{
+    struct bork_editor_map ed_map;
+    int loaded = bork_editor_load_map(&ed_map, filename);
+    if(!loaded) return 0;
+    else bork_editor_complete_map(map, &ed_map);
+    return 1;
+}

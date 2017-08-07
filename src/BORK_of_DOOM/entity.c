@@ -94,7 +94,6 @@ void bork_entity_move(struct bork_entity* ent, struct bork_map* map)
     int steps = 0;
     int hit = 0;
     while(curr_move < full_dist) {
-        vec3 curr_dest;
         if(curr_move + max_move >= full_dist) {
             vec3_set_len(max_move_dir, ent->vel, full_dist - curr_move);
             curr_move = full_dist;

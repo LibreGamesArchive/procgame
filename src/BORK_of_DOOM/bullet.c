@@ -39,15 +39,12 @@ void bork_bullet_move(struct bork_bullet* blt, struct bork_map* map)
             break;
         }
         /*  Hit the closest entity  */
-        enum bork_area area = bork_map_get_area(map,
-            blt->pos[0] * 0.5, blt->pos[1] * 0.5, blt->pos[2] * 0.5);
-        if(area >= BORK_AREA_EXTERIOR) continue;
         float closest = 100;
         struct bork_entity* closest_ent = NULL;
         int i;
         bork_entity_t ent_id;
         struct bork_entity* ent;
-        ARR_FOREACH(map->enemies[area], ent_id, i) {
+        ARR_FOREACH(map->enemies, ent_id, i) {
             ent = bork_entity_get(ent_id);
             if(!ent) continue;
             vec3 blt_to_ent;

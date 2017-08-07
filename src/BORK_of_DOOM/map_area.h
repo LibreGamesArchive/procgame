@@ -73,14 +73,12 @@ struct bork_map_object {
 };
 
 struct bork_map {
-    int area_pos[BORK_AREA_EXTERIOR][3];
-    struct bork_tile* data[BORK_AREA_EXTERIOR];
-    struct pg_model area_model[BORK_AREA_EXTERIOR];
-    ARR_T(struct bork_map_object) objects[BORK_AREA_EXTERIOR];
-    ARR_T(bork_entity_t) enemies[BORK_AREA_EXTERIOR];
-    ARR_T(bork_entity_t) items[BORK_AREA_EXTERIOR];
+    struct pg_model model;
+    struct bork_tile data[32][32][32];
+    ARR_T(struct bork_map_object) objects;
+    ARR_T(bork_entity_t) enemies;
+    ARR_T(bork_entity_t) items;
     struct pg_model door_model;
-    struct bork_game_core* core;
     struct bork_entity* plr;
 };
 
@@ -90,20 +88,18 @@ struct bork_tile_detail {
     float face_inset[6];
     int tex_tile[6];
     char name[32];
-    int (*add_model)(struct bork_map*, enum bork_area,
+    int (*add_model)(struct bork_map*, struct pg_texture*,
                      struct bork_tile*, int, int, int);
 };
+const struct bork_tile_detail* bork_tile_detail(enum bork_tile_type type);
 
-void bork_map_init(struct bork_map* map, struct bork_game_core* core);
-void bork_map_init_model(struct bork_map* map);
+void bork_map_init(struct bork_map* map);
+void bork_map_init_model(struct bork_map* map, struct bork_game_core* core);
 void bork_map_deinit(struct bork_map* map);
+struct bork_tile* bork_map_tile_ptr(struct bork_map* map, vec3 pos);
+struct bork_tile* bork_map_tile_ptri(struct bork_map* map, int x, int y, int z);
 void bork_map_write_to_file(struct bork_map* map, char* filename);
 void bork_map_load_from_file(struct bork_map* map, char* filename);
-void bork_map_update_area(struct bork_map* map, enum bork_area area,
-                          struct bork_entity* plr);
-void bork_map_draw_area(struct bork_map* map, enum bork_area area);
-enum bork_area bork_map_get_area(struct bork_map* map, int x, int y, int z);
-struct bork_tile* bork_map_tile_ptr(struct bork_map* map, enum bork_area area,
-                                    int x, int y, int z);
-const struct bork_tile_detail* bork_tile_detail(enum bork_tile_type type);
+void bork_map_update(struct bork_map* map, struct bork_entity* plr);
+void bork_map_draw(struct bork_map* map, struct bork_game_core* core);
 /*  See physics.c   */
