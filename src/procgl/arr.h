@@ -15,7 +15,7 @@
 #include <stdlib.h>
 #include <string.h>
 
-#define ARR_T(T) struct { T* data; size_t cap; size_t len; }
+#define ARR_T(...) struct { __VA_ARGS__ *data; size_t cap; size_t len; }
 typedef ARR_T(int)              arr_int_t;
 typedef ARR_T(unsigned)         arr_uint_t;
 typedef ARR_T(double)           arr_double_t;
