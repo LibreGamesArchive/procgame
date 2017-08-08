@@ -116,6 +116,18 @@ static inline void vec##n##_abs(vec##n r, vec##n const v) \
     for(i=0; i<n; ++i) \
         r[i] = fabsf(v[i]); \
 } \
+static inline void vec##n##_floor(vec##n r, vec##n const v) \
+{ \
+    int i; \
+    for(i=0; i<n; ++i) \
+        r[i] = floor(v[i]); \
+} \
+static inline void vec##n##_ceil(vec##n r, vec##n const v) \
+{ \
+    int i; \
+    for(i=0; i<n; ++i) \
+        r[i] = ceil(v[i]); \
+} \
 static inline float vec##n##_vmax(vec##n const v) \
 { \
     int i; \
