@@ -101,7 +101,7 @@ void pg_shader_3d_texture(struct pg_shader* shader, struct pg_texture* tex)
     } else d->unis_dirty = 1;
 }
 
-void pg_shader_3d_tex_transform(struct pg_shader* shader, vec2 scale, vec2 offset)
+void pg_shader_3d_tex_transform(struct pg_shader* shader, vec2 const scale, vec2 const offset)
 {
     struct data_3d* d = shader->data;
     vec4_set(d->state.tex_tx, scale[0], scale[1], offset[0], offset[1]);
@@ -110,7 +110,7 @@ void pg_shader_3d_tex_transform(struct pg_shader* shader, vec2 scale, vec2 offse
     } else d->unis_dirty = 1;
 }
 
-void pg_shader_3d_add_tex_tx(struct pg_shader* shader, vec2 scale, vec2 offset)
+void pg_shader_3d_add_tex_tx(struct pg_shader* shader, vec2 const scale, vec2 const offset)
 {
     struct data_3d* d = shader->data;
     vec2_mul(d->state.tex_tx, d->state.tex_tx, scale);

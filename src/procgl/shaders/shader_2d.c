@@ -86,21 +86,21 @@ int pg_shader_2d(struct pg_shader* shader)
     return 1;
 }
 
-void pg_shader_2d_resolution(struct pg_shader* shader, vec2 resolution)
+void pg_shader_2d_resolution(struct pg_shader* shader, vec2 const resolution)
 {
     mat4 tx;
     mat4_ortho(tx, 0, resolution[0], resolution[1], 0, 0, 1);
     pg_shader_set_matrix(shader, PG_VIEW_MATRIX, tx);
 }
 
-void pg_shader_2d_ndc(struct pg_shader* shader, vec2 scale)
+void pg_shader_2d_ndc(struct pg_shader* shader, vec2 const scale)
 {
     mat4 tx;
     mat4_ortho(tx, -scale[0], scale[0], scale[1], -scale[1], 0, 1);
     pg_shader_set_matrix(shader, PG_VIEW_MATRIX, tx);
 }
 
-void pg_shader_2d_transform(struct pg_shader* shader, vec2 pos, vec2 size,
+void pg_shader_2d_transform(struct pg_shader* shader, vec2 const pos, vec2 const size,
                             float rotation)
 {
     struct data_2d* d = shader->data;
@@ -133,7 +133,7 @@ void pg_shader_2d_tex_weight(struct pg_shader* shader, float weight)
     } else d->unis_dirty = 1;
 }
 
-void pg_shader_2d_tex_transform(struct pg_shader* shader, vec2 scale, vec2 offset)
+void pg_shader_2d_tex_transform(struct pg_shader* shader, vec2 const scale, vec2 const offset)
 {
     struct data_2d* d = shader->data;
     vec4_set(d->state.tex_tx, scale[0], scale[1], offset[0], offset[1]);
@@ -142,7 +142,7 @@ void pg_shader_2d_tex_transform(struct pg_shader* shader, vec2 scale, vec2 offse
     } else d->unis_dirty = 1;
 }
 
-void pg_shader_2d_add_tex_tx(struct pg_shader* shader, vec2 scale, vec2 offset)
+void pg_shader_2d_add_tex_tx(struct pg_shader* shader, vec2 const scale, vec2 const offset)
 {
     struct data_2d* d = shader->data;
     vec2_mul(d->state.tex_tx, d->state.tex_tx, scale);
@@ -166,7 +166,7 @@ void pg_shader_2d_tex_frame(struct pg_shader* shader, int frame)
     } else d->unis_dirty = 1;
 }
 
-void pg_shader_2d_color_mod(struct pg_shader* shader, vec4 color)
+void pg_shader_2d_color_mod(struct pg_shader* shader, vec4 const color)
 {
     struct data_2d* d = shader->data;
     vec4_dup(d->state.color_mod, color);

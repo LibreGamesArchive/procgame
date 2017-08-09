@@ -67,21 +67,21 @@ int pg_shader_text(struct pg_shader* shader)
     return 1;
 }
 
-void pg_shader_text_resolution(struct pg_shader* shader, vec2 resolution)
+void pg_shader_text_resolution(struct pg_shader* shader, vec2 const resolution)
 {
     mat4 tx;
     mat4_ortho(tx, 0, resolution[0], resolution[1], 0, 0, 1);
     pg_shader_set_matrix(shader, PG_VIEW_MATRIX, tx);
 }
 
-void pg_shader_text_ndc(struct pg_shader* shader, vec2 scale)
+void pg_shader_text_ndc(struct pg_shader* shader, vec2 const scale)
 {
     mat4 tx;
     mat4_ortho(tx, -scale[0], scale[0], scale[1], -scale[1], 0, 1);
     pg_shader_set_matrix(shader, PG_VIEW_MATRIX, tx);
 }
 
-void pg_shader_text_transform(struct pg_shader* shader, vec2 scale, vec2 offset)
+void pg_shader_text_transform(struct pg_shader* shader, vec2 const scale, vec2 const offset)
 {
     mat4 tx;
     mat4_translate(tx, offset[0], offset[1], 0);

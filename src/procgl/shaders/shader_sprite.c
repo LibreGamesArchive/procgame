@@ -115,7 +115,7 @@ void pg_shader_sprite_texture(struct pg_shader* shader, struct pg_texture* tex)
     } else d->unis_dirty = 1;
 }
 
-void pg_shader_sprite_tex_transform(struct pg_shader* shader, vec2 scale, vec2 offset)
+void pg_shader_sprite_tex_transform(struct pg_shader* shader, vec2 const scale, vec2 const offset)
 {
     struct data_sprite* d = shader->data;
     vec2_dup(d->state.tex_tx, scale);
@@ -125,7 +125,7 @@ void pg_shader_sprite_tex_transform(struct pg_shader* shader, vec2 scale, vec2 o
     } else d->unis_dirty = 1;
 }
 
-void pg_shader_sprite_transform(struct pg_shader* shader, vec2 scale, vec2 offset)
+void pg_shader_sprite_transform(struct pg_shader* shader, vec2 const scale, vec2 const offset)
 {
     struct data_sprite* d = shader->data;
     vec2_dup(d->state.sp_tx, scale);
@@ -135,7 +135,7 @@ void pg_shader_sprite_transform(struct pg_shader* shader, vec2 scale, vec2 offse
     } else d->unis_dirty = 1;
 }
 
-void pg_shader_sprite_add_tex_tx(struct pg_shader* shader, vec2 scale, vec2 offset)
+void pg_shader_sprite_add_tex_tx(struct pg_shader* shader, vec2 const scale, vec2 const offset)
 {
     struct data_sprite* d = shader->data;
     vec2_mul(d->state.tex_tx, d->state.tex_tx, scale);
@@ -159,7 +159,7 @@ void pg_shader_sprite_tex_frame(struct pg_shader* shader, int frame)
     } else d->unis_dirty = 1;
 }
 
-void pg_shader_sprite_color_mod(struct pg_shader* shader, vec4 color_mod)
+void pg_shader_sprite_color_mod(struct pg_shader* shader, vec4 const color_mod)
 {
     struct data_sprite* d = shader->data;
     vec4_dup(d->state.color_mod, color_mod);

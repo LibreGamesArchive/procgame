@@ -56,7 +56,7 @@ void pg_postproc_blur_dir(struct pg_postproc* pp, int dir)
     d->state_dir = dir;
 }
 
-void pg_postproc_blur_scale(struct pg_postproc* pp, vec2 scale)
+void pg_postproc_blur_scale(struct pg_postproc* pp, vec2 const scale)
 {
     struct blur_data* d = pp->data;
     vec2_dup(d->state_scale, scale);
