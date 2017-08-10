@@ -8,12 +8,27 @@
 void bork_init(struct bork_game_core* core)
 {
     srand(time(NULL));
-    core->user_exit = 0;
-    /*  Set up the gbuffer for deferred shading */
     int sw, sh;
     pg_screen_size(&sw, &sh);
-    vec2_set(core->screen_size, sw, sh);
-    core->aspect_ratio = core->screen_size[0] / core->screen_size[1];
+    *core = (struct bork_game_core) {
+        .screen_size = { sw, sh },
+        .aspect_ratio = (float)sw / (float)sh,
+        .ctrl_map = {
+            [BORK_CTRL_UP] = SDL_SCANCODE_W,
+            [BORK_CTRL_DOWN] = SDL_SCANCODE_S,
+            [BORK_CTRL_LEFT] = SDL_SCANCODE_A,
+            [BORK_CTRL_RIGHT] = SDL_SCANCODE_D,
+            [BORK_CTRL_JUMP] = SDL_SCANCODE_SPACE,
+            [BORK_CTRL_FIRE] = BORK_LEFT_MOUSE,
+            [BORK_CTRL_SELECT] = SDL_SCANCODE_E,
+            [BORK_CTRL_ESCAPE] = SDL_SCANCODE_ESCAPE,
+            [BORK_CTRL_BIND1] = SDL_SCANCODE_1,
+            [BORK_CTRL_BIND2] = SDL_SCANCODE_2,
+            [BORK_CTRL_BIND3] = SDL_SCANCODE_3,
+            [BORK_CTRL_BIND4] = SDL_SCANCODE_4,
+        },
+    };
+    /*  Set up the gbuffer for deferred shading */
     pg_gbuffer_init(&core->gbuf, sw, sh);
     pg_gbuffer_bind(&core->gbuf, 20, 21, 22, 23);
     pg_viewer_init(&core->view, (vec3){ 0, 0, 0 }, (vec2){ 0, 0 },
@@ -33,11 +48,6 @@ void bork_init(struct bork_game_core* core)
     pg_shader_2d_texture(&core->shader_2d, &core->editor_atlas);
     pg_shader_sprite_texture(&core->shader_sprite, &core->bullet_tex);
     pg_shader_sprite_tex_frame(&core->shader_sprite, 0);
-    /*  Set up the controls */
-    int i;
-    for(i = 0; i < BORK_CTRL_NULL; ++i) {
-        core->ctrl_state[i] = 0;
-    }
 }
 
 static void backdrop_color_func(vec4 out, vec2 p, struct pg_wave* wave)
@@ -136,66 +146,90 @@ void bork_poll_input(struct bork_game_core* core)
     SDL_Event e;
     while(SDL_PollEvent(&e)) {
         if(e.type == SDL_QUIT) core->user_exit = 1;
-        else if(e.type == SDL_MOUSEBUTTONDOWN && e.button.button == SDL_BUTTON_LEFT) {
-            if(core->ctrl_state[BORK_CTRL_FIRE] == 0) {
-                core->ctrl_state[BORK_CTRL_FIRE] = BORK_CONTROL_HIT;
+        else if(e.type == SDL_MOUSEBUTTONDOWN || e.type == SDL_MOUSEBUTTONUP) {
+            int down = (e.type == SDL_MOUSEBUTTONDOWN);
+            switch(e.button.button) {
+            case SDL_BUTTON_LEFT:
+                core->ctrl_state[BORK_LEFT_MOUSE] =
+                    down ? BORK_CONTROL_HIT : BORK_CONTROL_RELEASED;
+                core->ctrl_changes[core->ctrl_changed++] = BORK_LEFT_MOUSE;
+                break;
+            case SDL_BUTTON_RIGHT:
+                core->ctrl_state[BORK_RIGHT_MOUSE] =
+                    down ? BORK_CONTROL_HIT : BORK_CONTROL_RELEASED;
+                core->ctrl_changes[core->ctrl_changed++] = BORK_RIGHT_MOUSE;
+                break;
+            case SDL_BUTTON_MIDDLE:
+                core->ctrl_state[BORK_MIDDLE_MOUSE] =
+                    down ? BORK_CONTROL_HIT : BORK_CONTROL_RELEASED;
+                core->ctrl_changes[core->ctrl_changed++] = BORK_MIDDLE_MOUSE;
+                break;
             }
-        } else if(e.type == SDL_MOUSEBUTTONUP && e.button.button == SDL_BUTTON_LEFT) {
-            core->ctrl_state[BORK_CTRL_FIRE] = BORK_CONTROL_RELEASED;
         } else if(e.type == SDL_KEYDOWN) {
-            enum bork_control ctrl = BORK_CTRL_NULL;
-            switch(e.key.keysym.scancode) {
-            case SDL_SCANCODE_ESCAPE: ctrl = BORK_CTRL_ESCAPE; break;
-            case SDL_SCANCODE_W: ctrl = BORK_CTRL_UP; break;
-            case SDL_SCANCODE_S: ctrl = BORK_CTRL_DOWN; break;
-            case SDL_SCANCODE_A: ctrl = BORK_CTRL_LEFT; break;
-            case SDL_SCANCODE_D: ctrl = BORK_CTRL_RIGHT; break;
-            case SDL_SCANCODE_E: ctrl = BORK_CTRL_SELECT; break;
-            case SDL_SCANCODE_SPACE: ctrl = BORK_CTRL_JUMP; break;
-            case SDL_SCANCODE_1: ctrl = BORK_CTRL_BIND1; break;
-            case SDL_SCANCODE_2: ctrl = BORK_CTRL_BIND2; break;
-            case SDL_SCANCODE_3: ctrl = BORK_CTRL_BIND3; break;
-            case SDL_SCANCODE_4: ctrl = BORK_CTRL_BIND4; break;
-            default: break;
-            }
-            if(ctrl != BORK_CTRL_NULL && core->ctrl_state[ctrl] == 0) {
-                core->ctrl_state[ctrl] = BORK_CONTROL_HIT;
+            if(core->ctrl_state[e.key.keysym.scancode] != BORK_CONTROL_HELD) {
+                core->ctrl_state[e.key.keysym.scancode] = BORK_CONTROL_HIT;
+                core->ctrl_changes[core->ctrl_changed++] = e.key.keysym.scancode;
             }
         } else if(e.type == SDL_KEYUP) {
-            enum bork_control ctrl = BORK_CTRL_NULL;
-            switch(e.key.keysym.scancode) {
-            case SDL_SCANCODE_ESCAPE: ctrl = BORK_CTRL_ESCAPE; break;
-            case SDL_SCANCODE_W: ctrl = BORK_CTRL_UP; break;
-            case SDL_SCANCODE_S: ctrl = BORK_CTRL_DOWN; break;
-            case SDL_SCANCODE_A: ctrl = BORK_CTRL_LEFT; break;
-            case SDL_SCANCODE_D: ctrl = BORK_CTRL_RIGHT; break;
-            case SDL_SCANCODE_E: ctrl = BORK_CTRL_SELECT; break;
-            case SDL_SCANCODE_SPACE: ctrl = BORK_CTRL_JUMP; break;
-            case SDL_SCANCODE_1: ctrl = BORK_CTRL_BIND1; break;
-            case SDL_SCANCODE_2: ctrl = BORK_CTRL_BIND2; break;
-            case SDL_SCANCODE_3: ctrl = BORK_CTRL_BIND3; break;
-            case SDL_SCANCODE_4: ctrl = BORK_CTRL_BIND4; break;
-            default: break;
-            }
-            if(ctrl != BORK_CTRL_NULL) {
-                core->ctrl_state[ctrl] = BORK_CONTROL_RELEASED;
-            }
+            core->ctrl_state[e.key.keysym.scancode] = BORK_CONTROL_RELEASED;
+            core->ctrl_changes[core->ctrl_changed++] = e.key.keysym.scancode;
         }
+    }
+    int mx, my;
+    if(core->mouse_relative) {
+        SDL_GetRelativeMouseState(&mx, &my);
+        vec2 motion = { -(float)mx * core->mouse_sensitivity,
+                        -(float)my * core->mouse_sensitivity };
+        vec2_add(core->mouse_motion, core->mouse_motion, motion);
+        vec2_add(core->mouse_pos, core->mouse_pos, motion);
+    } else {
+        SDL_GetMouseState(&mx, &my);
+        vec2_set(core->mouse_pos, mx, my);
     }
 }
 
-void bork_update_inputs(struct bork_game_core* core)
+int bork_input_event(struct bork_game_core* core, uint8_t ctrl, uint8_t event)
+{
+    if(core->ctrl_state[ctrl] == event) return 1;
+    int changes = 0;
+    int i;
+    for(i = 0; i < core->ctrl_changed; ++i) {
+        changes += (core->ctrl_changes[i] == ctrl);
+        if(changes > 1) return 1;
+    }
+    return 0;
+}
+
+void bork_ack_input(struct bork_game_core* core)
 {
     int i;
-    for(i = 0; i < BORK_CTRL_NULL; ++i) {
-        switch(core->ctrl_state[i]) {
-        case BORK_CONTROL_HIT:
-            core->ctrl_state[i] = BORK_CONTROL_HELD;
+    for(i = 0; i < core->ctrl_changed; ++i) {
+        uint8_t c = core->ctrl_changes[i];
+        switch(core->ctrl_state[c]) {
+        case 0:
+            core->ctrl_state[c] = BORK_CONTROL_HIT;
             break;
-        case BORK_CONTROL_RELEASED:
-            core->ctrl_state[i] = 0;
+        case BORK_CONTROL_HIT:
+            core->ctrl_state[c] = BORK_CONTROL_HELD;
+            break;
+        case BORK_CONTROL_HELD: case BORK_CONTROL_RELEASED:
+            core->ctrl_state[c] = 0;
             break;
         }
+    }
+    vec2_set(core->mouse_motion, 0, 0);
+    core->ctrl_changed = 0;
+}
+
+void bork_grab_mouse(struct bork_game_core* core, int grab)
+{
+    if(grab) {
+        SDL_SetRelativeMouseMode(SDL_ENABLE);
+        SDL_GetRelativeMouseState(NULL, NULL);
+        core->mouse_relative = 1;
+    } else {
+        SDL_SetRelativeMouseMode(SDL_DISABLE);
+        core->mouse_relative = 0;
     }
 }
 

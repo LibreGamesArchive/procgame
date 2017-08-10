@@ -14,9 +14,13 @@ enum bork_control {
     BORK_CTRL_NULL,
 };
 
-#define BORK_CONTROL_HIT        1
-#define BORK_CONTROL_HELD       2
-#define BORK_CONTROL_RELEASED   3
+#define BORK_CONTROL_RELEASED   1
+#define BORK_CONTROL_HIT        2
+#define BORK_CONTROL_HELD       3
+/*  Special mouse control codes, mapped to unused SDL scancodes */
+#define BORK_LEFT_MOUSE         253
+#define BORK_RIGHT_MOUSE        254
+#define BORK_MIDDLE_MOUSE       255
 
 struct bork_game_core {
     int user_exit;
@@ -45,14 +49,23 @@ struct bork_game_core {
     struct pg_model enemy_model;
     struct pg_model gun_model;
     /*  Input state */
-    uint8_t ctrl_state[BORK_CTRL_NULL];
+    uint8_t ctrl_map[BORK_CTRL_NULL];
+    uint8_t ctrl_state[256];
+    uint8_t ctrl_changes[16];
+    uint8_t ctrl_changed;
+    vec2 mouse_pos;
+    vec2 mouse_motion;
+    float mouse_sensitivity;
+    int mouse_relative;
 };
 
 void bork_init(struct bork_game_core* core);
 void bork_deinit(struct bork_game_core* core);
 void bork_load_assets(struct bork_game_core* core);
 void bork_poll_input(struct bork_game_core* core);
-void bork_update_inputs(struct bork_game_core* core);
+int bork_input_event(struct bork_game_core* core, uint8_t ctrl, uint8_t event);
+void bork_ack_input(struct bork_game_core* core);
+void bork_grab_mouse(struct bork_game_core* core, int grab);
 void bork_menu_start(struct pg_game_state* state, struct bork_game_core* core);
 void bork_play_start(struct pg_game_state* state, struct bork_game_core* core);
 void bork_editor_start(struct pg_game_state* state, struct bork_game_core* core);
