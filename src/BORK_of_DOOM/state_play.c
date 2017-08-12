@@ -102,6 +102,7 @@ static void tick_bullets(struct bork_play_data* d);
 static void bork_play_tick(struct pg_game_state* state)
 {
     struct bork_play_data* d = state->data;
+    d->ticks = state->ticks;
     uint8_t* kmap = d->core->ctrl_map;
     /*  Handle input    */
     if(d->core->ctrl_state[kmap[BORK_CTRL_ESCAPE]] == BORK_CONTROL_HIT) {
@@ -172,7 +173,11 @@ static void tick_control_play(struct bork_play_data* d)
         struct bork_entity* item = bork_entity_get(d->looked_item);
         if(item) {
             item->flags &= ~BORK_ENTFLAG_LOOKED_AT;
-            ARR_PUSH(d->inventory, d->looked_item);
+            if(item->type == BORK_ITEM_BULLETS) {
+                d->ammo_bullets += 30;
+            } else {
+                ARR_PUSH(d->inventory, d->looked_item);
+            }
             ARR_SWAPSPLICE(d->map.items, d->looked_idx, 1);
         }
     }
@@ -203,18 +208,15 @@ static void tick_control_play(struct bork_play_data* d)
         d->plr.vel[0] -= move_speed * cos(d->plr.dir[0]);
         d->plr.vel[1] -= move_speed * sin(d->plr.dir[0]);
     }
-    if(ctrl[kmap[BORK_CTRL_FIRE]] == BORK_CONTROL_HIT) {
-        vec3 bullet_dir;
-        spherical_to_cartesian(bullet_dir, (vec2){ d->plr.dir[0] - M_PI,
-                                                   d->plr.dir[1] - (M_PI * 0.5) });
-        vec3_scale(bullet_dir, bullet_dir, 1);
-        struct bork_bullet new_bullet = {};
-        vec3_dup(new_bullet.pos, d->plr.pos);
-        new_bullet.pos[0] += 0.2 * sin(d->plr.dir[0]);
-        new_bullet.pos[1] -= 0.2 * cos(d->plr.dir[0]);
-        new_bullet.pos[2] += 0.75;
-        vec3_dup(new_bullet.dir, bullet_dir);
-        ARR_PUSH(d->bullets, new_bullet);
+    if(ctrl[kmap[BORK_CTRL_FIRE]] && d->held_item >= 0) {
+        bork_entity_t held_id = d->inventory.data[d->held_item];
+        struct bork_entity* held_ent = bork_entity_get(held_id);
+        if(held_ent) {
+            const struct bork_entity_profile* prof = &BORK_ENT_PROFILES[held_ent->type];
+            if(prof->use_func && ctrl[kmap[BORK_CTRL_FIRE]] == prof->use_ctrl) {
+                prof->use_func(held_ent, d);
+            }
+        }
     }
     if(ctrl[kmap[BORK_CTRL_BIND1]] == BORK_CONTROL_HIT) {
         d->held_item = d->quick_item[0];
@@ -330,10 +332,18 @@ static void bork_play_draw(struct pg_game_state* state)
         draw_menu_inv(d, (float)state->ticks / (float)state->tick_rate);
     } else {
         /*  Overlay */
+        pg_shader_begin(&d->core->shader_text, NULL);
+        if(d->held_item >= 0) {
+            bork_entity_t held_id = d->inventory.data[d->held_item];
+            struct bork_entity* held_ent = bork_entity_get(held_id);
+            if(held_ent) {
+                const struct bork_entity_profile* prof = &BORK_ENT_PROFILES[held_ent->type];
+                if(prof->hud_func) prof->hud_func(held_ent, d);
+            }
+        }
         draw_quickfetch_text(d, 0, (vec4){ 1, 1, 1, 0.15 }, (vec4){ 1, 1, 1, 0.75 });
         draw_quickfetch_items(d, (vec4){ 1, 1, 1, 0.15 }, (vec4){ 1, 1, 1, 0.75 });
     }
-    pg_shader_text_resolution(&d->core->shader_text, d->core->screen_size);
     bork_draw_fps(d->core);
 }
 
@@ -542,8 +552,8 @@ static void draw_quickfetch_items(struct bork_play_data* d,
     int current_frame = 0;
     int i;
     vec2 draw_pos[4] = {
-        { w - 0.2 + 0.015, 0.65 }, { w - 0.25 + 0.015, 0.7 },
-        { w - 0.15 + 0.015, 0.7 }, { w - 0.2 + 0.015, 0.75 } };
+        { w - 0.2 + 0.015, 0.75 }, { w - 0.25 + 0.015, 0.8 },
+        { w - 0.15 + 0.015, 0.8 }, { w - 0.2 + 0.015, 0.85 } };
     for(i = 0; i < 4; ++i) {
         if(d->quick_item[i] < 0) continue;
         item = bork_entity_get(d->inventory.data[d->quick_item[i]]);
@@ -580,10 +590,10 @@ static void draw_quickfetch_text(struct bork_play_data* d, int draw_label,
             "QUICK", "FETCH",
         },
         .block_style = {
-            { w - 0.2, 0.7, 0.03, 1 }, { w - 0.25, 0.75, 0.03, 1 },
-            { w - 0.15, 0.75, 0.03, 1 }, { w - 0.2, 0.8, 0.03, 1 },
-            { w - 0.25, 0.85, 0.025, 1.25 },
-            { w - 0.25, 0.9, 0.025, 1.25 },
+            { w - 0.2, 0.8, 0.03, 1 }, { w - 0.25, 0.85, 0.03, 1 },
+            { w - 0.15, 0.85, 0.03, 1 }, { w - 0.2, 0.9, 0.03, 1 },
+            { w - 0.45, 0.83, 0.025, 1.25 },
+            { w - 0.45, 0.88, 0.025, 1.25 },
         },
         .block_color = {
             { 1, 1, 1, 1 }, { 1, 1, 1, 1 }, { 1, 1, 1, 1 }, { 1, 1, 1, 1 },

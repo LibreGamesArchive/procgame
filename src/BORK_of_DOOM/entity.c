@@ -3,8 +3,10 @@
 #include "procgl/procgl.h"
 #include "bork.h"
 #include "entity.h"
+#include "bullet.h"
 #include "map_area.h"
 #include "physics.h"
+#include "game_states.h"
 
 static ARR_T(struct bork_entity) ent_pool = {};
 
@@ -65,7 +67,7 @@ void bork_entity_update(struct bork_entity* ent, struct bork_map* map)
 
 void bork_entity_move(struct bork_entity* ent, struct bork_map* map)
 {
-    struct bork_entity_profile* prof = &BORK_ENT_PROFILES[ent->type];
+    const struct bork_entity_profile* prof = &BORK_ENT_PROFILES[ent->type];
     ent->flags &= ~BORK_ENTFLAG_GROUND;
     vec3_add(ent->vel, ent->vel, (vec3){ 0, 0, -0.02 });
     struct bork_collision coll = {};
@@ -110,3 +112,34 @@ void bork_entity_move(struct bork_entity* ent, struct bork_map* map)
     if(vec3_len(ent->vel) < 0.0005) vec3_set(ent->vel, 0, 0, 0);
 }
 
+/*  Item use functions  */
+void bork_use_machinegun(struct bork_entity* ent, struct bork_play_data* d)
+{
+    if(ent->counter[0] > d->ticks || d->ammo_bullets <= 0) return;
+    ent->counter[0] = d->ticks + 10;
+    --d->ammo_bullets;
+    vec3 bullet_dir;
+    spherical_to_cartesian(bullet_dir, (vec2){ d->plr.dir[0] - M_PI,
+                                               d->plr.dir[1] - (M_PI * 0.5) });
+    vec3_scale(bullet_dir, bullet_dir, 1);
+    struct bork_bullet new_bullet = {};
+    vec3_dup(new_bullet.pos, d->plr.pos);
+    new_bullet.pos[0] += 0.4 * sin(d->plr.dir[0]);
+    new_bullet.pos[1] -= 0.4 * cos(d->plr.dir[0]);
+    new_bullet.pos[2] += 0.65;
+    vec3_dup(new_bullet.dir, bullet_dir);
+    ARR_PUSH(d->bullets, new_bullet);
+}
+
+void bork_hud_machinegun(struct bork_entity* ent, struct bork_play_data* d)
+{
+    struct pg_shader* shader = &d->core->shader_text;
+    struct pg_shader_text text = { .use_blocks = 1 };
+    float ar = d->core->aspect_ratio;
+    pg_shader_text_resolution(shader, (vec2){ ar, 1 });
+    pg_shader_text_transform(shader, (vec2){ 1, 1 }, (vec2){});
+    snprintf(text.block[0], 64, "AMMO: %d", d->ammo_bullets);
+    vec4_set(text.block_style[0], ar - 0.6, 0.85, 0.025, 1.2);
+    vec4_set(text.block_color[0], 1, 1, 1, 1);
+    pg_shader_text_write(shader, &text);
+}
