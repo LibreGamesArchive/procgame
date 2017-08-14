@@ -1,7 +1,5 @@
 #include <GL/glew.h>
 
-struct pg_sdf_tree;
-
 #define PG_MODEL_COMPONENT_POSITION     (1 << 0)
 #define PG_MODEL_COMPONENT_COLOR        (1 << 1)
 #define PG_MODEL_COMPONENT_UV           (1 << 2)
@@ -107,14 +105,19 @@ void pg_model_get_face_normal(struct pg_model* model, unsigned tri,
                               vec3 norm);
 void pg_model_face_projection_overlap(struct pg_model* model, vec3 proj,
                                       unsigned tri0, unsigned tri1);
-/*  Collision functions */
+
+/*  Collision functions - Return the nearest colliding triangle index, and set
+    'out' argument to the push vector to get out of the collision   */
+int pg_model_collide_sphere(struct pg_model* model, mat4 transform,
+                            float r, vec3 pos, vec3 out);
+int pg_model_collide_sphere_sub(struct pg_model* model, mat4 transform,
+                                unsigned sub_i, unsigned sub_len,
+                                float r, vec3 pos, vec3 out);
 int pg_model_collide_ellipsoid(struct pg_model* model, mat4 transform,
-                               vec3 ellipsoid_r, vec3 ellipsoid_pos,
-                               vec3 out, vec3 out_norm);
+                               vec3 r, vec3 pos, vec3 out);
 int pg_model_collide_ellipsoid_sub(struct pg_model* model, mat4 transform,
                                    unsigned sub_i, unsigned sub_len,
-                                   vec3 ellipsoid_r, vec3 ellipsoid_pos,
-                                   vec3 out, vec3 out_norm);
+                                   vec3 r, vec3 pos, vec3 out);
 
 /*  PRIMITIVES  model_prims.c   */
 void pg_model_quad(struct pg_model* model, vec2 tex_scale);
@@ -128,4 +131,5 @@ void pg_model_cone_trunc(struct pg_model* model, int n, float t, vec3 warp,
 void pg_model_icosphere(struct pg_model* model, int n);
 
 /*  Generate a model from an SDF tree   marching_cubes.c    */
+struct pg_sdf_tree;
 void pg_model_sdf(struct pg_model* model, struct pg_sdf_tree* sdf, float p);

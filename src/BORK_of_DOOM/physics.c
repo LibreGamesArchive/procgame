@@ -44,8 +44,9 @@ int bork_map_collide(struct bork_map* map, struct bork_collision* coll_out,
                 vec3 tile_push, tile_norm;
                 int c = pg_model_collide_ellipsoid_sub(model, transform,
                             tile->model_tri_idx, tile->num_tris,
-                            size, pos, tile_push, tile_norm);
+                            size, pos, tile_push);
                 if(c < 0) continue;
+                pg_model_get_face_normal(model, c, tile_norm);
                 float depth = vec3_len(tile_push);
                 if(depth <= deepest) continue;
                 deepest = depth;
@@ -69,8 +70,9 @@ int bork_map_collide(struct bork_map* map, struct bork_collision* coll_out,
         if(obj->door.dir) mat4_rotate_Z(transform, transform, M_PI * 0.5);
         vec3 obj_push, obj_norm;
         int c = pg_model_collide_ellipsoid(&map->door_model, transform,
-                                           size, pos, obj_push, obj_norm);
+                                           size, pos, obj_push);
         if(c < 0) continue;
+        pg_model_get_face_normal(&map->door_model, c, obj_norm);
         float depth = vec3_len(obj_push);
         if(depth <= deepest) continue;
         deepest = depth;

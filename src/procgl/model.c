@@ -594,29 +594,7 @@ void pg_model_get_face_normal(struct pg_model* model, unsigned t, vec3 out)
 }
 
 /*  Collision functions */
-static inline float sd_plane(vec3 const p, vec3 const normal, float plane_d)
-{
-    return vec3_mul_inner(p, normal) + plane_d;
-}
-
-static int is_point_in_triangle(vec3 point, vec3 a, vec3 b, vec3 c)
-{
-    float total_angles = 0.0f;
-    vec3 v1, v2, v3;
-    vec3_sub(v1, point, a);
-    vec3_sub(v2, point, b);
-    vec3_sub(v3, point, c);
-    vec3_normalize(v1, v1);
-    vec3_normalize(v2, v2);
-    vec3_normalize(v3, v3);
-    total_angles += acosf(vec3_mul_inner(v1,v2));   
-    total_angles += acosf(vec3_mul_inner(v2,v3));
-    total_angles += acosf(vec3_mul_inner(v3,v1)); 
-    if (fabs(total_angles - 2 * M_PI) <= 0.05) return 1;
-    else return 0;
-}
-
-void nearest_on_triangle(vec3 out, vec3 p, vec3 a, vec3 b, vec3 c)
+static void nearest_on_triangle(vec3 out, vec3 p, vec3 a, vec3 b, vec3 c)
 {
     // Check if P in vertex region outside A
     vec3 ab, ac, ap, bp, cp;
@@ -682,45 +660,61 @@ void nearest_on_triangle(vec3 out, vec3 p, vec3 a, vec3 b, vec3 c)
     vec3_add(out, ab, a);
 }
 
-static int collide_with_tri(vec3 sphere_pos, vec3 t0, vec3 t1, vec3 t2,
-                            vec3 tnorm, vec3 out)
+int pg_model_collide_sphere(struct pg_model* model, mat4 transform,
+                            float r, vec3 pos, vec3 out)
 {
-    vec3 sphere_ix, face_ix;
-    float plane_d = -sd_plane(t0, tnorm, 0);
-    float dist_to_plane = sd_plane(sphere_pos, tnorm, plane_d);
-    if(dist_to_plane > 1 || dist_to_plane < 0) return 0;
-    vec3_set(face_ix, sphere_pos[0] - dist_to_plane * tnorm[0],
-                      sphere_pos[1] - dist_to_plane * tnorm[1],
-                      sphere_pos[2] - dist_to_plane * tnorm[2]);
-    if(is_point_in_triangle(face_ix, t0, t1, t2)) {
-        vec3_sub(sphere_ix, sphere_pos, tnorm);
-        vec3_dup(face_ix, face_ix);
-        vec3_sub(out, face_ix, sphere_ix);
-        return 1;
+    return pg_model_collide_sphere_sub(model, transform, 0, model->tris.len,
+                                       r, pos, out);
+}
+
+int pg_model_collide_sphere_sub(struct pg_model* model, mat4 transform,
+                                unsigned sub_i, unsigned sub_len,
+                                float r, vec3 pos, vec3 out)
+{
+    float deepest = 0;
+    int tri_idx = -1;
+    int sub_end = sub_i + sub_len;
+    int i;
+    vec4 pos_tx;
+    vec3 tri_push;
+    mat4 tx_inv;
+    mat4_invert(tx_inv, transform);
+    mat4_mul_vec4(pos_tx, tx_inv, (vec4){ pos[0], pos[1], pos[2], 1.0f });
+    for(i = sub_i; i < sub_end; ++i) {
+        struct pg_tri* tri = &model->tris.data[i];
+        vec3 p0, p1, p2;
+        vec3_dup(p0, model->pos.data[tri->t[0]].v);
+        vec3_dup(p1, model->pos.data[tri->t[1]].v);
+        vec3_dup(p2, model->pos.data[tri->t[2]].v);
+        vec3 tmp_push;
+        vec3 pos_to_tri;
+        nearest_on_triangle(pos_to_tri, pos_tx, p0, p1, p2);
+        vec3_sub(pos_to_tri, pos_tx, pos_to_tri);
+        float dist = vec3_len(pos_to_tri);
+        if(dist <= r) {
+            /*  If this collision has the greatest depth so far, then
+                set the result to this one  */
+            float depth = r - dist;
+            if(depth <= deepest) continue;
+            deepest = depth;
+            vec3_set_len(tri_push, pos_to_tri, depth);
+            tri_idx = i;
+        }
     }
-    nearest_on_triangle(face_ix, sphere_pos, t0, t1, t2);
-    vec3_sub(sphere_ix, face_ix, sphere_pos);
-    float dist = vec3_len(sphere_ix);
-    if(dist > 1) return 0;
-    vec3_normalize(sphere_ix, sphere_ix);
-    vec3_add(sphere_ix, sphere_ix, sphere_pos);
-    vec3_sub(out, face_ix, sphere_ix);
-    return 1;
+    mat3_mul_vec3(out, transform, tri_push);
+    return tri_idx;
 }
 
 int pg_model_collide_ellipsoid(struct pg_model* model, mat4 transform,
-                               vec3 ellipsoid_r, vec3 ellipsoid_pos,
-                               vec3 out, vec3 out_norm)
+                               vec3 ellipsoid_r, vec3 ellipsoid_pos, vec3 out)
 {
     return pg_model_collide_ellipsoid_sub(model, transform, 0, model->tris.len,
-                                          ellipsoid_r, ellipsoid_pos,
-                                          out, out_norm);
+                                          ellipsoid_r, ellipsoid_pos, out);
 }
 
 int pg_model_collide_ellipsoid_sub(struct pg_model* model, mat4 transform,
                                    unsigned sub_i, unsigned sub_len,
-                                   vec3 ellipsoid_r, vec3 ellipsoid_pos,
-                                   vec3 out, vec3 out_norm)
+                                   vec3 r, vec3 pos, vec3 out)
 {
     float deepest = 0;
     int tri_idx = -1;
@@ -730,78 +724,34 @@ int pg_model_collide_ellipsoid_sub(struct pg_model* model, mat4 transform,
     mat4 tx_inv;
     mat4_invert(tx_inv, transform);
     mat4_mul_vec4(ellipsoid_tx, tx_inv,
-        (vec4){ ellipsoid_pos[0], ellipsoid_pos[1], ellipsoid_pos[2], 1.0f });
-    vec3 pos, tri_push, tri_norm;
-    vec3_div(pos, ellipsoid_tx, ellipsoid_r);
+        (vec4){ pos[0], pos[1], pos[2], 1.0f });
+    vec3 sphere_pos, tri_push;
+    vec3_div(sphere_pos, ellipsoid_tx, r);
     for(i = sub_i; i < sub_end; ++i) {
         struct pg_tri* tri = &model->tris.data[i];
         vec3 p0, p1, p2;
         vec3_dup(p0, model->pos.data[tri->t[0]].v);
         vec3_dup(p1, model->pos.data[tri->t[1]].v);
         vec3_dup(p2, model->pos.data[tri->t[2]].v);
-        vec3_div(p0, p0, ellipsoid_r);
-        vec3_div(p1, p1, ellipsoid_r);
-        vec3_div(p2, p2, ellipsoid_r);
-        vec3 plane_1, plane_2;
-        vec3_sub(plane_1, p1, p0);
-        vec3_sub(plane_2, p2, p0);
-        vec3 tmp_push, tmp_norm;
-        vec3_wedge(tmp_norm, plane_1, plane_2);
-        vec3_normalize(tmp_norm, tmp_norm);
-        int c = collide_with_tri(pos, p0, p1, p2, tmp_norm, tmp_push);
-        if(c) {
+        vec3_div(p0, p0, r);
+        vec3_div(p1, p1, r);
+        vec3_div(p2, p2, r);
+        vec3 pos_to_tri;
+        nearest_on_triangle(pos_to_tri, sphere_pos, p0, p1, p2);
+        vec3_sub(pos_to_tri, sphere_pos, pos_to_tri);
+        float dist = vec3_len(pos_to_tri);
+        if(dist < 1) {
             /*  If this collision has the greatest depth so far, then
                 set the result to this one  */
-            float depth = vec3_len(tmp_push);
+            float depth = 1 - dist;
             if(depth <= deepest) continue;
             deepest = depth;
-            vec3_dup(tri_push, tmp_push);
-            vec3_dup(tri_norm, tmp_norm);
+            vec3_set_len(tri_push, pos_to_tri, depth);
             tri_idx = i;
         }
     }
     mat3_mul_vec3(tri_push, transform, tri_push);
-    vec3 new_pos;
-    vec3_add(new_pos, pos, tri_push);
-    vec3_mul(new_pos, new_pos, ellipsoid_r);
-    if(out) vec3_sub(out, new_pos, ellipsoid_tx);
-    if(out_norm) vec3_dup(out_norm, tri_norm);
+    vec3_mul(out, tri_push, r);
     return tri_idx;
 }
-
-#if 0
-void pg_model_generate_texture(struct pg_model* model,
-                                   struct pg_texture* texture,
-                                   unsigned w, unsigned h)
-{
-    struct pg_vert3d* v[3];
-    unsigned t[3];
-    int i;
-    for(i = 0; i < model->tris.len; i += 3) {
-        t[0] = model->tris.data[i].v;
-        t[1] = model->tris.data[i + 1];
-        t[2] = model->tris.data[i + 2];
-        v[0] = &model->verts.data[t[0]];
-        v[1] = &model->verts.data[t[1]];
-        v[2] = &model->verts.data[t[2]];
-        vec3 norm;
-        vec3 edge0, edge1;
-        vec3 b_x, b_y;
-        vec3_sub(edge0, v[0]->pos, v[1]->pos);
-        vec3_sub(edge1, v[0]->pos, v[2]->pos);
-        vec3_normalize(edge0, edge0);
-        vec3_normalize(edge1, edge1);
-        vec3_mul_cross(norm, edge0, edge1);
-        vec3_normalize(norm, norm);
-        vec3_dup(b_x, edge0);
-        vec3_mul_cross(b_y, edge0, norm);
-        int j;
-        vec2 tex[3];
-        for(j = 0; j < 3; ++j) {
-            tex[j][0] = vec3_mul_inner(v[j]->pos, b_x);
-            tex[j][1] = vec3_mul_inner(v[j]->pos, b_y);
-        }
-    }
-}
-#endif
 
