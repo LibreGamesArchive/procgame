@@ -70,10 +70,10 @@ obj/map_area.o: src/BORK_of_DOOM/map_area.c src/BORK_of_DOOM/map_area.h \
 obj/physics.o: src/BORK_of_DOOM/physics.c src/BORK_of_DOOM/map_area.h \
  $(PROCGL) $(PROCGL_LIBS)
 	$(CC) $(CFLAGS) -o obj/physics.o -c src/BORK_of_DOOM/physics.c $(INCLUDES)
-obj/entity.o: src/BORK_of_DOOM/entity.c src/BORK_of_DOOM/map_area.h \
+obj/entity.o: src/BORK_of_DOOM/entity.c src/BORK_of_DOOM/entity.h \
  src/BORK_of_DOOM/physics.h $(PROCGL) $(PROCGL_LIBS)
 	$(CC) $(CFLAGS) -o obj/entity.o -c src/BORK_of_DOOM/entity.c $(INCLUDES)
-obj/bullet.o: src/BORK_of_DOOM/bullet.c src/BORK_of_DOOM/map_area.h \
+obj/bullet.o: src/BORK_of_DOOM/bullet.c src/BORK_of_DOOM/bullet.h \
  src/BORK_of_DOOM/physics.h $(PROCGL) $(PROCGL_LIBS)
 	$(CC) $(CFLAGS) -o obj/bullet.o -c src/BORK_of_DOOM/bullet.c $(INCLUDES)
 
@@ -169,10 +169,17 @@ dump_shaders: src/procgl/shaders/*.glsl
     xxd -i sprite_frag.glsl >> sprite.glsl.h && \
     xxd -i cubetex_vert.glsl >> cubetex.glsl.h && \
     xxd -i cubetex_frag.glsl >> cubetex.glsl.h && \
+    xxd -i screen_vert.glsl >> post_blur.glsl.h && \
+    xxd -i post_blur3_frag.glsl >> post_blur.glsl.h && \
+    xxd -i post_blur5_frag.glsl >> post_blur.glsl.h && \
+    xxd -i post_blur7_frag.glsl >> post_blur.glsl.h && \
     xxd -i deferred_vert.glsl >> deferred.glsl.h && \
     xxd -i deferred_frag.glsl >> deferred.glsl.h && \
+    xxd -i deferred_spot_frag.glsl >> deferred.glsl.h && \
     xxd -i screen_vert.glsl >> deferred.glsl.h && \
-    xxd -i screen_frag.glsl >> deferred.glsl.h
+    xxd -i screen_frag.glsl >> deferred.glsl.h && \
+    sed -i -e 's/unsigned char/static char/g' *.glsl.h && \
+    sed -i -e 's/unsigned int/static unsigned/g' *.glsl.h
 
 clean:
 	rm -f obj/*.o
