@@ -77,6 +77,25 @@ void pg_gbuffer_init(struct pg_gbuffer* gbuf, int w, int h)
     gbuf->uni_light = glGetUniformLocation(gbuf->l_prog, "light");
     gbuf->uni_color = glGetUniformLocation(gbuf->l_prog, "color");
     gbuf->uni_clip = glGetUniformLocation(gbuf->l_prog, "clip_planes");
+    /*  And again for spotlights    */
+#ifdef PROCGL_STATIC_SHADERS
+    pg_compile_glsl_static(&gbuf->spot_vert, &gbuf->spot_frag, &gbuf->spot_prog,
+        deferred_vert_glsl, deferred_vert_glsl_len,
+        deferred_spot_frag_glsl, deferred_spot_frag_glsl_len);
+#else
+    pg_compile_glsl(&gbuf->spot_vert, &gbuf->spot_frag, &gbuf->spot_prog,
+                    "src/procgl/shaders/deferred_vert.glsl",
+                    "src/procgl/shaders/deferred_spot_frag.glsl");
+#endif
+    gbuf->uni_projview_spot = glGetUniformLocation(gbuf->spot_prog, "projview_matrix");
+    gbuf->uni_view_spot = glGetUniformLocation(gbuf->spot_prog, "view_matrix");
+    gbuf->uni_eye_pos_spot = glGetUniformLocation(gbuf->spot_prog, "eye_pos");
+    gbuf->uni_normal_spot = glGetUniformLocation(gbuf->spot_prog, "g_normal");
+    gbuf->uni_depth_spot = glGetUniformLocation(gbuf->spot_prog, "g_depth");
+    gbuf->uni_light_spot = glGetUniformLocation(gbuf->spot_prog, "light");
+    gbuf->uni_dir_spot = glGetUniformLocation(gbuf->spot_prog, "dir_angle");
+    gbuf->uni_color_spot = glGetUniformLocation(gbuf->spot_prog, "color");
+    gbuf->uni_clip_spot = glGetUniformLocation(gbuf->spot_prog, "clip_planes");
     /*  Load the shader which combines the light accumulation buffer and the
         color buffer, and draws the final result    */
 #ifdef PROCGL_STATIC_SHADERS
@@ -106,6 +125,9 @@ void pg_gbuffer_deinit(struct pg_gbuffer* gbuf)
     glDeleteShader(gbuf->l_vert);
     glDeleteShader(gbuf->l_frag);
     glDeleteProgram(gbuf->l_prog);
+    glDeleteShader(gbuf->spot_vert);
+    glDeleteShader(gbuf->spot_frag);
+    glDeleteProgram(gbuf->spot_prog);
     glDeleteShader(gbuf->f_vert);
     glDeleteShader(gbuf->f_frag);
     glDeleteProgram(gbuf->f_prog);
@@ -135,7 +157,7 @@ void pg_gbuffer_dst(struct pg_gbuffer* gbuf)
 {
     glBindFramebuffer(GL_FRAMEBUFFER, gbuf->frame);
     glViewport(0, 0, gbuf->w, gbuf->h);
-    glDrawBuffers(2, drawbufs);
+    glDrawBuffers(3, drawbufs);
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 }
 
@@ -144,7 +166,6 @@ void pg_gbuffer_begin_light(struct pg_gbuffer* gbuf, struct pg_viewer* view)
     /*  Set the output buffer to the light accumulation buffer  */
     glBindFramebuffer(GL_FRAMEBUFFER, gbuf->frame);
     glDrawBuffers(1, drawbufs + 2);
-    glClear(GL_COLOR_BUFFER_BIT);
     glDisable(GL_DEPTH_TEST);
     glDepthMask(0);
     /*  All the lights are just added on top of each other  */
@@ -172,6 +193,41 @@ void pg_gbuffer_draw_light(struct pg_gbuffer* gbuf, vec4 light, vec3 color)
         draw the light volume mesh  */
     glUniform4fv(gbuf->uni_light, 1, light);
     glUniform3fv(gbuf->uni_color, 1, color);
+    glDrawArrays(GL_TRIANGLES, 0, 60);
+}
+
+void pg_gbuffer_begin_spotlight(struct pg_gbuffer* gbuf, struct pg_viewer* view)
+{
+    /*  Set the output buffer to the light accumulation buffer  */
+    glBindFramebuffer(GL_FRAMEBUFFER, gbuf->frame);
+    glDrawBuffers(1, drawbufs + 2);
+    glDisable(GL_DEPTH_TEST);
+    glDepthMask(0);
+    /*  All the lights are just added on top of each other  */
+    glEnable(GL_BLEND);
+    glBlendFunc(GL_ONE, GL_ONE);
+    glUseProgram(gbuf->spot_prog);
+    /*  It only needs to know positions and normals for each pixel  */
+    glUniform1i(gbuf->uni_normal_spot, gbuf->normal_slot);
+    glUniform1i(gbuf->uni_depth_spot, gbuf->depth_slot);
+    mat4 projview;
+    mat4_mul(projview, view->proj_matrix, view->view_matrix);
+    glUniformMatrix4fv(gbuf->uni_projview_spot, 1, GL_FALSE, *projview);
+    glUniformMatrix4fv(gbuf->uni_view_spot, 1, GL_FALSE, *view->view_matrix);
+    glUniform3f(gbuf->uni_eye_pos_spot, view->pos[0], view->pos[1], view->pos[2]);
+    vec2 clip = { view->near_far[1] / (view->near_far[1] - view->near_far[0]),
+                  (-view->near_far[1] * view->near_far[0]) / (view->near_far[1] - view->near_far[0]) };
+    glUniform2fv(gbuf->uni_clip_spot, 1, clip);
+    /*  A dummy VAO because the light volume mesh is defined in the shader  */
+    glBindVertexArray(gbuf->dummy_vao);
+}
+
+void pg_gbuffer_draw_spotlight(struct pg_gbuffer* gbuf,
+                               vec4 light, vec4 dir_angle, vec3 color)
+{
+    glUniform4fv(gbuf->uni_light_spot, 1, light);
+    glUniform4fv(gbuf->uni_dir_spot, 1, dir_angle);
+    glUniform3fv(gbuf->uni_color_spot, 1, color);
     glDrawArrays(GL_TRIANGLES, 0, 60);
 }
 
