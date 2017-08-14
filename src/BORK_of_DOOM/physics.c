@@ -61,7 +61,7 @@ int bork_map_collide(struct bork_map* map, struct bork_collision* coll_out,
     struct bork_map_object* obj;
     int i;
     ARR_FOREACH_PTR(map->objects, obj, i) {
-        if(obj->type == BORK_MAP_OBJ_LIGHT) continue;
+        if(obj->type != BORK_MAP_OBJ_DOOR) continue;
         mat4_translate(transform,
             obj->x * 2.0f + 1.0f,
             obj->y * 2.0f + 1.0f,

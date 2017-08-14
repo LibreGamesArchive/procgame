@@ -31,6 +31,7 @@ enum bork_tile_type {
     BORK_TILE_HANDRAIL,
     BORK_TILE_EDITOR_DOOR,
     BORK_TILE_EDITOR_LIGHT1,
+    BORK_TILE_EDITOR_LIGHT_WALLMOUNT,
     BORK_TILE_COUNT,
 };
 
@@ -60,7 +61,6 @@ struct bork_map_object {
     int x, y, z;
     enum {
         BORK_MAP_OBJ_DOOR,
-        BORK_MAP_OBJ_LIGHT,
     } type;
     union {
         struct {
@@ -78,6 +78,8 @@ struct bork_map {
     ARR_T(struct bork_map_object) objects;
     ARR_T(bork_entity_t) enemies;
     ARR_T(bork_entity_t) items;
+    ARR_T(struct bork_light) lights;
+    ARR_T(struct bork_light) spotlights;
     struct pg_model door_model;
     struct bork_entity* plr;
 };

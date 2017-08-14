@@ -315,7 +315,12 @@ static void bork_play_draw(struct pg_game_state* state)
     ARR_FOREACH_PTR(d->lights_buf, light, i) {
         pg_gbuffer_draw_light(&d->core->gbuf, light->pos, light->color);
     }
+    pg_gbuffer_begin_spotlight(&d->core->gbuf, &d->core->view);
+    ARR_FOREACH_PTR(d->spotlights, light, i) {
+        pg_gbuffer_draw_spotlight(&d->core->gbuf, light->pos, light->dir_angle, light->color);
+    }
     ARR_TRUNCATE(d->lights_buf, 0);
+    ARR_TRUNCATE(d->spotlights, 0);
     if(d->menu.state == BORK_MENU_CLOSED) pg_screen_dst();
     else pg_ppbuffer_dst(&d->core->ppbuf);
     pg_gbuffer_finish(&d->core->gbuf, (vec3){ 0.05, 0.05, 0.05 });
@@ -344,6 +349,7 @@ static void bork_play_draw(struct pg_game_state* state)
         draw_quickfetch_text(d, 0, (vec4){ 1, 1, 1, 0.15 }, (vec4){ 1, 1, 1, 0.75 });
         draw_quickfetch_items(d, (vec4){ 1, 1, 1, 0.15 }, (vec4){ 1, 1, 1, 0.75 });
     }
+        pg_shader_begin(&d->core->shader_text, NULL);
     bork_draw_fps(d->core);
 }
 
@@ -488,17 +494,24 @@ static void draw_bullets(struct bork_play_data* d, float lerp)
 static void draw_map_lights(struct bork_play_data* d)
 {
     int i;
-    struct bork_map_object* obj;
-    ARR_FOREACH_PTR(d->map.objects, obj, i) {
-        vec4 light = { obj->x * 2.0f + 1.0f,
-                       obj->y * 2.0f + 1.0f,
-                       obj->z * 2.0f + 1.5f, obj->light[3] };
+    struct bork_light* light;
+    ARR_FOREACH_PTR(d->map.lights, light, i) {
+        /*
         vec3 light_to_plr;
-        vec3_sub(light_to_plr, light, d->plr.pos);
+        vec3_sub(light_to_plr, light->pos, d->plr.pos);
         float dist = vec3_len(light_to_plr);
-        if(dist > 40) continue;
-        else if(dist > 20) light[3] *= 1 - (dist - 20) / 20;
-        draw_light(d, light, obj->light);
+        if(dist > 50) continue;
+        else if(dist > 30) light->pos[3] *= 1 - (dist - 30) / 20;*/
+        ARR_PUSH(d->lights_buf, *light);
+    }
+    ARR_FOREACH_PTR(d->map.spotlights, light, i) {
+        /*
+        vec3 light_to_plr;
+        vec3_sub(light_to_plr, light->pos, d->plr.pos);
+        float dist = vec3_len(light_to_plr);
+        if(dist > 50) continue;
+        else if(dist > 30) light->pos[3] *= 1 - (dist - 30) / 20;*/
+        ARR_PUSH(d->spotlights, *light);
     }
 }
 
@@ -507,6 +520,7 @@ static void draw_light(struct bork_play_data* d, vec4 light, vec3 color)
     struct bork_light new_light = {
         .pos = { light[0], light[1], light[2], light[3] },
         .color = { color[0], color[1], color[2] } };
+    //printf("%f, %f, %f, %f\n", light[0], light[1], light[2], light[3]);
     ARR_PUSH(d->lights_buf, new_light);
 }
 

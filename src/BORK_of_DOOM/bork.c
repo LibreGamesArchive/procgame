@@ -241,7 +241,7 @@ void bork_draw_fps(struct bork_game_core* core)
     vec4_set(fps_text.block_style[0], 0, 0, 1, 1.2);
     vec4_set(fps_text.block_color[0], 1, 1, 1, 1);
     snprintf(fps_text.block[0], 10, "FPS: %d", (int)pg_framerate());
-    pg_shader_text_transform(&core->shader_text, (vec2){ 0, 0 }, (vec2){ 8, 8 });
+    pg_shader_text_transform(&core->shader_text, (vec2){ 8, 8 }, (vec2){ 0, 0 });
     pg_shader_text_write(&core->shader_text, &fps_text);
 }
 

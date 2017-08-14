@@ -124,9 +124,10 @@ void bork_use_machinegun(struct bork_entity* ent, struct bork_play_data* d)
     vec3_scale(bullet_dir, bullet_dir, 1);
     struct bork_bullet new_bullet = {};
     vec3_dup(new_bullet.pos, d->plr.pos);
-    new_bullet.pos[0] += 0.4 * sin(d->plr.dir[0]);
-    new_bullet.pos[1] -= 0.4 * cos(d->plr.dir[0]);
-    new_bullet.pos[2] += 0.65;
+    new_bullet.pos[0] += 0.2 * sin(d->plr.dir[0]) + bullet_dir[0] * 0.3;
+    new_bullet.pos[1] -= 0.2 * cos(d->plr.dir[0]) - bullet_dir[1] * 0.3;
+    new_bullet.pos[2] += 0.65 + bullet_dir[2] * 0.3;
+    //vec3_add(new_bullet.pos, new_bullet.pos, bullet_dir);
     vec3_dup(new_bullet.dir, bullet_dir);
     ARR_PUSH(d->bullets, new_bullet);
 }

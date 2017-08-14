@@ -1,3 +1,4 @@
+#include <stdio.h>
 #include <stdlib.h>
 #include <limits.h>
 #include "procgl/procgl.h"
@@ -35,7 +36,6 @@ static void bork_editor_update_map(struct bork_editor_data* d)
                        d->core->mouse_pos[1] / d->core->screen_size[1] };
         vec2_sub(click, click, (vec2){ 0.19, 0.19 });
         vec2_scale(click, click, (1 / (0.02 * 32)) * 32);
-        printf("%f %f\n", click[0], click[1]);
         if(!(click[0] < 0 || click[0] >= 32 || click[1] < 0 || click[1] >= 32)) {
             struct bork_editor_entity new_ent = {
                 .type = d->ent_type,
@@ -246,17 +246,20 @@ static void bork_editor_draw(struct pg_game_state* state)
     pg_shader_text_resolution(shader, (vec2){ d->core->aspect_ratio, 1 });
     pg_shader_text_transform(shader, (vec2){ 1, 1 }, (vec2){});
     /*  Right-side UI text  */
-    struct pg_shader_text text = { .use_blocks = 3 };
+    struct pg_shader_text text = { .use_blocks = 4 };
     snprintf(text.block[0], 64, "LEVEL: %d", d->cursor[2]);
     vec4_set(text.block_style[0], 0.25, 0.1, 0.02, 1.2);
     vec4_set(text.block_color[0], 1, 1, 1, 1);
     snprintf(text.block[1], 64, "TILE DETAIL: %s", detail->name);
     vec4_set(text.block_style[1], 1, 0.2, 0.02, 1.2);
     vec4_set(text.block_color[1], 1, 1, 1, 1);
-    const struct bork_entity_profile* prof = &BORK_ENT_PROFILES[d->ent_type];
-    snprintf(text.block[2], 64, "PLACING ENTITY: %s", prof->name);
+    snprintf(text.block[2], 64, "ENTITY SNAP: %s", d->ent_snap ? "ON" : "OFF");
     vec4_set(text.block_style[2], 1, 0.23, 0.02, 1.2);
     vec4_set(text.block_color[2], 1, 1, 1, 1);
+    const struct bork_entity_profile* prof = &BORK_ENT_PROFILES[d->ent_type];
+    snprintf(text.block[3], 64, "PLACING ENTITY: %s", prof->name);
+    vec4_set(text.block_style[3], 1, 0.26, 0.02, 1.2);
+    vec4_set(text.block_color[3], 1, 1, 1, 1);
     pg_shader_text_write(shader, &text);
     bork_editor_draw_items_text(d);
     bork_draw_fps(d->core);
@@ -268,8 +271,9 @@ static void bork_editor_write_map(struct bork_editor_map* map, char* filename)
     if(!file) {
         printf("BORK map writing error: could not open file %s\n", filename);
     }
+    uint32_t len = map->ents.len;
     fwrite(map->tiles, sizeof(struct bork_editor_tile), 32 * 32 *32, file);
-    fwrite(&map->ents.len, sizeof(map->ents.len), 1, file);
+    fwrite(&map->ents.len, sizeof(len), 1, file);
     fwrite(map->ents.data, sizeof(struct bork_editor_entity), map->ents.len, file);
     fclose(file);
 }
@@ -282,7 +286,7 @@ int bork_editor_load_map(struct bork_editor_map* map, char* filename)
         return 0;
     }
     fread(map->tiles, sizeof(struct bork_editor_tile), 32 * 32 *32, file);
-    size_t num_items = 0;
+    uint32_t num_items = 0;
     fread(&num_items, sizeof(num_items), 1, file);
     ARR_RESERVE(map->ents, num_items);
     fread(map->ents.data, sizeof(struct bork_editor_entity), num_items, file);
@@ -319,11 +323,37 @@ void bork_editor_complete_map(struct bork_map* map, struct bork_editor_map* ed_m
                     ARR_PUSH(map->objects, new_obj);
                     tile->type = BORK_TILE_ATMO;
                 } else if(tile->type == BORK_TILE_EDITOR_LIGHT1) {
-                    struct bork_map_object new_obj = {
-                        .type = BORK_MAP_OBJ_LIGHT,
-                        .light = { 2, 2, 1.8, 8 },
-                        .x = i, .y = j, .z = k };
-                    ARR_PUSH(map->objects, new_obj);
+                    struct bork_light new_light = {
+                        .pos = { i * 2 + 1, j * 2 + 1, k * 2 + 1.25, 7 },
+                        .dir_angle = { 0, 0, -1, 2 },
+                        .color = { 1.5, 1.5, 1.2 } };
+                    ARR_PUSH(map->spotlights, new_light);
+                    tile->type = BORK_TILE_ATMO;
+                } else if(tile->type == BORK_TILE_EDITOR_LIGHT_WALLMOUNT) {
+                    struct bork_light new_light = {
+                        .pos = { i * 2 + 1, j * 2 + 1, k * 2 + 1.8, 5 },
+                        .dir_angle = { 0, 0, -1, 1.15 },
+                        .color = { 1.5, 1.5, 1.2 } };
+                    switch(tile->orientation) {
+                    default: case (1 << PG_FRONT):
+                        new_light.dir_angle[1] = 1;
+                        new_light.pos[1] -= 0.8;
+                        break;
+                    case (1 << PG_BACK):
+                        new_light.dir_angle[1] = -1;
+                        new_light.pos[1] += 0.8;
+                        break;
+                    case (1 << PG_LEFT):
+                        new_light.dir_angle[0] = 1;
+                        new_light.pos[0] -= 0.8;
+                        break;
+                    case (1 << PG_RIGHT):
+                        new_light.dir_angle[0] = -1;
+                        new_light.pos[0] += 0.8;
+                        break;
+                    }
+                    vec3_normalize(new_light.dir_angle, new_light.dir_angle);
+                    ARR_PUSH(map->spotlights, new_light);
                     tile->type = BORK_TILE_ATMO;
                 }
             }
