@@ -7,6 +7,10 @@
 #include "procgl/shader.h"
 #include "procgl/shaders/shaders.h"
 
+#ifdef PROCGL_STATIC_SHADERS
+#include "procgl/shaders/post_blur.glsl.h"
+#endif
+
 struct blur_data {
     int state_dir;
     vec2 state_scale;
@@ -23,6 +27,25 @@ static void blur_pre(struct pg_postproc* pp)
 
 void pg_postproc_blur(struct pg_postproc* pp, enum pg_postproc_blur_level level)
 {
+#ifdef PROCGL_STATIC_SHADERS
+    switch(level) {
+    case PG_BLUR3:
+        pg_postproc_load_static(pp, screen_vert_glsl, screen_vert_glsl_len,
+                                post_blur3_frag_glsl, post_blur3_frag_glsl_len,
+                             "color", "resolution");
+        break;
+    case PG_BLUR5:
+        pg_postproc_load_static(pp, screen_vert_glsl, screen_vert_glsl_len,
+                                post_blur5_frag_glsl, post_blur5_frag_glsl_len,
+                             "color", "resolution");
+        break;
+    case PG_BLUR7:
+        pg_postproc_load_static(pp, screen_vert_glsl, screen_vert_glsl_len,
+                                post_blur7_frag_glsl, post_blur7_frag_glsl_len,
+                             "color", "resolution");
+        break;
+    }
+#else
     switch(level) {
     case PG_BLUR3:
         pg_postproc_load(pp, "src/procgl/shaders/screen_vert.glsl",
@@ -40,6 +63,7 @@ void pg_postproc_blur(struct pg_postproc* pp, enum pg_postproc_blur_level level)
                              "color", "resolution");
         break;
     }
+#endif
     struct blur_data* d = malloc(sizeof(struct blur_data));
     d->state_dir = 0;
     vec2_set(d->state_scale, 1, 1);

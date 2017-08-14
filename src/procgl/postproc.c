@@ -102,6 +102,23 @@ void pg_postproc_load(struct pg_postproc* pp,
     pp->pre = NULL;
 }
 
+void pg_postproc_load_static(struct pg_postproc* pp,
+                      const char* vert, int vert_len,
+                      const char* frag, int frag_len,
+                      const char* color_name, const char* size_name)
+{
+    pg_compile_glsl_static(&pp->vert, &pp->frag, &pp->prog,
+                           vert, vert_len, frag, frag_len);
+    glGenVertexArrays(1, &pp->dummy_vao);
+    if(color_name) pp->tex_unit = glGetUniformLocation(pp->prog, color_name);
+    else pp->tex_unit = -1;
+    if(size_name) pp->uni_size = glGetUniformLocation(pp->prog, size_name);
+    else pp->uni_size = -1;
+    pp->data = NULL;
+    pp->deinit = NULL;
+    pp->pre = NULL;
+}
+
 void pg_postproc_deinit(struct pg_postproc* pp)
 {
     glDeleteShader(pp->vert);
