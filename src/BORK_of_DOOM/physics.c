@@ -10,7 +10,7 @@
     and returns information about the collision through 'coll_out', while
     returning 1 if there is a collision, 0 otherwise    */
 int bork_map_collide(struct bork_map* map, struct bork_collision* coll_out,
-                     vec3 pos, vec3 size)
+                     vec3 const pos, vec3 const size)
 {
     /*  Now make the box to check in the map for collisions, also in
         ellipsoid space; also scaled up a little bit so there's a safe
@@ -22,16 +22,16 @@ int bork_map_collide(struct bork_map* map, struct bork_collision* coll_out,
     vec3_sub(bbox[0], pos, size_scaled);
     vec3_add(bbox[1], pos, size_scaled);
     box_mul_vec3(bbox, bbox, (vec3){ 0.5, 0.5, 0.5 });
-    int check[2][3] = { { (int)bbox[0][0]-1, (int)bbox[0][1]-1, (int)bbox[0][2]-1 },
-                        { (int)bbox[1][0]+1, (int)bbox[1][1]+1, (int)bbox[1][2]+1 } };
+    int check[2][3] = { { (int)bbox[0][0], (int)bbox[0][1], (int)bbox[0][2] },
+                        { (int)bbox[1][0], (int)bbox[1][1], (int)bbox[1][2] } };
     /*  First check collisions against the map  */
+    struct pg_model* model = &map->model;
     int x, y, z;
     int hits = 0;
     float deepest = 0;
-    for(z = check[0][2]; z < check[1][2]; ++z) {
-        struct pg_model* model = &map->model;
-        for(y = check[0][1]; y < check[1][1]; ++y) {
-            for(x = check[0][0]; x < check[1][0]; ++x) {
+    for(z = check[0][2]; z <= check[1][2]; ++z) {
+        for(y = check[0][1]; y <= check[1][1]; ++y) {
+            for(x = check[0][0]; x <= check[1][0]; ++x) {
                 /*  Get the map area that the checked box is in */
                 /*  Get a pointer to the tile in the map area   */
                 struct bork_tile* tile = bork_map_tile_ptri(map, x, y, z);
@@ -42,7 +42,7 @@ int bork_map_collide(struct bork_map* map, struct bork_collision* coll_out,
                     triangles in the area model */
                 vec3 tile_push, tile_norm;
                 int c = pg_model_collide_ellipsoid_sub(model, tile_push,
-                            pos, size, 1, tile->model_tri_idx, tile->num_tris);
+                            pos, size, 3, tile->model_tri_idx, tile->num_tris);
                 if(c < 0) continue;
                 pg_model_get_face_normal(model, c, tile_norm);
                 float depth = vec3_len(tile_push);
@@ -79,7 +79,7 @@ int bork_map_collide(struct bork_map* map, struct bork_collision* coll_out,
         if(depth <= deepest) continue;
         deepest = depth;
         *coll_out = (struct bork_collision) {
-            .x = x, .y = y, .z = z, .tile = NULL };
+            .x = obj->x, .y = obj->y, .z = obj->z, .tile = NULL };
         vec3_dup(coll_out->push, obj_push);
         vec3_dup(coll_out->face_norm, obj_norm);
         if(++hits > 3) return 1;

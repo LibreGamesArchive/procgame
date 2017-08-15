@@ -1,3 +1,6 @@
+struct pg_model;
+struct pg_viewer;
+
 enum pg_matrix {
     PG_MODEL_MATRIX,
     PG_NORMAL_MATRIX,

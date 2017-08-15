@@ -23,6 +23,7 @@ void pg_ppbuffer_bind_all(struct pg_ppbuffer* buf);
 void pg_ppbuffer_bind_active(struct pg_ppbuffer* buf);
 void pg_ppbuffer_dst(struct pg_ppbuffer* buf);
 void pg_ppbuffer_swap(struct pg_ppbuffer* buf);
+void pg_ppbuffer_swapdst(struct pg_ppbuffer* buf);
 
 void pg_postproc_load(struct pg_postproc* pp,
                       const char* vert_filename, const char* frag_filename,

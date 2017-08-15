@@ -34,6 +34,7 @@ static float pg_wave_sample_array(struct pg_wave* wave, int* end_idx, int n,
             break;
         } else sub_len = 1;
         switch(iter->type) {
+        default: break;
         case PG_WAVE_CONSTANT: {
             s += iter->constant * iter->scale + iter->add;
             break;

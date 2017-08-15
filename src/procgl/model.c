@@ -594,7 +594,8 @@ void pg_model_get_face_normal(struct pg_model* model, unsigned t, vec3 out)
 }
 
 /*  Collision functions */
-static void nearest_on_triangle(vec3 out, vec3 p, vec3 a, vec3 b, vec3 c)
+static void nearest_on_triangle(vec3 out, vec3 const p,
+                                vec3 const a, vec3 const b, vec3 const c)
 {
     // Check if P in vertex region outside A
     vec3 ab, ac, ap, bp, cp;
@@ -660,13 +661,14 @@ static void nearest_on_triangle(vec3 out, vec3 p, vec3 a, vec3 b, vec3 c)
     vec3_add(out, ab, a);
 }
 
-int pg_model_collide_sphere(struct pg_model* model, vec3 out, vec3 pos, float r, int n)
+int pg_model_collide_sphere(struct pg_model* model, vec3 out, vec3 const pos,
+                            float r, int n)
 {
     return pg_model_collide_sphere_sub(model, out, pos, r, n, 0, model->tris.len);
 }
 
-int pg_model_collide_sphere_sub(struct pg_model* model, vec3 out, vec3 pos, float r, int n,
-                                unsigned sub_i, unsigned sub_len)
+int pg_model_collide_sphere_sub(struct pg_model* model, vec3 out, vec3 const pos,
+                                float r, int n, unsigned sub_i, unsigned sub_len)
 {
     float deepest = 0;
     int tri_idx = -1;
@@ -699,13 +701,14 @@ int pg_model_collide_sphere_sub(struct pg_model* model, vec3 out, vec3 pos, floa
     return tri_idx;
 }
 
-int pg_model_collide_ellipsoid(struct pg_model* model, vec3 out, vec3 pos, vec3 r, int n)
+int pg_model_collide_ellipsoid(struct pg_model* model, vec3 out, vec3 const pos,
+                               vec3 const r, int n)
 {
     return pg_model_collide_ellipsoid_sub(model, out, pos, r, n, 0, model->tris.len);
 }
 
-int pg_model_collide_ellipsoid_sub(struct pg_model* model, vec3 out, vec3 pos, vec3 r, int n,
-                                   unsigned sub_i, unsigned sub_len)
+int pg_model_collide_ellipsoid_sub(struct pg_model* model, vec3 out, vec3 const pos,
+                                   vec3 const r, int n, unsigned sub_i, unsigned sub_len)
 {
     float deepest = 0;
     int tri_idx = -1;

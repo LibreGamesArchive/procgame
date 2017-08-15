@@ -113,7 +113,7 @@ static void bork_menu_draw(struct pg_game_state* state)
     /*  Overlay */
     pg_screen_dst();
     struct pg_shader* shader = &d->core->shader_text;
-    bork_draw_backdrop(d->core, (vec4){ 1, 1, 1, 1 },
+    bork_draw_backdrop(d->core, (vec4){ 2, 2, 2, 1 },
                        (float)state->ticks / (float)state->tick_rate);
     bork_draw_linear_vignette(d->core, (vec4){ 0, 0, 0, 1 });
     pg_shader_text_ndc(shader, (vec2){d->core->aspect_ratio, 1});
@@ -124,7 +124,7 @@ static void bork_menu_draw(struct pg_game_state* state)
     for(i = 0; i < BORK_MENU_COUNT; ++i) {
         vec4_set(main_menu_text.block_style[i],
             (d->current_selection == i) * 0.15 + 0.1,
-            i * 0.2 - 0.6, 0.075, 1.2);
+            i * 0.2 - 0.5, 0.075, 1.2);
         vec4_set(main_menu_text.block_color[i], 1, 1, 1, 1);
     }
     pg_shader_text_write(shader, &main_menu_text);

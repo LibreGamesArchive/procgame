@@ -285,12 +285,18 @@ int bork_editor_load_map(struct bork_editor_map* map, char* filename)
         printf("BORK map loading error: could not open file %s\n", filename);
         return 0;
     }
-    fread(map->tiles, sizeof(struct bork_editor_tile), 32 * 32 *32, file);
+    int r = fread(map->tiles, sizeof(struct bork_editor_tile), 32 * 32 *32, file);
+    if(r != 32 * 32 * 32) {
+        printf("WARNING! Map file did not contain the correct number of tiles!\n");
+    }
     uint32_t num_items = 0;
-    fread(&num_items, sizeof(num_items), 1, file);
+    r = fread(&num_items, sizeof(num_items), 1, file);
     ARR_RESERVE(map->ents, num_items);
-    fread(map->ents.data, sizeof(struct bork_editor_entity), num_items, file);
-    map->ents.len = num_items;
+    r = fread(map->ents.data, sizeof(struct bork_editor_entity), num_items, file);
+    if(r != num_items) {
+        printf("WARNING! Map file's item count did not match actual number of stored items!\n");
+    }
+    map->ents.len = r;
     fclose(file);
     return 1;
 }

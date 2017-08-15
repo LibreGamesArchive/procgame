@@ -171,7 +171,7 @@ static void tick_control_play(struct bork_play_data* d)
     if(bork_input_event(d->core, kmap[BORK_CTRL_SELECT], BORK_CONTROL_HIT)
     && d->looked_item >= 0) {
         struct bork_entity* item = bork_entity_get(d->looked_item);
-        if(item) {
+        if(item && bork_map_check_vis(&d->map, d->plr.pos, item->pos)) {
             item->flags &= ~BORK_ENTFLAG_LOOKED_AT;
             if(item->type == BORK_ITEM_BULLETS) {
                 d->ammo_bullets += 30;

@@ -54,7 +54,7 @@ static void begin(struct pg_shader* shader, struct pg_viewer* view)
         glUniform1i(d->unis.norm_right, d->state.norm_right);
         glUniform1i(d->unis.norm_top, d->state.norm_top);
         glUniform1i(d->unis.norm_bottom, d->state.norm_bottom);
-        glUniform2fv(d->unis.tex_scale, 6, d->state.tex_scale);
+        glUniform2fv(d->unis.tex_scale, 6, (float*)d->state.tex_scale);
         d->tex_dirty = 0;
     }
     /*  Enable depth testing    */

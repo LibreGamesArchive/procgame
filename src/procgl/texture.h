@@ -1,3 +1,6 @@
+struct pg_heightmap;
+struct pg_wave;
+
 typedef unsigned char pg_texel_t[4];
 
 static inline void pg_texel_set(pg_texel_t t, unsigned char r, unsigned char g,

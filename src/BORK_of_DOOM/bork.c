@@ -1,5 +1,6 @@
 #include <stdlib.h>
 #include <limits.h>
+#include <time.h>
 #include "procgl/procgl.h"
 #include "bork.h"
 #include "entity.h"

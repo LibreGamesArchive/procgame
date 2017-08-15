@@ -6,4 +6,4 @@ struct bork_collision {
 };
 
 int bork_map_collide(struct bork_map* map, struct bork_collision* coll_out,
-                     vec3 pos, vec3 size);
+                     vec3 const pos, vec3 const size);

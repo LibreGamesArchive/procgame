@@ -17,7 +17,7 @@ void pg_texture_init_from_file(struct pg_texture* tex,
                                const char* diffuse_file, const char* light_file)
 {
     unsigned w0, h0, w1, h1;
-    lodepng_decode32_file(&tex->diffuse, &w0, &h0, diffuse_file);
+    lodepng_decode32_file((unsigned char**)&tex->diffuse, &w0, &h0, diffuse_file);
     tex->w = w0;
     tex->h = h0;
     tex->diffuse_slot = 0;
@@ -32,7 +32,7 @@ void pg_texture_init_from_file(struct pg_texture* tex,
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
     if(light_file) {
-        lodepng_decode32_file(&tex->light, &w1, &h1, light_file);
+        lodepng_decode32_file((unsigned char**)&tex->light, &w1, &h1, light_file);
         if(w0 != w1 || h0 != h1) {
             printf("Warning: colormap and normalmap size mismatch:\n"
                    "    colormap: %s\n    normalmap: %s\n",

@@ -6,11 +6,17 @@
 int main(int argc, char *argv[])
 {
     /*  Read the options file   */
-    FILE* config = fopen("./options.txt", "r");
-    int w, h, fullscreen;
+    int w, h, fullscreen, opts_read;
     float mouse_sens;
-    fscanf(config, "x:%d\ny:%d\nfullscreen:%d\nmouse:%f",
-           &w, &h, &fullscreen, &mouse_sens);
+    FILE* config = fopen("./options.txt", "r");
+    if(!config) {
+        printf("Could not read options.txt, exiting.\n");
+    }
+    opts_read = fscanf(config, "x:%d\ny:%d\nfullscreen:%d\nmouse:%f",
+                           &w, &h, &fullscreen, &mouse_sens);
+    if(opts_read != 4) {
+        printf("Bad options.txt, exiting.\n");
+    }
     /*  Init procgame   */
     pg_init(w, h, fullscreen, "BORK of DOOM");
     glEnable(GL_CULL_FACE);

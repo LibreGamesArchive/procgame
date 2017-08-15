@@ -74,14 +74,18 @@ static GLuint compile_glsl(const char* filename, GLenum type)
 {
     /*  Read the file into a buffer */
     FILE* f = fopen(filename, "r");
+    if(!f) {
+        printf("Could not read shader source file: %s\n", filename);
+        return 0;
+    }
     int len;
     fseek(f, 0, SEEK_END);
     len = ftell(f);
     GLchar source[len+1];
     const GLchar* double_ptr = source; /*  GL requires this   */
     fseek(f, 0, SEEK_SET);
-    fread(source, 1, len, f);
-    source[len] = '\0';
+    int r = fread(source, 1, len, f);
+    source[r] = '\0';
     /*  Create a shader and give it the source  */
     GLuint shader = glCreateShader(type);
     glShaderSource(shader, 1, &double_ptr, NULL);
