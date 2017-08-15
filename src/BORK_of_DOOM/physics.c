@@ -30,7 +30,6 @@ int bork_map_collide(struct bork_map* map, struct bork_collision* coll_out,
     float deepest = 0;
     for(z = check[0][2]; z < check[1][2]; ++z) {
         struct pg_model* model = &map->model;
-        mat4_translate(transform, 0, 0, 0);
         for(y = check[0][1]; y < check[1][1]; ++y) {
             for(x = check[0][0]; x < check[1][0]; ++x) {
                 /*  Get the map area that the checked box is in */
@@ -42,9 +41,8 @@ int bork_map_collide(struct bork_map* map, struct bork_collision* coll_out,
                 /*  Otherwise test collisions against this tile's associated
                     triangles in the area model */
                 vec3 tile_push, tile_norm;
-                int c = pg_model_collide_ellipsoid_sub(model, transform,
-                            tile->model_tri_idx, tile->num_tris,
-                            size, pos, tile_push);
+                int c = pg_model_collide_ellipsoid_sub(model, tile_push,
+                            pos, size, 1, tile->model_tri_idx, tile->num_tris);
                 if(c < 0) continue;
                 pg_model_get_face_normal(model, c, tile_norm);
                 float depth = vec3_len(tile_push);
@@ -68,10 +66,14 @@ int bork_map_collide(struct bork_map* map, struct bork_collision* coll_out,
             obj->y * 2.0f + 1.0f,
             obj->z * 2.0f + 1.0f + obj->door.pos);
         if(obj->door.dir) mat4_rotate_Z(transform, transform, M_PI * 0.5);
+        mat4 tx_inv;
+        mat4_invert(tx_inv, transform);
+        vec4 pos_tx;
+        mat4_mul_vec4(pos_tx, tx_inv, (vec4){ pos[0], pos[1], pos[2], 1 });
         vec3 obj_push, obj_norm;
-        int c = pg_model_collide_ellipsoid(&map->door_model, transform,
-                                           size, pos, obj_push);
+        int c = pg_model_collide_ellipsoid(&map->door_model, obj_push, pos_tx, size, 1);
         if(c < 0) continue;
+        mat3_mul_vec3(obj_push, transform, obj_push);
         pg_model_get_face_normal(&map->door_model, c, obj_norm);
         float depth = vec3_len(obj_push);
         if(depth <= deepest) continue;

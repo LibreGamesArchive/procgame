@@ -108,16 +108,12 @@ void pg_model_face_projection_overlap(struct pg_model* model, vec3 proj,
 
 /*  Collision functions - Return the nearest colliding triangle index, and set
     'out' argument to the push vector to get out of the collision   */
-int pg_model_collide_sphere(struct pg_model* model, mat4 transform,
-                            float r, vec3 pos, vec3 out);
-int pg_model_collide_sphere_sub(struct pg_model* model, mat4 transform,
-                                unsigned sub_i, unsigned sub_len,
-                                float r, vec3 pos, vec3 out);
-int pg_model_collide_ellipsoid(struct pg_model* model, mat4 transform,
-                               vec3 r, vec3 pos, vec3 out);
-int pg_model_collide_ellipsoid_sub(struct pg_model* model, mat4 transform,
-                                   unsigned sub_i, unsigned sub_len,
-                                   vec3 r, vec3 pos, vec3 out);
+int pg_model_collide_sphere(struct pg_model* model, vec3 out, vec3 pos, float r, int n);
+int pg_model_collide_sphere_sub(struct pg_model* model, vec3 out, vec3 pos, float r, int n,
+                                unsigned sub_i, unsigned sub_len);
+int pg_model_collide_ellipsoid(struct pg_model* model, vec3 out, vec3 pos, vec3 r, int n);
+int pg_model_collide_ellipsoid_sub(struct pg_model* model, vec3 out, vec3 pos, vec3 r, int n,
+                                   unsigned sub_i, unsigned sub_len);
 
 /*  PRIMITIVES  model_prims.c   */
 void pg_model_quad(struct pg_model* model, vec2 tex_scale);

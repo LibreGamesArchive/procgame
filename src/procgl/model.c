@@ -660,38 +660,31 @@ static void nearest_on_triangle(vec3 out, vec3 p, vec3 a, vec3 b, vec3 c)
     vec3_add(out, ab, a);
 }
 
-int pg_model_collide_sphere(struct pg_model* model, mat4 transform,
-                            float r, vec3 pos, vec3 out)
+int pg_model_collide_sphere(struct pg_model* model, vec3 out, vec3 pos, float r, int n)
 {
-    return pg_model_collide_sphere_sub(model, transform, 0, model->tris.len,
-                                       r, pos, out);
+    return pg_model_collide_sphere_sub(model, out, pos, r, n, 0, model->tris.len);
 }
 
-int pg_model_collide_sphere_sub(struct pg_model* model, mat4 transform,
-                                unsigned sub_i, unsigned sub_len,
-                                float r, vec3 pos, vec3 out)
+int pg_model_collide_sphere_sub(struct pg_model* model, vec3 out, vec3 pos, float r, int n,
+                                unsigned sub_i, unsigned sub_len)
 {
     float deepest = 0;
     int tri_idx = -1;
     int sub_end = sub_i + sub_len;
     int i;
-    vec4 pos_tx;
+    int hits = 0;
     vec3 tri_push;
-    mat4 tx_inv;
-    mat4_invert(tx_inv, transform);
-    mat4_mul_vec4(pos_tx, tx_inv, (vec4){ pos[0], pos[1], pos[2], 1.0f });
     for(i = sub_i; i < sub_end; ++i) {
         struct pg_tri* tri = &model->tris.data[i];
         vec3 p0, p1, p2;
         vec3_dup(p0, model->pos.data[tri->t[0]].v);
         vec3_dup(p1, model->pos.data[tri->t[1]].v);
         vec3_dup(p2, model->pos.data[tri->t[2]].v);
-        vec3 tmp_push;
         vec3 pos_to_tri;
-        nearest_on_triangle(pos_to_tri, pos_tx, p0, p1, p2);
-        vec3_sub(pos_to_tri, pos_tx, pos_to_tri);
+        nearest_on_triangle(pos_to_tri, pos, p0, p1, p2);
+        vec3_sub(pos_to_tri, pos, pos_to_tri);
         float dist = vec3_len(pos_to_tri);
-        if(dist <= r) {
+        if(dist < r) {
             /*  If this collision has the greatest depth so far, then
                 set the result to this one  */
             float depth = r - dist;
@@ -699,34 +692,28 @@ int pg_model_collide_sphere_sub(struct pg_model* model, mat4 transform,
             deepest = depth;
             vec3_set_len(tri_push, pos_to_tri, depth);
             tri_idx = i;
+            if(++hits >= n) break;
         }
     }
-    mat3_mul_vec3(out, transform, tri_push);
+    vec3_dup(out, tri_push);
     return tri_idx;
 }
 
-int pg_model_collide_ellipsoid(struct pg_model* model, mat4 transform,
-                               vec3 ellipsoid_r, vec3 ellipsoid_pos, vec3 out)
+int pg_model_collide_ellipsoid(struct pg_model* model, vec3 out, vec3 pos, vec3 r, int n)
 {
-    return pg_model_collide_ellipsoid_sub(model, transform, 0, model->tris.len,
-                                          ellipsoid_r, ellipsoid_pos, out);
+    return pg_model_collide_ellipsoid_sub(model, out, pos, r, n, 0, model->tris.len);
 }
 
-int pg_model_collide_ellipsoid_sub(struct pg_model* model, mat4 transform,
-                                   unsigned sub_i, unsigned sub_len,
-                                   vec3 r, vec3 pos, vec3 out)
+int pg_model_collide_ellipsoid_sub(struct pg_model* model, vec3 out, vec3 pos, vec3 r, int n,
+                                   unsigned sub_i, unsigned sub_len)
 {
     float deepest = 0;
     int tri_idx = -1;
     int sub_end = sub_i + sub_len;
     int i;
-    vec4 ellipsoid_tx;
-    mat4 tx_inv;
-    mat4_invert(tx_inv, transform);
-    mat4_mul_vec4(ellipsoid_tx, tx_inv,
-        (vec4){ pos[0], pos[1], pos[2], 1.0f });
+    int hits = 0;
     vec3 sphere_pos, tri_push;
-    vec3_div(sphere_pos, ellipsoid_tx, r);
+    vec3_div(sphere_pos, pos, r);
     for(i = sub_i; i < sub_end; ++i) {
         struct pg_tri* tri = &model->tris.data[i];
         vec3 p0, p1, p2;
@@ -748,9 +735,9 @@ int pg_model_collide_ellipsoid_sub(struct pg_model* model, mat4 transform,
             deepest = depth;
             vec3_set_len(tri_push, pos_to_tri, depth);
             tri_idx = i;
+            if(++hits >= n) break;
         }
     }
-    mat3_mul_vec3(tri_push, transform, tri_push);
     vec3_mul(out, tri_push, r);
     return tri_idx;
 }
