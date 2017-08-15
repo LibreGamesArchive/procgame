@@ -7,6 +7,22 @@
 #include "map_area.h"
 #include "game_states.h"
 
+static const char* BORK_AREA_STRING[] = {
+    [BORK_AREA_PETS] = "P.E.T.S.",
+    [BORK_AREA_WAREHOUSE] = "WAREHOUSE",
+    [BORK_AREA_CAFETERIA] = "CAFETERIA",
+    [BORK_AREA_REC_CENTER] = "DOG PARK",
+    [BORK_AREA_INFIRMARY] = "VETERINARY CLINIC",
+    [BORK_AREA_SCIENCE_LABS] = "SCIENCE LABS",
+    [BORK_AREA_COMMAND] = "COMMAND CENTER",
+    [BORK_AREA_MUTT] = "M.U.T.T.",
+    [BORK_AREA_EXTERIOR] = "BONZ EXTERIOR",
+};
+const char* bork_map_area_str(enum bork_area area) {
+    if(area >= BORK_AREA_PETS && area <= BORK_AREA_MUTT) return BORK_AREA_STRING[area];
+    else return BORK_AREA_STRING[BORK_AREA_EXTERIOR];
+}
+
 #define BORK_AREA_FLAG_SQUARE   (1 << 0)
 
 static int tile_model_basic(struct bork_map*, struct pg_texture*,
@@ -153,7 +169,7 @@ void bork_map_draw(struct bork_map* map, struct bork_game_core* core)
     }
 }
 
-struct bork_tile* bork_map_tile_ptr(struct bork_map* map, vec3 pos)
+struct bork_tile* bork_map_tile_ptr(struct bork_map* map, vec3 const pos)
 {
     int x = (int)(pos[0] * 0.5f);
     int y = (int)(pos[1] * 0.5f);
@@ -168,6 +184,57 @@ struct bork_tile* bork_map_tile_ptri(struct bork_map* map, int x, int y, int z)
     if(x >= 0 && x < 32 && y >= 0 && y < 32 && z >= 0 && z < 32)
         return &map->data[x][y][z];
     else return NULL;
+}
+
+int bork_map_check_sphere(struct bork_map* map, vec3 const pos, float r)
+{
+    box bbox;
+    vec3 r_scaled = { r * 1.25, r * 1.25, r * 1.25 };
+    vec3_sub(bbox[0], pos, r_scaled);
+    vec3_add(bbox[1], pos, r_scaled);
+    box_mul_vec3(bbox, bbox, (vec3){ 0.5, 0.5, 0.5 });
+    int check[2][3] = { { (int)bbox[0][0], (int)bbox[0][1], (int)bbox[0][2] },
+                        { (int)bbox[1][0], (int)bbox[1][1], (int)bbox[1][2] } };
+    /*  First check collisions against the map  */
+    struct pg_model* model = &map->model;
+    int x, y, z;
+    for(z = check[0][2]; z <= check[1][2]; ++z) {
+        for(y = check[0][1]; y <= check[1][1]; ++y) {
+            for(x = check[0][0]; x <= check[1][0]; ++x) {
+                /*  Get the map area that the checked box is in */
+                /*  Get a pointer to the tile in the map area   */
+                struct bork_tile* tile = bork_map_tile_ptri(map, x, y, z);
+                /*  If the tile is outside the map, or the tile is not
+                    collidable, move on to the next one */
+                if(!tile || tile->type < 2) continue;
+                /*  Otherwise test collisions against this tile's associated
+                    triangles in the area model */
+                vec3 tile_push;
+                int c = pg_model_collide_sphere_sub(model, tile_push,
+                            pos, r, 1, tile->model_tri_idx, tile->num_tris);
+                if(c >= 0) return 1;
+            }
+        }
+    }
+    return 0;
+}
+
+int bork_map_check_vis(struct bork_map* map, vec3 const start, vec3 const end)
+{
+    vec3 full_vec, part_vec, curr_point;
+    vec3_sub(full_vec, end, start);
+    float full_dist = vec3_len(full_vec);
+    float part_dist = 0.5;
+    float curr_dist = 0;
+    vec3_set_len(part_vec, full_vec, part_dist);
+    vec3_dup(curr_point, start);
+    while(curr_dist <= full_dist) {
+        if(bork_map_check_sphere(map, curr_point, 0.25)) return 0;
+        if(curr_dist + part_dist > full_dist) vec3_dup(curr_point, end);
+        else vec3_add(curr_point, curr_point, part_vec);
+        curr_dist += part_dist;
+    }
+    return 1;
 }
 
 /*  Model generation code   */

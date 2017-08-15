@@ -6,21 +6,10 @@ enum bork_area {
     BORK_AREA_INFIRMARY,
     BORK_AREA_SCIENCE_LABS,
     BORK_AREA_COMMAND,
-    BORK_AREA_EXTERIOR,
     BORK_AREA_MUTT,
+    BORK_AREA_EXTERIOR,
 };
-
-static const char* BORK_AREA_STRING[] = {
-    [BORK_AREA_PETS] = "P.E.T.S.",
-    [BORK_AREA_WAREHOUSE] = "WAREHOUSE",
-    [BORK_AREA_CAFETERIA] = "CAFETERIA",
-    [BORK_AREA_REC_CENTER] = "DOG PARK",
-    [BORK_AREA_INFIRMARY] = "VETERINARY CLINIC",
-    [BORK_AREA_SCIENCE_LABS] = "SCIENCE LABS",
-    [BORK_AREA_COMMAND] = "COMMAND CENTER",
-    [BORK_AREA_EXTERIOR] = "BONZ EXTERIOR",
-    [BORK_AREA_MUTT] = "M.U.T.T."
-};
+const char* bork_map_area_str(enum bork_area area);
 
 enum bork_tile_type {
     BORK_TILE_VAC,
@@ -98,10 +87,11 @@ const struct bork_tile_detail* bork_tile_detail(enum bork_tile_type type);
 void bork_map_init(struct bork_map* map);
 void bork_map_init_model(struct bork_map* map, struct bork_game_core* core);
 void bork_map_deinit(struct bork_map* map);
-struct bork_tile* bork_map_tile_ptr(struct bork_map* map, vec3 pos);
+struct bork_tile* bork_map_tile_ptr(struct bork_map* map, vec3 const pos);
 struct bork_tile* bork_map_tile_ptri(struct bork_map* map, int x, int y, int z);
 void bork_map_write_to_file(struct bork_map* map, char* filename);
 void bork_map_load_from_file(struct bork_map* map, char* filename);
 void bork_map_update(struct bork_map* map, struct bork_entity* plr);
 void bork_map_draw(struct bork_map* map, struct bork_game_core* core);
-/*  See physics.c   */
+int bork_map_check_sphere(struct bork_map* map, vec3 const pos, float r);
+int bork_map_check_vis(struct bork_map* map, vec3 const start, vec3 const end);
