@@ -1,6 +1,11 @@
+#define BORK_BULLET_DEAD            (1 << 0)
+#define BORK_BULLET_HURTS_PLAYER    (1 << 1)
+#define BORK_BULLET_HURTS_ENEMY     (1 << 2)
+
 struct bork_bullet {
-    int dead_ticks;
-    uint32_t flags;
+    uint16_t flags;
+    uint8_t dead_ticks;
+    uint8_t type;
     vec3 light_color;
     vec3 pos;
     vec3 dir;

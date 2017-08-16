@@ -32,6 +32,7 @@ void bork_bullet_move(struct bork_bullet* blt, struct bork_map* map)
         }
         vec3_add(new_pos, new_pos, max_move_dir);
         if(bork_map_collide(map, &coll, new_pos, (vec3){ 0.1, 0.1, 0.1 })) {
+            blt->flags |= BORK_BULLET_DEAD;
             blt->dead_ticks = 10;
             vec3_set(blt->dir, 0, 0, 0);
             vec3_sub(blt->pos, new_pos, max_move_dir);
@@ -57,6 +58,7 @@ void bork_bullet_move(struct bork_bullet* blt, struct bork_map* map)
         }
         if(closest_ent) {
             closest_ent->flags |= BORK_ENTFLAG_DEAD;
+            blt->flags |= BORK_BULLET_DEAD;
             blt->dead_ticks = 30;
             vec3_set(blt->dir, 0, 0, 0);
             vec3_set(blt->light_color, 2, 0.8, 0.8);

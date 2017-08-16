@@ -6,6 +6,8 @@ struct bork_play_data;
 #define BORK_ENTFLAG_GROUND     (1 << 2)
 #define BORK_ENTFLAG_LOOKED_AT  (1 << 3)
 #define BORK_ENTFLAG_ITEM       (1 << 4)
+#define BORK_ENTFLAG_PLAYER     (1 << 5)
+#define BORK_ENTFLAG_ENEMY      (1 << 6)
 
 struct bork_entity {
     vec3 pos;
@@ -42,9 +44,11 @@ static const struct bork_entity_profile {
     void (*hud_func)(struct bork_entity*, struct bork_play_data*);
 } BORK_ENT_PROFILES[] = {
     [BORK_ENTITY_PLAYER] = { .name = "Player",
+        .base_flags = BORK_ENTFLAG_PLAYER,
         .size = { 0.5, 0.5, 0.9 },
         .sprite_tx = { 1, 1, 0, 0 } },
     [BORK_ENTITY_ENEMY] = { .name = "Enemy",
+        .base_flags = BORK_ENTFLAG_ENEMY,
         .size = { 1, 1, 1 },
         .sprite_tx = { 1, 1, 0, 0 },
         .front_frame = 192,

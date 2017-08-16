@@ -240,6 +240,16 @@ static void tick_enemies(struct bork_play_data* d)
             ARR_SWAPSPLICE(d->map.enemies, i, 1);
             continue;
         }
+        int vis = bork_map_check_vis(&d->map, ent->pos, d->plr.pos);
+        if(vis && ent->counter[0] < d->ticks) {
+            vec3 ent_to_plr;
+            vec3_sub(ent_to_plr, d->plr.pos, ent->pos);
+            struct bork_bullet new_bullet = { .type = 1 };
+            vec3_set_len(new_bullet.dir, ent_to_plr, 1);
+            vec3_add(new_bullet.pos, ent->pos, new_bullet.dir);
+            ARR_PUSH(d->bullets, new_bullet);
+            ent->counter[0] = d->ticks + 60;
+        }
         bork_entity_update(ent, &d->map);
     }
 }
@@ -264,11 +274,13 @@ static void tick_bullets(struct bork_play_data* d)
     struct bork_bullet* blt;
     int i;
     ARR_FOREACH_PTR_REV(d->bullets, blt, i) {
-        if(blt->dead_ticks == 1) {
-            ARR_SWAPSPLICE(d->bullets, i, 1);
-            continue;
-        } else if(blt->dead_ticks) --blt->dead_ticks;
-        else bork_bullet_move(blt, &d->map);
+        if(blt->flags & BORK_BULLET_DEAD) {
+            if(blt->dead_ticks == 0) {
+                ARR_SWAPSPLICE(d->bullets, i, 1);
+                continue;
+            }
+            --blt->dead_ticks;
+        } else bork_bullet_move(blt, &d->map);
     }
 }
 
@@ -474,14 +486,19 @@ static void draw_bullets(struct bork_play_data* d, float lerp)
     pg_shader_sprite_color_mod(shader, (vec4){ 1.0f, 1.0f, 1.0f, 1.0f });
     pg_model_begin(model, shader);
     mat4 bullet_transform;
+    int current_frame = 0;
     struct bork_bullet* blt;
     int i;
     ARR_FOREACH_PTR(d->bullets, blt, i) {
-        if(blt->dead_ticks) {
+        if(blt->flags & BORK_BULLET_DEAD) {
             draw_light(d, (vec4){ blt->pos[0], blt->pos[1], blt->pos[2],
                                   ((float)blt->dead_ticks / 10.0f) * 3.0f },
                           blt->light_color);
             continue;
+        }
+        if(blt->type != current_frame) {
+            pg_shader_sprite_tex_frame(shader, blt->type);
+            current_frame = blt->type;
         }
         vec3 pos_lerp;
         vec3_scale(pos_lerp, blt->dir, lerp);
