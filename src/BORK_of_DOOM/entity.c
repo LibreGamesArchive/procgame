@@ -93,7 +93,7 @@ void bork_entity_move(struct bork_entity* ent, struct bork_map* map)
             vec3_add(new_pos, new_pos, coll.push);
             float down_angle = vec3_angle_diff(coll.face_norm, PG_DIR_VEC[PG_UP]);
             if(down_angle < 0.1 * M_PI) ent->flags |= BORK_ENTFLAG_GROUND;
-            else if(coll.tile && coll.tile->type == BORK_TILE_LADDER) ladder = 1;
+            if(coll.tile && coll.tile->type == BORK_TILE_LADDER) ladder = 1;
             ++hit;
         }
     }

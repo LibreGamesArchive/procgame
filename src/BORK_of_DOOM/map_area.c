@@ -32,16 +32,30 @@ static void bork_map_generate_model(struct bork_map* map,
 
 /*  Tile details */
 struct bork_tile_detail BORK_TILE_DETAILS[] = {
-    [BORK_TILE_VAC] = { .name = "Vacuum" },
-    [BORK_TILE_ATMO] = { .name = "Atmosphere" },
-    [BORK_TILE_HULL] = { .name = "Basic hull",
+    [BORK_TILE_VAC] = { .name = "VACUUM" },
+    [BORK_TILE_ATMO] = { .name = "ATMOSPHERE" },
+    [BORK_TILE_HULL] = { .name = "BASIC HULL",
         .face_flags = { 1, 1, 1, 1, 1, 1 },
         .tex_tile = {
-            [PG_LEFT] = 3, [PG_RIGHT] = 3,
-            [PG_FRONT] = 3, [PG_BACK] = 3,
+            [PG_LEFT] = 19, [PG_RIGHT] = 19,
+            [PG_FRONT] = 19, [PG_BACK] = 19,
+            [PG_TOP] = 3, [PG_DOWN] = 20 },
+        .add_model = tile_model_basic },
+    [BORK_TILE_HULL_EDGE] = { .name = "HULL EDGE",
+        .face_flags = { 1, 1, 1, 1, 1, 1 },
+        .tex_tile = {
+            [PG_LEFT] = 35, [PG_RIGHT] = 35,
+            [PG_FRONT] = 35, [PG_BACK] = 35,
+            [PG_TOP] = 3, [PG_DOWN] = 20 },
+        .add_model = tile_model_basic },
+    [BORK_TILE_CONTROL_PANEL] = { .name = "CONTROL PANEL",
+        .face_flags = { 1, 1, 1, 1, 1, 1 },
+        .tex_tile = {
+            [PG_LEFT] = 4, [PG_RIGHT] = 4,
+            [PG_FRONT] = 4, [PG_BACK] = 4,
             [PG_TOP] = 3, [PG_DOWN] = 3 },
         .add_model = tile_model_basic },
-    [BORK_TILE_LADDER] = { .name = "Ladder",
+    [BORK_TILE_LADDER] = { .name = "LADDER",
         .tile_flags = BORK_TILE_HAS_ORIENTATION | BORK_TILE_FACE_ORIENTED,
         .face_flags = { BORK_FACE_HAS_SURFACE | BORK_FACE_FLUSH_SURFACE |
                             BORK_FACE_HAS_BACKFACE | BORK_FACE_SEETHRU_SURFACE,
@@ -57,12 +71,12 @@ struct bork_tile_detail BORK_TILE_DETAILS[] = {
             [PG_LEFT] = 5, [PG_RIGHT] = 5,
             [PG_FRONT] = 5, [PG_BACK] = 5 },
         .add_model = tile_model_basic },
-    [BORK_TILE_CATWALK] = { .name = "Catwalk",
+    [BORK_TILE_CATWALK] = { .name = "CATWALK",
         .face_flags = { [PG_TOP] = BORK_FACE_HAS_SURFACE | BORK_FACE_HAS_BACKFACE },
         .face_inset = { },
         .tex_tile = { [PG_TOP] = 6 },
         .add_model = tile_model_basic },
-    [BORK_TILE_HANDRAIL] = { .name = "Handrail",
+    [BORK_TILE_HANDRAIL] = { .name = "HANDRAIL",
         .tile_flags = BORK_TILE_HAS_ORIENTATION | BORK_TILE_FACE_ORIENTED,
         .face_flags = { BORK_FACE_HAS_SURFACE | BORK_FACE_HAS_BACKFACE |
                             BORK_FACE_SEETHRU_SURFACE | BORK_FACE_HALF_BOTTOM,
@@ -75,11 +89,18 @@ struct bork_tile_detail BORK_TILE_DETAILS[] = {
         .face_inset = { -0.05, -0.05, -0.05, -0.05 },
         .tex_tile = { 7, 7, 7, 7 },
         .add_model = tile_model_basic },
-    [BORK_TILE_EDITOR_DOOR] = { .name = "Door (-> Atmosphere)",
+    [BORK_TILE_POWERBLOCK] = { .name = "POWER BLOCK",
+        .face_flags = { 1, 1, 1, 1, 1, 1 },
+        .tex_tile = {
+            [PG_LEFT] = 8, [PG_RIGHT] = 8,
+            [PG_FRONT] = 8, [PG_BACK] = 8,
+            [PG_TOP] = 9, [PG_DOWN] = 9 },
+        .add_model = tile_model_basic },
+    [BORK_TILE_EDITOR_DOOR] = { .name = "DOOR",
         .tile_flags = BORK_TILE_HAS_ORIENTATION,
     },
-    [BORK_TILE_EDITOR_LIGHT1] = { .name = "Light #1 (-> Atmosphere)" },
-    [BORK_TILE_EDITOR_LIGHT_WALLMOUNT] = { .name = "WALL-MOUNTED LIGHT",
+    [BORK_TILE_EDITOR_LIGHT1] = { .name = "CEIL LIGHT" },
+    [BORK_TILE_EDITOR_LIGHT_WALLMOUNT] = { .name = "WALL LIGHT",
         .tile_flags = BORK_TILE_HAS_ORIENTATION },
 };
 
@@ -117,55 +138,69 @@ void bork_map_deinit(struct bork_map* map)
 {
     pg_model_deinit(&map->model);
     pg_model_deinit(&map->door_model);
-    ARR_DEINIT(map->objects);
+    ARR_DEINIT(map->doors);
     ARR_DEINIT(map->enemies);
     ARR_DEINIT(map->items);
 }
 
 void bork_map_update(struct bork_map* map, struct bork_entity* plr)
 {
-    struct bork_map_object* obj;
+    struct bork_map_door* door;
     int i;
-    ARR_FOREACH_PTR(map->objects, obj, i) {
-        if(obj->type == BORK_MAP_OBJ_DOOR) {
-            vec3 obj_pos = { obj->x * 2.0f + 1.0f,
-                             obj->y * 2.0f + 1.0f,
-                             obj->z * 2.0f + 1.0f };
-            vec3 plr_to_door;
-            vec3_sub(plr_to_door, obj_pos, plr->pos);
-            float dist = vec3_len(plr_to_door);
-            if(dist < 3) {
-                obj->door.pos += 0.1;
-                if(obj->door.pos > 2) obj->door.pos = 2;
-            } else if(obj->door.pos > 0) {
-                obj->door.pos -= 0.1;
-                if(obj->door.pos < 0) obj->door.pos = 0;
-            }
+    ARR_FOREACH_PTR(map->doors, door, i) {
+        vec3 door_pos = { door->x * 2.0f + 1.0f,
+                         door->y * 2.0f + 1.0f,
+                         door->z * 2.0f + 1.0f };
+        vec3 plr_to_door;
+        vec3_sub(plr_to_door, door_pos, plr->pos);
+        float dist = vec3_len(plr_to_door);
+        if(dist < 3) {
+            door->pos += 0.1;
+            if(door->pos > 2) door->pos = 2;
+        } else if(door->pos > 0) {
+            door->pos -= 0.1;
+            if(door->pos < 0) door->pos = 0;
         }
     }
 }
 
 void bork_map_draw(struct bork_map* map, struct bork_game_core* core)
 {
-    pg_shader_begin(&core->shader_3d, &core->view);
+    struct pg_shader* shader = &core->shader_3d;
+    pg_shader_begin(shader, &core->view);
     /*  Draw the base level geometry    */
-    pg_model_begin(&map->model, &core->shader_3d);
+    pg_model_begin(&map->model, shader);
     mat4 model_transform;
     mat4_translate(model_transform, 0, 0, 0);
     pg_model_draw(&map->model, model_transform);
-    /*  Then draw the map objects (except lights)   */
+    /*  Then draw the map doors (except lights)   */
     int i;
-    struct bork_map_object* obj;
-    pg_model_begin(&map->door_model, &core->shader_3d);
-    ARR_FOREACH_PTR(map->objects, obj, i) {
-        if(obj->type == BORK_MAP_OBJ_DOOR) {
-            mat4_translate(model_transform,
-                           obj->x * 2.0f + 1.0f,
-                           obj->y * 2.0f + 1.0f,
-                           obj->z * 2.0f + 1.0f + obj->door.pos);
-            if(obj->door.dir) mat4_rotate_Z(model_transform, model_transform, M_PI * 0.5);
-            pg_model_draw(&map->door_model, model_transform);
+    struct bork_map_door* door;
+    pg_model_begin(&map->door_model, shader);
+    ARR_FOREACH_PTR(map->doors, door, i) {
+        mat4_translate(model_transform,
+                       door->x * 2.0f + 1.0f,
+                       door->y * 2.0f + 1.0f,
+                       door->z * 2.0f + 1.0f + door->pos);
+        if(door->dir) mat4_rotate_Z(model_transform, model_transform, M_PI * 0.5);
+        pg_model_draw(&map->door_model, model_transform);
+    }
+    shader = &core->shader_sprite;
+    pg_shader_begin(shader, &core->view);
+    pg_shader_sprite_mode(shader, PG_SPRITE_CYLINDRICAL);
+    pg_shader_sprite_transform(shader, (vec2){ 1, 1 }, (vec2){ 0, 0 });
+    pg_shader_sprite_texture(shader, &core->env_atlas);
+    pg_shader_sprite_tex_frame(shader, 16);
+    pg_model_begin(&core->enemy_model, shader);
+    int current_type = 0;
+    struct bork_map_light_fixture* lfix;
+    ARR_FOREACH_PTR(map->light_fixtures, lfix, i) {
+        mat4_translate(model_transform, lfix->pos[0], lfix->pos[1], lfix->pos[2]);
+        if(lfix->type != current_type) {
+            pg_shader_sprite_tex_frame(shader, lfix->type + 16);
+            current_type = lfix->type;
         }
+        pg_model_draw(&core->enemy_model, model_transform);
     }
 }
 

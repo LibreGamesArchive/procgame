@@ -15,9 +15,12 @@ enum bork_tile_type {
     BORK_TILE_VAC,
     BORK_TILE_ATMO,
     BORK_TILE_HULL,
+    BORK_TILE_HULL_EDGE,
+    BORK_TILE_CONTROL_PANEL,
     BORK_TILE_LADDER,
     BORK_TILE_CATWALK,
     BORK_TILE_HANDRAIL,
+    BORK_TILE_POWERBLOCK,
     BORK_TILE_EDITOR_DOOR,
     BORK_TILE_EDITOR_LIGHT1,
     BORK_TILE_EDITOR_LIGHT_WALLMOUNT,
@@ -37,6 +40,7 @@ enum bork_tile_type {
 #define BORK_TILE_SPECIAL_MODEL     (1 << 0)
 #define BORK_TILE_HAS_ORIENTATION   (1 << 1)
 #define BORK_TILE_FACE_ORIENTED     (1 << 2)
+#define BORK_TILE_EDITOR_PUSHUP     (1 << 3)
 
 struct bork_tile {
     enum bork_tile_type type;
@@ -46,25 +50,23 @@ struct bork_tile {
     uint32_t model_tri_idx;
 };
 
-struct bork_map_object {
+struct bork_map_door {
     int x, y, z;
-    enum {
-        BORK_MAP_OBJ_DOOR,
-    } type;
-    union {
-        struct {
-            int dir;
-            int locked;
-            float pos;
-        } door;
-        vec4 light;
-    };
+    int dir;
+    int locked;
+    float pos;
+};
+
+struct bork_map_light_fixture {
+    vec3 pos;
+    int type;
 };
 
 struct bork_map {
     struct pg_model model;
     struct bork_tile data[32][32][32];
-    ARR_T(struct bork_map_object) objects;
+    ARR_T(struct bork_map_door) doors;
+    ARR_T(struct bork_map_light_fixture) light_fixtures;
     ARR_T(bork_entity_t) enemies;
     ARR_T(bork_entity_t) items;
     ARR_T(struct bork_light) lights;

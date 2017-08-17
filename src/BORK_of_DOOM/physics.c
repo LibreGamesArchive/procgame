@@ -56,32 +56,31 @@ int bork_map_collide(struct bork_map* map, struct bork_collision* coll_out,
             }
         }
     }
-    /*  Next check collisions against map objects (that are close enough)   */
-    struct bork_map_object* obj;
+    /*  Next check collisions against map doorects (that are close enough)   */
+    struct bork_map_door* door;
     int i;
-    ARR_FOREACH_PTR(map->objects, obj, i) {
-        if(obj->type != BORK_MAP_OBJ_DOOR) continue;
+    ARR_FOREACH_PTR(map->doors, door, i) {
         mat4_translate(transform,
-            obj->x * 2.0f + 1.0f,
-            obj->y * 2.0f + 1.0f,
-            obj->z * 2.0f + 1.0f + obj->door.pos);
-        if(obj->door.dir) mat4_rotate_Z(transform, transform, M_PI * 0.5);
+            door->x * 2.0f + 1.0f,
+            door->y * 2.0f + 1.0f,
+            door->z * 2.0f + 1.0f + door->pos);
+        if(door->dir) mat4_rotate_Z(transform, transform, M_PI * 0.5);
         mat4 tx_inv;
         mat4_invert(tx_inv, transform);
         vec4 pos_tx;
         mat4_mul_vec4(pos_tx, tx_inv, (vec4){ pos[0], pos[1], pos[2], 1 });
-        vec3 obj_push, obj_norm;
-        int c = pg_model_collide_ellipsoid(&map->door_model, obj_push, pos_tx, size, 1);
+        vec3 door_push, door_norm;
+        int c = pg_model_collide_ellipsoid(&map->door_model, door_push, pos_tx, size, 1);
         if(c < 0) continue;
-        mat3_mul_vec3(obj_push, transform, obj_push);
-        pg_model_get_face_normal(&map->door_model, c, obj_norm);
-        float depth = vec3_len(obj_push);
+        mat3_mul_vec3(door_push, transform, door_push);
+        pg_model_get_face_normal(&map->door_model, c, door_norm);
+        float depth = vec3_len(door_push);
         if(depth <= deepest) continue;
         deepest = depth;
         *coll_out = (struct bork_collision) {
-            .x = obj->x, .y = obj->y, .z = obj->z, .tile = NULL };
-        vec3_dup(coll_out->push, obj_push);
-        vec3_dup(coll_out->face_norm, obj_norm);
+            .x = door->x, .y = door->y, .z = door->z, .tile = NULL };
+        vec3_dup(coll_out->push, door_push);
+        vec3_dup(coll_out->face_norm, door_norm);
         if(++hits > 3) return 1;
     }
     /*  Set the new position to the final pushed position   */
