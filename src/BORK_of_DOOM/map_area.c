@@ -197,7 +197,7 @@ void bork_map_draw(struct bork_map* map, struct bork_game_core* core)
     ARR_FOREACH_PTR(map->light_fixtures, lfix, i) {
         mat4_translate(model_transform, lfix->pos[0], lfix->pos[1], lfix->pos[2]);
         if(lfix->type != current_type) {
-            pg_shader_sprite_tex_frame(shader, lfix->type + 16);
+            pg_shader_sprite_tex_frame(shader, lfix->type + 160);
             current_type = lfix->type;
         }
         pg_model_draw(&core->enemy_model, model_transform);

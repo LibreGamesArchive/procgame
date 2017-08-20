@@ -117,14 +117,14 @@ static void bork_editor_update_map(struct bork_editor_data* d)
             d->cursor[2] = MOD(d->cursor[2] + 1, 32);
         else if(ctrl[SDL_SCANCODE_LSHIFT])
             d->ent_type = MOD((int)d->ent_type + 1, BORK_ENTITY_TYPES);
-        else d->current_tile.type = MOD(d->current_tile.type + 1, BORK_TILE_COUNT);
+        else d->current_tile.type = MOD((int)d->current_tile.type + 1, BORK_TILE_COUNT);
     }
     if(bork_input_event(d->core, SDL_SCANCODE_Y, BORK_CONTROL_HIT)) {
         if(ctrl[SDL_SCANCODE_LCTRL])
             d->cursor[2] = MOD(d->cursor[2] - 1, 32);
         else if(ctrl[SDL_SCANCODE_LSHIFT])
             d->ent_type = MOD((int)d->ent_type - 1, BORK_ENTITY_TYPES);
-        else d->current_tile.type = MOD(d->current_tile.type - 1, BORK_TILE_COUNT);
+        else d->current_tile.type = MOD((int)d->current_tile.type - 1, BORK_TILE_COUNT);
     }
     if(bork_input_event(d->core, SDL_SCANCODE_R, BORK_CONTROL_HIT)) {
         if(ctrl[SDL_SCANCODE_LCTRL]) bork_editor_write_map(&d->map, "test.bork_map");
@@ -312,7 +312,7 @@ static void bork_editor_draw(struct pg_game_state* state)
 
 static void bork_editor_write_map(struct bork_editor_map* map, char* filename)
 {
-    FILE* file = fopen(filename, "w");
+    FILE* file = fopen(filename, "wb");
     if(!file) {
         printf("BORK map writing error: could not open file %s\n", filename);
     }
@@ -325,7 +325,7 @@ static void bork_editor_write_map(struct bork_editor_map* map, char* filename)
 
 int bork_editor_load_map(struct bork_editor_map* map, char* filename)
 {
-    FILE* file = fopen(filename, "r");
+    FILE* file = fopen(filename, "rb");
     if(!file) {
         printf("BORK map loading error: could not open file %s\n", filename);
         return 0;
@@ -352,13 +352,13 @@ void bork_editor_complete_entity(struct bork_entity* ent,
     *ent = (struct bork_entity) {
         .pos = { (32 - ed->pos[0]) * 2, ed->pos[1] * 2, ed->pos[2] * 2 },
         .flags = BORK_ENT_PROFILES[ed->type].base_flags,
+        .item_quantity = 1,
         .type = ed->type,
     };
 }
 
 void bork_editor_complete_map(struct bork_map* map, struct bork_editor_map* ed_map)
 {
-    bork_map_init(map);
     int i, j, k;
     for(i = 0; i < 32; ++i) {
         for(j = 0; j < 32; ++j) {
@@ -377,13 +377,17 @@ void bork_editor_complete_map(struct bork_map* map, struct bork_editor_map* ed_m
                 } else if(tile->type == BORK_TILE_EDITOR_LIGHT1) {
                     struct bork_light new_light = {
                         .pos = { i * 2 + 1, j * 2 + 1, k * 2 + 1.75, 7 },
-                        .dir_angle = { 0, 0, -1, 1.75 },
+                        .dir_angle = { 0, 0, -1, 1.7 },
                         .color = { 1.5, 1.5, 1.2 } };
-                    if(ed_tile->dir & (1 << 7)) new_light.pos[2] += 2;
+                    int push = 0;
+                    if(ed_tile->dir & (1 << 7)) {
+                        push = 1;
+                        new_light.pos[2] += 1.3;
+                    }
                     ARR_PUSH(map->spotlights, new_light);
                     struct bork_map_light_fixture new_lfix = {
                         .pos = { new_light.pos[0], new_light.pos[1], new_light.pos[2] - 0.2 },
-                        .type = 0,
+                        .type = 0 + (push ? 2 : 0),
                     };
                     ARR_PUSH(map->light_fixtures, new_lfix);
                     tile->type = BORK_TILE_ATMO;
@@ -392,30 +396,32 @@ void bork_editor_complete_map(struct bork_map* map, struct bork_editor_map* ed_m
                         .pos = { i * 2 + 1, j * 2 + 1, k * 2 + 1.8, 5 },
                         .dir_angle = { 0, 0, -1, 1.15 },
                         .color = { 1.5, 1.5, 1.2 } };
-                    switch(tile->orientation) {
-                    default: case (1 << PG_FRONT):
+                    if(ed_tile->dir & (1 << PG_FRONT)) {
                         new_light.dir_angle[1] = 1;
                         new_light.pos[1] -= 0.8;
-                        break;
-                    case (1 << PG_BACK):
+                    }
+                    if(ed_tile->dir & (1 << PG_BACK)) {
                         new_light.dir_angle[1] = -1;
                         new_light.pos[1] += 0.8;
-                        break;
-                    case (1 << PG_LEFT):
+                    }
+                    if(ed_tile->dir & (1 << PG_LEFT)) {
                         new_light.dir_angle[0] = 1;
                         new_light.pos[0] -= 0.8;
-                        break;
-                    case (1 << PG_RIGHT):
+                    }
+                    if(ed_tile->dir & (1 << PG_RIGHT)) {
                         new_light.dir_angle[0] = -1;
                         new_light.pos[0] += 0.8;
-                        break;
                     }
-                    if(ed_tile->dir & (1 << 7)) new_light.pos[2] += 2;
+                    int push = 0;
+                    if(ed_tile->dir & (1 << 7)) {
+                        push = 1;
+                        new_light.pos[2] += 1.3;
+                    }
                     vec3_normalize(new_light.dir_angle, new_light.dir_angle);
                     ARR_PUSH(map->spotlights, new_light);
                     struct bork_map_light_fixture new_lfix = {
                         .pos = { new_light.pos[0], new_light.pos[1], new_light.pos[2] - 0.1 },
-                        .type = 1,
+                        .type = 1 + (push ? 2 : 0),
                     };
                     ARR_PUSH(map->light_fixtures, new_lfix);
                     tile->type = BORK_TILE_ATMO;
@@ -426,6 +432,12 @@ void bork_editor_complete_map(struct bork_map* map, struct bork_editor_map* ed_m
     bork_entity_t ent_arr = bork_entity_new(ed_map->ents.len);
     struct bork_editor_entity* ed_ent;
     ARR_FOREACH_PTR(ed_map->ents, ed_ent, i) {
+        if(ed_ent->type == BORK_ENTITY_PLAYER) {
+            if(!map->plr) continue;
+            vec3_set(map->plr->pos,
+                (32 - ed_ent->pos[0]) * 2, ed_ent->pos[1] * 2, ed_ent->pos[2] * 2);
+            continue;
+        }
         bork_entity_t ent_id = ent_arr + i;
         struct bork_entity* ent = bork_entity_get(ent_id);
         bork_editor_complete_entity(ent, ed_ent);
