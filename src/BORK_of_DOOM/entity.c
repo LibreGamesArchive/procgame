@@ -122,7 +122,7 @@ void bork_use_machinegun(struct bork_entity* ent, struct bork_play_data* d)
     spherical_to_cartesian(bullet_dir, (vec2){ d->plr.dir[0] - M_PI,
                                                d->plr.dir[1] - (M_PI * 0.5) });
     vec3_scale(bullet_dir, bullet_dir, 1);
-    struct bork_bullet new_bullet = { .type = 0 };
+    struct bork_bullet new_bullet = { .type = 0, .flags = BORK_BULLET_HURTS_ENEMY };
     vec3_dup(new_bullet.pos, d->plr.pos);
     new_bullet.pos[0] += 0.2 * sin(d->plr.dir[0]) + bullet_dir[0] * 0.3;
     new_bullet.pos[1] -= 0.2 * cos(d->plr.dir[0]) - bullet_dir[1] * 0.3;

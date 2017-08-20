@@ -241,13 +241,17 @@ static void tick_enemies(struct bork_play_data* d)
             ARR_SWAPSPLICE(d->map.enemies, i, 1);
             continue;
         }
-        int vis = bork_map_check_vis(&d->map, ent->pos, d->plr.pos);
+        vec3 ent_head, plr_head;
+        vec3_add(ent_head, ent->pos, (vec3){ 0, 0, 0.5 });
+        vec3_add(plr_head, d->plr.pos, (vec3){ 0, 0, 0.5 });
+        int vis = bork_map_check_vis(&d->map, ent_head, plr_head);
         if(vis && ent->counter[0] < d->ticks) {
             vec3 ent_to_plr;
-            vec3_sub(ent_to_plr, d->plr.pos, ent->pos);
-            struct bork_bullet new_bullet = { .type = 1 };
+            vec3_sub(ent_to_plr, plr_head, ent_head);
+            struct bork_bullet new_bullet = { .type = 1,
+                .flags = BORK_BULLET_HURTS_PLAYER };
             vec3_set_len(new_bullet.dir, ent_to_plr, 1);
-            vec3_add(new_bullet.pos, ent->pos, new_bullet.dir);
+            vec3_add(new_bullet.pos, ent_head, new_bullet.dir);
             ARR_PUSH(d->bullets, new_bullet);
             ent->counter[0] = d->ticks + 60;
         }
@@ -552,7 +556,6 @@ static void draw_light(struct bork_play_data* d, vec4 light, vec3 color)
     struct bork_light new_light = {
         .pos = { light[0], light[1], light[2], light[3] },
         .color = { color[0], color[1], color[2] } };
-    //printf("%f, %f, %f, %f\n", light[0], light[1], light[2], light[3]);
     ARR_PUSH(d->lights_buf, new_light);
 }
 
