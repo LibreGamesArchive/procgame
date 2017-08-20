@@ -238,11 +238,6 @@ static void tick_control_play(struct bork_play_data* d)
     && d->plr.flags & BORK_ENTFLAG_GROUND) {
         d->plr.vel[2] = 0.3;
         d->plr.flags &= ~BORK_ENTFLAG_GROUND;
-        bork_entity_t new_id = bork_entity_new(1);
-        struct bork_entity* new_ent = bork_entity_get(new_id);
-        bork_entity_init(new_ent, (rand() % 2) ? BORK_ITEM_DOGFOOD : BORK_ITEM_MACHINEGUN);
-        vec3_dup(new_ent->pos, d->plr.pos);
-        ARR_PUSH(d->map.items, new_id);
     }
     float move_speed = d->player_speed * (d->plr.flags & BORK_ENTFLAG_GROUND ? 1 : 0.15);
     if(ctrl[kmap[BORK_CTRL_LEFT]]) {
