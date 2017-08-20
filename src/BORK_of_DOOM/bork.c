@@ -140,6 +140,17 @@ void bork_load_assets(struct bork_game_core* core)
         vec4_set(color->v, 1, 1, 1, 1);
     }
     pg_shader_buffer_model(&core->shader_2d, &core->quad_2d);
+    /*  Generate audio  */
+    struct pg_audio_envelope env = {
+        .attack_time = 0.02, .max = 0.65,
+        .decay_time = 0.02, .sustain = 0.3,
+        .release_time = 0.1 };
+    struct pg_wave menu_wave[4] = {
+        PG_WAVE_FUNC_SINE(.frequency = { 440.0f }, .scale = 0.5 ),
+        PG_WAVE_FUNC_PERLIN(.frequency = { 1000.0f }),
+    };
+    pg_audio_alloc(&core->menu_sound, 0.15);
+    pg_audio_generate(&core->menu_sound, 0.15, &PG_WAVE_ARRAY(menu_wave, 4), &env);
 }
 
 void bork_poll_input(struct bork_game_core* core)

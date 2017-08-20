@@ -61,9 +61,11 @@ static void bork_menu_tick(struct pg_game_state* state)
             switch(e.key.keysym.scancode) {
             case SDL_SCANCODE_DOWN:
                 d->current_selection = MOD(d->current_selection + 1, BORK_MENU_COUNT);
+                pg_audio_play(&d->core->menu_sound, 0.2);
                 break;
             case SDL_SCANCODE_UP:
                 d->current_selection = MOD(d->current_selection - 1, BORK_MENU_COUNT);
+                pg_audio_play(&d->core->menu_sound, 0.2);
                 break;
             case SDL_SCANCODE_RETURN:
                 if(d->current_selection == BORK_MENU_NEW_GAME)

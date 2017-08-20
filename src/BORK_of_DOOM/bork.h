@@ -48,6 +48,7 @@ struct bork_game_core {
     struct pg_model bullet_model;
     struct pg_model enemy_model;
     struct pg_model gun_model;
+    struct pg_audio_chunk menu_sound;
     /*  Input state */
     uint8_t ctrl_map[BORK_CTRL_NULL];
     uint8_t ctrl_state[256];
