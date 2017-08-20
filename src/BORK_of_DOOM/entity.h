@@ -8,6 +8,8 @@ struct bork_play_data;
 #define BORK_ENTFLAG_ITEM       (1 << 4)
 #define BORK_ENTFLAG_PLAYER     (1 << 5)
 #define BORK_ENTFLAG_ENEMY      (1 << 6)
+#define BORK_ENTFLAG_DESTROY_ON_USE (1 << 7)
+#define BORK_ENTFLAG_STACKS     (1 << 8)
 
 struct bork_entity {
     vec3 pos;
@@ -17,6 +19,7 @@ struct bork_entity {
     int still_ticks;
     int HP;
     int counter[4];
+    int item_quantity;
     enum bork_entity_type {
         BORK_ENTITY_PLAYER,
         BORK_ENTITY_ENEMY,
@@ -54,12 +57,12 @@ static const struct bork_entity_profile {
         .front_frame = 192,
         .dir_frames = 4 },
     [BORK_ITEM_DOGFOOD] = { .name = "DOG FOOD",
-        .base_flags = BORK_ENTFLAG_ITEM,
+        .base_flags = BORK_ENTFLAG_ITEM | BORK_ENTFLAG_DESTROY_ON_USE | BORK_ENTFLAG_STACKS,
         .size = { 0.5, 0.5, 0.5 },
         .sprite_tx = { 1, 1, 0, 0 },
         .front_frame = 0,
         .use_ctrl = BORK_CONTROL_HIT,
-        .use_func = NULL },
+        .use_func = bork_use_dogfood },
     [BORK_ITEM_MACHINEGUN] = { .name = "MACHINE GUN",
         .base_flags = BORK_ENTFLAG_ITEM,
         .size = { 0.5, 0.5, 0.5 },

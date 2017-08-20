@@ -129,6 +129,13 @@ void bork_use_machinegun(struct bork_entity* ent, struct bork_play_data* d)
     new_bullet.pos[2] += 0.65 + bullet_dir[2] * 0.3;
     vec3_dup(new_bullet.dir, bullet_dir);
     ARR_PUSH(d->bullets, new_bullet);
+    bork_play_reset_hud_anim(d);
+    vec3_set(d->hud_anim[0], 0.3, 0, 0.02);
+    vec3_set(d->hud_anim[1], 0.025, 0, 0);
+    vec3_set(d->hud_anim[2], 0, 0, 0);
+    vec3_set(d->hud_anim[3], 0, 0, 0);
+    d->hud_anim_speed = 0.05;
+    d->hud_anim_active = 2;
 }
 
 void bork_hud_machinegun(struct bork_entity* ent, struct bork_play_data* d)
@@ -138,8 +145,24 @@ void bork_hud_machinegun(struct bork_entity* ent, struct bork_play_data* d)
     float ar = d->core->aspect_ratio;
     pg_shader_text_resolution(shader, (vec2){ ar, 1 });
     pg_shader_text_transform(shader, (vec2){ 1, 1 }, (vec2){});
-    snprintf(text.block[0], 64, "AMMO: %d", d->ammo_bullets);
-    vec4_set(text.block_style[0], ar - 0.6, 0.85, 0.025, 1.2);
+    int len = snprintf(text.block[0], 64, "AMMO: %d", d->ammo_bullets);
+    vec4_set(text.block_style[0], ar / 2 - (len * 0.025 * 1.2 * 0.5), 0.85, 0.025, 1.2);
     vec4_set(text.block_color[0], 1, 1, 1, 1);
     pg_shader_text_write(shader, &text);
+}
+
+void bork_use_dogfood(struct bork_entity* ent, struct bork_play_data* d)
+{
+    if(d->hud_anim_active && d->hud_anim_destroy_when_finished) return;
+    bork_play_reset_hud_anim(d);
+    d->plr.HP = MIN(100, d->plr.HP + 20);
+    vec3_set(d->hud_anim[0], 0, 0, 0);
+    vec3_set(d->hud_anim[1], -0.3, -0.3, 0);
+    vec3_set(d->hud_anim[2], 0, 0, 0);
+    vec3_set(d->hud_anim[3], 0, 0, 0);
+    d->hud_anim_speed = 0.02;
+    d->hud_anim_active = 2;
+    if(--ent->item_quantity == 0) {
+        d->hud_anim_destroy_when_finished = 1;
+    }
 }
