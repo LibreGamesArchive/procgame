@@ -61,6 +61,9 @@ float pg_wave_sample(struct pg_wave* wave, int d, vec4 p);
 #define PG_WAVE_MODULATE_PHASE(...) \
     ((struct pg_wave){ .type = PG_WAVE_PM, \
         .frequency = { 1, 1, 1, 1 }, .scale = 1, __VA_ARGS__ })
+#define PG_WAVE_MODULATE_AMPLITUDE(...) \
+    ((struct pg_wave){ .type = PG_WAVE_AM, \
+        .frequency = { 1, 1, 1, 1 }, .scale = 1, __VA_ARGS__ })
 #define PG_WAVE_MIX(f, k, ...) \
     ((struct pg_wave){ .type = PG_WAVE_MIX_FUNC, .mix = f, .mix_k = k, __VA_ARGS })
 #define PG_WAVE_POP()     ((struct pg_wave){ .type = PG_WAVE_POP })
@@ -118,39 +121,40 @@ float pg_wave_mix_lerp(float a, float b, float k);
                        .frequency = { 1, 1, 1, 1 }, .scale = 1, __VA_ARGS__ })
 
 /*  Built-in primitive functions    */
+float pg_wave_rand1(float x);
+#define PG_WAVE_FUNC_RAND(...) \
+    ( (struct pg_wave) { \
+        .type = PG_WAVE_FUNCTION, .dimension_mask = 0xF, \
+        .func1 = pg_wave_rand1, .scale = 1, .frequency = { 1 }, __VA_ARGS__ } )
+
 #include "ext/noise1234.h"
 #define PG_WAVE_FUNC_PERLIN(...) \
     ( (struct pg_wave) { \
         .type = PG_WAVE_FUNCTION, .dimension_mask = 0xF, \
         .func1 = perlin1, .func2 = perlin2, .func3 = perlin3, .func4 = perlin4, \
-        .scale = 1, .frequency = { 1, 1, 1, 1 }, \
-        __VA_ARGS__ } )
+        .scale = 1, .frequency = { 1, 1, 1, 1 }, __VA_ARGS__ } )
 
 /*  The 1D functions (use PG_WAVE_MOD_EXPAND to get more out of these)   */
 float pg_wave_sin1(float x);
 #define PG_WAVE_FUNC_SINE(...) \
     ( (struct pg_wave) { \
         .type = PG_WAVE_FUNCTION, .dimension_mask = 0x1, \
-        .func1 = pg_wave_sin1, .scale = 1, .frequency = { 1 }, \
-        __VA_ARGS__ } )
+        .func1 = pg_wave_sin1, .scale = 1, .frequency = { 1 }, __VA_ARGS__ } )
 float pg_wave_tri1(float x);
 #define PG_WAVE_FUNC_TRIANGLE(...) \
     ( (struct pg_wave) { \
         .type = PG_WAVE_FUNCTION, .dimension_mask = 0x1, \
-        .func1 = pg_wave_tri1, .scale = 1, .frequency = { 1 }, \
-        __VA_ARGS__ } )
+        .func1 = pg_wave_tri1, .scale = 1, .frequency = { 1 }, __VA_ARGS__ } )
 float pg_wave_square1(float x);
 #define PG_WAVE_FUNC_SQUARE(...) \
     ( (struct pg_wave) { \
         .type = PG_WAVE_FUNCTION, .dimension_mask = 0x1, \
-        .func1 = pg_wave_square1, .scale = 1, .frequency = { 1 }, \
-        __VA_ARGS__ } )
+        .func1 = pg_wave_square1, .scale = 1, .frequency = { 1 }, __VA_ARGS__ } )
 float pg_wave_saw1(float x);
 #define PG_WAVE_FUNC_SAW(...) \
     ( (struct pg_wave) { \
         .type = PG_WAVE_FUNCTION, .dimension_mask = 0x1, \
-        .func1 = pg_wave_saw1, .scale = 1, .frequency = { 1 }, \
-        __VA_ARGS__ } )
+        .func1 = pg_wave_saw1, .scale = 1, .frequency = { 1 }, __VA_ARGS__ } )
 
 /*  Some basic math functions for utility   */
 float pg_wave_dist1(float x);

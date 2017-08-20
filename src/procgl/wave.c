@@ -23,6 +23,7 @@ static float pg_wave_sample_array(struct pg_wave* wave, int* end_idx, int n,
         case 3: vec3_dup(p_, p); break;
         case 4: vec4_dup(p_, p); break;
     }
+    float scale = 1, add = 0;
     float s = 0;
     int i;
     int sub_len = 1;
@@ -69,6 +70,11 @@ static float pg_wave_sample_array(struct pg_wave* wave, int* end_idx, int n,
             }
             vec4_add(p_, iter_p, pm);
             vec4_add(p_, p_, iter->phase);
+            break;
+        } case PG_WAVE_AM: {
+            p_transform(iter_p, p_, iter->phase, iter->frequency);
+            float am = pg_wave_sample_array(iter + 1, &sub_len, n - i - 1, 4, iter_p);
+            scale *= am;
             break;
         } case PG_WAVE_ARRAY: {
             p_transform(iter_p, p_, iter->phase, iter->frequency);
@@ -178,7 +184,7 @@ static float pg_wave_sample_array(struct pg_wave* wave, int* end_idx, int n,
         } }
     }
     if(end_idx) *end_idx = i + sub_len;
-    return s;
+    return s * scale + add;
 }
 
 float pg_wave_sample(struct pg_wave* wave, int d, vec4 p)
@@ -218,6 +224,11 @@ float pg_wave_mix_lerp(float a, float b, float k)
 }
 
 /*  Function definitions for the built-in waves */
+float pg_wave_rand1(float x)
+{
+    return (float)((double)rand() / (double)RAND_MAX);
+}
+
 float pg_wave_sin1(float x)
 {
     return sin(x * M_PI * 2);
