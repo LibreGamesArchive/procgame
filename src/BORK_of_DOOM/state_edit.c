@@ -175,7 +175,7 @@ static void bork_editor_draw_items(struct bork_editor_data* d)
     pg_shader_2d_resolution(shader, (vec2){ d->core->aspect_ratio, 1 });
     pg_shader_2d_texture(shader, &d->core->bullet_tex);
     pg_shader_2d_tex_frame(shader, 0);
-    struct pg_model* model = &d->core->quad_2d;
+    struct pg_model* model = &d->core->quad_2d_ctr;
     pg_model_begin(model, shader);
     int i;
     struct bork_editor_entity* ent;
@@ -211,7 +211,7 @@ static void bork_editor_draw(struct pg_game_state* state)
     /*  Draw the map slice  */
     shader = &d->core->shader_2d;
     pg_shader_begin(shader, NULL);
-    pg_model_begin(&d->core->quad_2d, shader);
+    pg_model_begin(&d->core->quad_2d_ctr, shader);
     pg_shader_2d_resolution(shader, (vec2){ d->core->aspect_ratio, 1 });
     pg_shader_2d_texture(shader, &d->core->editor_atlas);
     pg_shader_2d_tex_weight(shader, 1.0f);
@@ -236,7 +236,7 @@ static void bork_editor_draw(struct pg_game_state* state)
             pg_shader_2d_transform(&d->core->shader_2d,
                 (vec2){ 0.2 + 0.02 * x, 0.2 + 0.02 * y },
                 (vec2){ 0.01, 0.01 }, 0);
-            pg_model_draw(&d->core->quad_2d, NULL);
+            pg_model_draw(&d->core->quad_2d_ctr, NULL);
         }
     }
     /*  Get the stuff for the currently selected tile   */
@@ -249,26 +249,26 @@ static void bork_editor_draw(struct pg_game_state* state)
     pg_shader_2d_transform(&d->core->shader_2d,
         (vec2){ d->cursor[0] * 0.02 + 0.2, d->cursor[1] * 0.02 + 0.2 },
         (vec2){ 0.02, 0.02 }, 0);
-    pg_model_draw(&d->core->quad_2d, NULL);
+    pg_model_draw(&d->core->quad_2d_ctr, NULL);
     if(cursor_detail->tile_flags & BORK_TILE_HAS_ORIENTATION) {
         int i;
         for(i = 0; i < 4; ++i) {
             if(!(d->current_tile.dir & (1 << i))) continue;
             pg_shader_2d_tex_frame(&d->core->shader_2d, 252 + i);
-            pg_model_draw(&d->core->quad_2d, NULL);
+            pg_model_draw(&d->core->quad_2d_ctr, NULL);
         }
     }
     /*  Draw the current "brush" tile   */
     pg_shader_2d_tex_frame(&d->core->shader_2d, tile->type);
     pg_shader_2d_transform(&d->core->shader_2d,
         (vec2){ 0.95, 0.2 }, (vec2){ 0.03, 0.03 }, 0);
-    pg_model_draw(&d->core->quad_2d, NULL);
+    pg_model_draw(&d->core->quad_2d_ctr, NULL);
     if(detail->tile_flags & BORK_TILE_HAS_ORIENTATION) {
         int i;
         for(i = 0; i < 4; ++i) {
             if(!(tile->dir & (1 << i))) continue;
             pg_shader_2d_tex_frame(&d->core->shader_2d, 252 + i);
-            pg_model_draw(&d->core->quad_2d, NULL);
+            pg_model_draw(&d->core->quad_2d_ctr, NULL);
         }
     }
     bork_editor_draw_items(d);

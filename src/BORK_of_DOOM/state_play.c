@@ -54,6 +54,7 @@ void bork_play_start(struct pg_game_state* state, struct bork_game_core* core)
     ARR_INIT(d->lights_buf);
     ARR_INIT(d->inventory);
     vec3_set(d->plr.pos, 32, 32, 40);
+    d->plr.HP = 75;
     /*  Generate the BONZ station   */
     struct bork_editor_map ed_map = {};
     bork_editor_load_map(&ed_map, "test.bork_map");
@@ -280,7 +281,9 @@ static void tick_bullets(struct bork_play_data* d)
                 continue;
             }
             --blt->dead_ticks;
-        } else bork_bullet_move(blt, &d->map);
+        } else {
+            bork_bullet_move(blt, &d->map);
+        }
     }
 }
 
@@ -360,8 +363,20 @@ static void bork_play_draw(struct pg_game_state* state)
         }
         draw_quickfetch_text(d, 0, (vec4){ 1, 1, 1, 0.15 }, (vec4){ 1, 1, 1, 0.75 });
         draw_quickfetch_items(d, (vec4){ 1, 1, 1, 0.15 }, (vec4){ 1, 1, 1, 0.75 });
+        pg_shader_begin(&d->core->shader_2d, NULL);
+        pg_model_begin(&d->core->quad_2d, &d->core->shader_2d);
+        pg_shader_2d_resolution(&d->core->shader_2d, (vec2){ d->core->aspect_ratio, 1 });
+        pg_shader_2d_tex_frame(&d->core->shader_2d, 60);
+        pg_shader_2d_add_tex_tx(&d->core->shader_2d, (vec2){ 4, 1 }, (vec2){ 0, 0 });
+        pg_shader_2d_transform(&d->core->shader_2d, (vec2){ 0.1, 0.8 }, (vec2){ 0.4, 0.1 }, 0);
+        pg_shader_2d_color_mod(&d->core->shader_2d, (vec4){ 1, 1, 1, 1 });
+        pg_model_draw(&d->core->quad_2d, NULL);
+        float hp_frac = (float)d->plr.HP / 100.0f;
+        pg_shader_2d_add_tex_tx(&d->core->shader_2d, (vec2){ hp_frac, 1 }, (vec2){ -0.5, 0 });
+        pg_shader_2d_transform(&d->core->shader_2d, (vec2){ 0.1, 0.8 }, (vec2){ 0.4 * hp_frac, 0.1 }, 0);
+        pg_model_draw(&d->core->quad_2d, NULL);
     }
-        pg_shader_begin(&d->core->shader_text, NULL);
+    pg_shader_begin(&d->core->shader_text, NULL);
     bork_draw_fps(d->core);
 }
 
@@ -577,7 +592,7 @@ static void draw_quickfetch_items(struct bork_play_data* d,
     pg_shader_2d_tex_frame(shader, 0);
     pg_shader_2d_color_mod(shader, (vec4){ 1, 1, 1, 1 });
     if(!pg_shader_is_active(shader)) pg_shader_begin(shader, NULL);
-    pg_model_begin(&d->core->quad_2d, shader);
+    pg_model_begin(&d->core->quad_2d_ctr, shader);
     struct bork_entity* item;
     const struct bork_entity_profile* prof;
     int current_frame = 0;
@@ -602,7 +617,7 @@ static void draw_quickfetch_items(struct bork_play_data* d,
         }
         pg_shader_2d_transform(shader, draw_pos[i],
             (vec2){ 0.05 * prof->sprite_tx[0], 0.05 * prof->sprite_tx[1] }, 0);
-        pg_model_draw(&d->core->quad_2d, NULL);
+        pg_model_draw(&d->core->quad_2d_ctr, NULL);
     }
 }
 

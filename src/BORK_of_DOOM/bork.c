@@ -122,17 +122,32 @@ void bork_load_assets(struct bork_game_core* core)
     pg_model_transform(&core->gun_model, transform);
     pg_model_precalc_ntb(&core->gun_model);
     pg_shader_buffer_model(&core->shader_3d, &core->gun_model);
-    /*  Our basic 2d quad for drawing images   */
-    pg_model_init(&core->quad_2d);
-    pg_model_quad(&core->quad_2d, (vec2){ 1, 1 });
+    /*  Our basic 2d quad for drawing images (centered)  */
+    pg_model_init(&core->quad_2d_ctr);
+    pg_model_quad(&core->quad_2d_ctr, (vec2){ 1, 1 });
     mat4_identity(transform);
     mat4_scale_aniso(transform, transform, 2, -2, 0);
-    pg_model_transform(&core->quad_2d, transform);
-    pg_model_reserve_component(&core->quad_2d,
+    pg_model_transform(&core->quad_2d_ctr, transform);
+    pg_model_reserve_component(&core->quad_2d_ctr,
         PG_MODEL_COMPONENT_COLOR | PG_MODEL_COMPONENT_HEIGHT);
     vec4_t* color;
     float* f;
     int i;
+    ARR_FOREACH_PTR(core->quad_2d_ctr.height, f, i) {
+        *f = 1.0f;
+    }
+    ARR_FOREACH_PTR(core->quad_2d_ctr.color, color, i) {
+        vec4_set(color->v, 1, 1, 1, 1);
+    }
+    pg_shader_buffer_model(&core->shader_2d, &core->quad_2d_ctr);
+    /*  Our basic 2d quad for drawing images (not centered)  */
+    pg_model_init(&core->quad_2d);
+    pg_model_quad(&core->quad_2d, (vec2){ 1, 1 });
+    mat4_translate(transform, 0.5, 0.5, 0);
+    mat4_scale_aniso(transform, transform, 1, -1, 0);
+    pg_model_transform(&core->quad_2d, transform);
+    pg_model_reserve_component(&core->quad_2d,
+        PG_MODEL_COMPONENT_COLOR | PG_MODEL_COMPONENT_HEIGHT);
     ARR_FOREACH_PTR(core->quad_2d.height, f, i) {
         *f = 1.0f;
     }
@@ -272,7 +287,7 @@ void bork_draw_backdrop(struct bork_game_core* core, vec4 color_mod, float t)
     pg_shader_2d_tex_weight(shader, 1);
     if(!pg_shader_is_active(shader)) pg_shader_begin(shader, NULL);
     pg_shader_2d_transform(shader, (vec2){}, (vec2){ core->aspect_ratio, 1 }, 0);
-    pg_model_begin(&core->quad_2d, shader);
+    pg_model_begin(&core->quad_2d_ctr, shader);
     int i;
     for(i = 0; i < 3; ++i) {
         vec4 c;
@@ -280,7 +295,7 @@ void bork_draw_backdrop(struct bork_game_core* core, vec4 color_mod, float t)
         pg_shader_2d_color_mod(shader, c);
         pg_shader_2d_tex_transform(shader, (vec2){ core->aspect_ratio, 1 },
            (vec2){ cos(t * f[i]) * off[i], sin(t * f[i]) * off[i] });
-        pg_model_draw(&core->quad_2d, NULL);
+        pg_model_draw(&core->quad_2d_ctr, NULL);
     }
 }
 
@@ -292,6 +307,6 @@ void bork_draw_linear_vignette(struct bork_game_core* core, vec4 color_mod)
     pg_shader_2d_texture(shader, &core->menu_vignette);
     pg_shader_2d_color_mod(shader, color_mod);
     if(!pg_shader_is_active(shader)) pg_shader_begin(shader, NULL);
-    pg_model_begin(&core->quad_2d, shader);
-    pg_model_draw(&core->quad_2d, NULL);
+    pg_model_begin(&core->quad_2d_ctr, shader);
+    pg_model_draw(&core->quad_2d_ctr, NULL);
 }

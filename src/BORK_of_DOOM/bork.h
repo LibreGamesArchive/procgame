@@ -45,6 +45,7 @@ struct bork_game_core {
     struct pg_texture backdrop_tex;
     struct pg_texture menu_vignette;
     struct pg_model quad_2d;
+    struct pg_model quad_2d_ctr;
     struct pg_model bullet_model;
     struct pg_model enemy_model;
     struct pg_model gun_model;
