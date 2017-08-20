@@ -1,7 +1,7 @@
 #define PG_AUDIO_SAMPLE_RATE 44100
 
 struct pg_audio_chunk {
-    float* samples;
+    int16_t* samples;
     int len;
 };
 
