@@ -103,6 +103,9 @@ static void bork_editor_update_map(struct bork_editor_data* d)
             } else d->current_tile.dir = 1 << PG_BACK;
         } else d->cursor[1] = MOD(d->cursor[1] - 1, 32);
     }
+    if(bork_input_event(d->core, SDL_SCANCODE_N, BORK_CONTROL_HIT)) {
+        if(ctrl[SDL_SCANCODE_LCTRL]) d->current_tile.dir = 0;
+    }
     if(bork_input_event(d->core, SDL_SCANCODE_V, BORK_CONTROL_HIT)) {
         if(d->select_mode < 1) {
             d->select_mode = 1;

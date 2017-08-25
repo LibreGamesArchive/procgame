@@ -28,6 +28,7 @@ struct bork_entity {
         BORK_ITEM_BULLETS,
         BORK_ITEM_SCRAPMETAL,
         BORK_ITEM_MACHINEGUN,
+        BORK_ITEM_PLANT1,
         BORK_ENTITY_TYPES,
     } type;
 };
@@ -77,6 +78,11 @@ static const struct bork_entity_profile {
         .size = { 0.5, 0.5, 0.5 },
         .sprite_tx = { 1, 1, 0, 0 },
         .front_frame = 1 },
+    [BORK_ITEM_PLANT1] = { .name = "PLANT",
+        .base_flags = BORK_ENTFLAG_ITEM | BORK_ENTFLAG_STACKS,
+        .size = { 0.5, 0.5, 0.5 },
+        .sprite_tx = { 1, 1, 0, 0 },
+        .front_frame = 3 },
     [BORK_ITEM_SCRAPMETAL] = { .name = "SCRAP METAL",
         .base_flags = BORK_ENTFLAG_ITEM,
         .size = { 0.5, 0.5, 0.5 },
@@ -90,3 +96,4 @@ struct bork_entity* bork_entity_get(bork_entity_t ent);
 void bork_entity_init(struct bork_entity* ent, enum bork_entity_type type);
 void bork_entity_push(struct bork_entity* ent, vec3 push);
 void bork_entity_update(struct bork_entity* ent, struct bork_map* map);
+int bork_entity_ground(struct bork_entity* ent);
