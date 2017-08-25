@@ -173,6 +173,7 @@ dump_shaders: src/procgl/shaders/*.glsl
     xxd -i post_blur3_frag.glsl >> post_blur.glsl.h && \
     xxd -i post_blur5_frag.glsl >> post_blur.glsl.h && \
     xxd -i post_blur7_frag.glsl >> post_blur.glsl.h && \
+    xxd -i deferred_spot_vert.glsl >> deferred.glsl.h && \
     xxd -i deferred_vert.glsl >> deferred.glsl.h && \
     xxd -i deferred_frag.glsl >> deferred.glsl.h && \
     xxd -i deferred_spot_frag.glsl >> deferred.glsl.h && \

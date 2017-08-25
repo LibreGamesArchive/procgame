@@ -1,15 +1,9 @@
-struct bork_light {
-    vec4 pos;
-    vec4 dir_angle;
-    vec3 color;
-};
-
 struct bork_play_data {
     /*  Core data   */
     int ticks;
     struct bork_game_core* core;
-    ARR_T(struct bork_light) lights_buf;    /*  Updated per frame   */
-    ARR_T(struct bork_light) spotlights;
+    ARR_T(struct pg_light) lights_buf;    /*  Updated per frame   */
+    ARR_T(struct pg_light) spotlights;
     /*  Gameplay data   */
     struct bork_map map;
     struct bork_entity plr;

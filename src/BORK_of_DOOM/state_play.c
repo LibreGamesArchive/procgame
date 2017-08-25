@@ -1,4 +1,5 @@
 #include <stdlib.h>
+#include <stdio.h>
 #include <limits.h>
 #include "procgl/procgl.h"
 #include "bork.h"
@@ -360,7 +361,7 @@ static void draw_enemies(struct bork_play_data* d, float lerp);
 static void draw_items(struct bork_play_data* d, float lerp);
 static void draw_bullets(struct bork_play_data* d, float lerp);
 static void draw_map_lights(struct bork_play_data* d);
-static void draw_light(struct bork_play_data* d, vec4 light, vec3 color);
+static void draw_lights(struct bork_play_data* d);
 static void draw_menu_inv(struct bork_play_data* d, float t);
 static void draw_quickfetch_text(struct bork_play_data* d, int draw_label,
                                  vec4 color_mod, vec4 selected_mod);
@@ -391,19 +392,7 @@ static void bork_play_draw(struct pg_game_state* state)
     pg_shader_3d_texture(&d->core->shader_3d, &d->core->env_atlas);
     bork_map_draw(&d->map, d->core);
     draw_map_lights(d);
-    /*  Lighting    */
-    pg_gbuffer_begin_light(&d->core->gbuf, &d->core->view);
-    int i;
-    struct bork_light* light;
-    ARR_FOREACH_PTR(d->lights_buf, light, i) {
-        pg_gbuffer_draw_light(&d->core->gbuf, light->pos, light->color);
-    }
-    pg_gbuffer_begin_spotlight(&d->core->gbuf, &d->core->view);
-    ARR_FOREACH_PTR(d->spotlights, light, i) {
-        pg_gbuffer_draw_spotlight(&d->core->gbuf, light->pos, light->dir_angle, light->color);
-    }
-    ARR_TRUNCATE(d->lights_buf, 0);
-    ARR_TRUNCATE(d->spotlights, 0);
+    draw_lights(d);
     if(d->menu.state == BORK_MENU_CLOSED) pg_screen_dst();
     else pg_ppbuffer_dst(&d->core->ppbuf);
     pg_gbuffer_finish(&d->core->gbuf, (vec3){ 0.05, 0.05, 0.05 });
@@ -423,6 +412,46 @@ static void bork_play_draw(struct pg_game_state* state)
     }
     pg_shader_begin(&d->core->shader_text, NULL);
     bork_draw_fps(d->core);
+}
+
+static void draw_lights(struct bork_play_data* d)
+{
+    pg_gbuffer_begin_pointlight(&d->core->gbuf, &d->core->view);
+    int i;
+    int nearlights = 0;
+    struct pg_light* light;
+    ARR_FOREACH_PTR(d->lights_buf, light, i) {
+        vec3 light_to_plr;
+        vec3_sub(light_to_plr, light->pos, d->plr.pos);
+        vec3_abs(light_to_plr, light_to_plr);
+        if(vec3_vmax(light_to_plr) < light->size * 1.25) {
+            d->lights_buf.data[nearlights++] = *light;
+            continue;
+        }
+        pg_gbuffer_draw_pointlight(&d->core->gbuf, light);
+    }
+    pg_gbuffer_mode(&d->core->gbuf, 1);
+    for(i = 0; i < nearlights; ++i) {
+        pg_gbuffer_draw_pointlight(&d->core->gbuf, &d->lights_buf.data[i]);
+    }
+    nearlights = 0;
+    pg_gbuffer_begin_spotlight(&d->core->gbuf, &d->core->view);
+    ARR_FOREACH_PTR(d->spotlights, light, i) {
+        vec3 light_to_plr;
+        vec3_sub(light_to_plr, light->pos, d->plr.pos);
+        vec3_abs(light_to_plr, light_to_plr);
+        if(vec3_vmax(light_to_plr) < light->size * 1.5) {
+            d->spotlights.data[nearlights++] = *light;
+            continue;
+        }
+        pg_gbuffer_draw_spotlight(&d->core->gbuf, light);
+    }
+    pg_gbuffer_mode(&d->core->gbuf, 1);
+    for(i = 0; i < nearlights; ++i) {
+        pg_gbuffer_draw_spotlight(&d->core->gbuf, &d->spotlights.data[i]);
+    }
+    ARR_TRUNCATE(d->lights_buf, 0);
+    ARR_TRUNCATE(d->spotlights, 0);
 }
 
 static void draw_hud_overlay(struct bork_play_data* d)
@@ -588,9 +617,10 @@ static void draw_bullets(struct bork_play_data* d, float lerp)
     int i;
     ARR_FOREACH_PTR(d->bullets, blt, i) {
         if(blt->flags & BORK_BULLET_DEAD) {
-            draw_light(d, (vec4){ blt->pos[0], blt->pos[1], blt->pos[2],
-                                  ((float)blt->dead_ticks / 10.0f) * 3.0f },
-                          blt->light_color);
+            struct pg_light light;
+            pg_light_pointlight(&light, blt->pos,
+                ((float)blt->dead_ticks / 10.0f) * 1.0f, blt->light_color);
+            ARR_PUSH(d->lights_buf, light);
             continue;
         }
         if(blt->type != current_frame) {
@@ -608,9 +638,9 @@ static void draw_bullets(struct bork_play_data* d, float lerp)
 static void draw_map_lights(struct bork_play_data* d)
 {
     int i;
-    struct bork_light* light;
+    struct pg_light* light;
     ARR_FOREACH_PTR(d->map.lights, light, i) {
-        /*
+    /*
         vec3 light_to_plr;
         vec3_sub(light_to_plr, light->pos, d->plr.pos);
         float dist = vec3_len(light_to_plr);
@@ -619,7 +649,7 @@ static void draw_map_lights(struct bork_play_data* d)
         ARR_PUSH(d->lights_buf, *light);
     }
     ARR_FOREACH_PTR(d->map.spotlights, light, i) {
-        /*
+    /*
         vec3 light_to_plr;
         vec3_sub(light_to_plr, light->pos, d->plr.pos);
         float dist = vec3_len(light_to_plr);
@@ -627,14 +657,6 @@ static void draw_map_lights(struct bork_play_data* d)
         else if(dist > 30) light->pos[3] *= 1 - (dist - 30) / 20;*/
         ARR_PUSH(d->spotlights, *light);
     }
-}
-
-static void draw_light(struct bork_play_data* d, vec4 light, vec3 color)
-{
-    struct bork_light new_light = {
-        .pos = { light[0], light[1], light[2], light[3] },
-        .color = { color[0], color[1], color[2] } };
-    ARR_PUSH(d->lights_buf, new_light);
 }
 
 static void tick_control_inv_menu(struct bork_play_data* d)

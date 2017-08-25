@@ -375,10 +375,10 @@ void bork_editor_complete_map(struct bork_map* map, struct bork_editor_map* ed_m
                     ARR_PUSH(map->doors, new_door);
                     tile->type = BORK_TILE_ATMO;
                 } else if(tile->type == BORK_TILE_EDITOR_LIGHT1) {
-                    struct bork_light new_light = {
-                        .pos = { i * 2 + 1, j * 2 + 1, k * 2 + 1.75, 7 },
-                        .dir_angle = { 0, 0, -1, 1.7 },
-                        .color = { 1.5, 1.5, 1.2 } };
+                    struct pg_light new_light;
+                    pg_light_spotlight(&new_light,
+                        (vec3){ i * 2 + 1, j * 2 + 1, k * 2 + 1.75 }, 7,
+                        (vec3){ 1.5, 1.5, 1.2 }, (vec3){ 0, 0, -1 }, 1.7);
                     int push = 0;
                     if(ed_tile->dir & (1 << 7)) {
                         push = 1;
@@ -392,32 +392,33 @@ void bork_editor_complete_map(struct bork_map* map, struct bork_editor_map* ed_m
                     ARR_PUSH(map->light_fixtures, new_lfix);
                     tile->type = BORK_TILE_ATMO;
                 } else if(tile->type == BORK_TILE_EDITOR_LIGHT_WALLMOUNT) {
-                    struct bork_light new_light = {
-                        .pos = { i * 2 + 1, j * 2 + 1, k * 2 + 1.8, 5 },
-                        .dir_angle = { 0, 0, -1, 1.15 },
-                        .color = { 1.5, 1.5, 1.2 } };
+                    vec3 dir_angle = { 0, 0, -1 };
+                    vec3 pos = { i * 2 + 1, j * 2 + 1, k * 2 + 1.75 };
                     if(ed_tile->dir & (1 << PG_FRONT)) {
-                        new_light.dir_angle[1] = 1;
-                        new_light.pos[1] -= 0.8;
+                        dir_angle[1] = 1;
+                        pos[1] -= 0.8;
                     }
                     if(ed_tile->dir & (1 << PG_BACK)) {
-                        new_light.dir_angle[1] = -1;
-                        new_light.pos[1] += 0.8;
+                        dir_angle[1] = -1;
+                        pos[1] += 0.8;
                     }
                     if(ed_tile->dir & (1 << PG_LEFT)) {
-                        new_light.dir_angle[0] = 1;
-                        new_light.pos[0] -= 0.8;
+                        dir_angle[0] = 1;
+                        pos[0] -= 0.8;
                     }
                     if(ed_tile->dir & (1 << PG_RIGHT)) {
-                        new_light.dir_angle[0] = -1;
-                        new_light.pos[0] += 0.8;
+                        dir_angle[0] = -1;
+                        pos[0] += 0.8;
                     }
                     int push = 0;
                     if(ed_tile->dir & (1 << 7)) {
                         push = 1;
-                        new_light.pos[2] += 1.3;
+                        pos[2] += 1.3;
                     }
-                    vec3_normalize(new_light.dir_angle, new_light.dir_angle);
+                    vec3_normalize(dir_angle, dir_angle);
+                    struct pg_light new_light;
+                    pg_light_spotlight(&new_light,
+                        pos, 5, (vec3){ 1.5, 1.5, 1.2 }, dir_angle, 1.15);
                     ARR_PUSH(map->spotlights, new_light);
                     struct bork_map_light_fixture new_lfix = {
                         .pos = { new_light.pos[0], new_light.pos[1], new_light.pos[2] - 0.1 },

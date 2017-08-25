@@ -40,7 +40,6 @@ enum bork_tile_type {
 #define BORK_TILE_SPECIAL_MODEL     (1 << 0)
 #define BORK_TILE_HAS_ORIENTATION   (1 << 1)
 #define BORK_TILE_FACE_ORIENTED     (1 << 2)
-#define BORK_TILE_EDITOR_PUSHUP     (1 << 3)
 
 struct bork_tile {
     enum bork_tile_type type;
@@ -69,8 +68,8 @@ struct bork_map {
     ARR_T(struct bork_map_light_fixture) light_fixtures;
     ARR_T(bork_entity_t) enemies;
     ARR_T(bork_entity_t) items;
-    ARR_T(struct bork_light) lights;
-    ARR_T(struct bork_light) spotlights;
+    ARR_T(struct pg_light) lights;
+    ARR_T(struct pg_light) spotlights;
     struct pg_model door_model;
     struct bork_entity* plr;
 };

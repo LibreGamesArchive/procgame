@@ -3,10 +3,11 @@
 uniform mat4 view_matrix;
 uniform sampler2D g_normal;
 uniform sampler2D g_depth;
-uniform vec4 light;
-uniform vec3 color;
 uniform vec3 eye_pos;
 uniform vec2 clip_planes;
+
+flat in vec4 f_light;
+flat in vec3 f_color;
 
 in vec4 pos_cs;
 in vec3 view_ray;
@@ -14,6 +15,7 @@ out vec4 frag_color;
 
 void main()
 {
+    /*  Reconstructing world-space position from the depth buffer   */
     vec3 look_dir =  vec3(view_matrix[0][2],
                           view_matrix[1][2],
                           view_matrix[2][2]);
@@ -22,18 +24,21 @@ void main()
     float depth = texture(g_depth, g_tex_coord).x;
     float lin_depth = clip_planes[1] / (clip_planes[0] - depth);
     float viewzdist = dot(look_dir, view_ray);
-    vec3 pos = eye_pos + view_ray * (lin_depth / viewzdist);
-    vec3 light_to_pos = pos - light.xyz;
+    vec3 frag_to_eye = view_ray * (lin_depth / viewzdist);
+    vec3 pos = eye_pos + frag_to_eye;
+    frag_to_eye = -normalize(frag_to_eye);
+    /*  Calculate distance from the light to the fragment   */
+    vec3 light_to_pos = pos - f_light.xyz;
     float dist = length(light_to_pos);
-    if(dist > light.w) discard;
+    if(dist > f_light.w) discard;
+    /*  Light the fragment based on the normal  */
     vec4 norm_sample = texture(g_normal, g_tex_coord);
     vec3 norm = norm_sample.xyz * 2 - 1;
+    vec3 light_dir = normalize(light_to_pos);
     float shininess = norm_sample.w;
-    vec3 light_dir = -normalize(light_to_pos);
-    vec3 frag_to_eye = normalize(eye_pos - pos);
-    vec3 half_angle = normalize(frag_to_eye + light_dir);
-    vec3 specular = color * shininess * pow(max(dot(norm, half_angle), 0), 32);
-    vec3 diffuse = color * max(dot(norm, light_dir), 0);
-    float attenuation = pow(1 - dist / light.w, 1.7);
+    vec3 half_angle = normalize(frag_to_eye - light_dir);
+    vec3 specular = f_color * shininess * pow(max(dot(norm, half_angle), 0), 16);
+    vec3 diffuse = f_color * max(dot(norm, -light_dir), 0);
+    float attenuation = pow(1 - dist / f_light.w, 1.7);
     frag_color = vec4(attenuation * (diffuse + specular), 0);
 }

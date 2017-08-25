@@ -1,3 +1,9 @@
+struct pg_light {
+    vec3 pos, color;
+    float size, angle;
+    vec4 dir_quat;
+};
+
 struct pg_gbuffer {
     /*  The texture units that all the buffers should be kept in    */
     int color_slot, normal_slot, depth_slot, light_slot;
@@ -22,6 +28,11 @@ struct pg_gbuffer {
     int w, h;
 };
 
+void pg_light_spotlight(struct pg_light* light, vec3 const pos, float size,
+                        vec3 const color, vec3 const dir, float angle);
+void pg_light_pointlight(struct pg_light* light, vec3 const pos, float size,
+                         vec3 const color);
+
 /*  Texture slot 0 is used for initialization, make sure to bind the buffer to
     the desired slots afterward */
 void pg_gbuffer_init(struct pg_gbuffer* gbuf, int w, int h);
@@ -33,13 +44,12 @@ void pg_gbuffer_bind(struct pg_gbuffer* gbuf, int color_slot,
     are written to output to the first three color attachments,
     (0: color buffer, 1: world-space normals, 2: world-space positions) */
 void pg_gbuffer_dst(struct pg_gbuffer* gbuf);
-/*  These three perform the lighting pass. After all regular drawing is done,
-    call pg_gbuffer_begin_light(), then draw_light() for every light in the
-    scene, and finish() to draw the final result to the given ppbuffer, or
-    to the screen directly if ppbuf is set to NULL  */
-void pg_gbuffer_begin_light(struct pg_gbuffer* gbuf, struct pg_viewer* view);
-void pg_gbuffer_draw_light(struct pg_gbuffer* gbuf, vec4 light, vec3 color);
+void pg_gbuffer_begin_pointlight(struct pg_gbuffer* gbuf, struct pg_viewer* view);
 void pg_gbuffer_begin_spotlight(struct pg_gbuffer* gbuf, struct pg_viewer* view);
-void pg_gbuffer_draw_spotlight(struct pg_gbuffer* gbuf,
-                               vec4 light, vec4 dir_angle, vec3 color);
+void pg_gbuffer_draw_pointlight(struct pg_gbuffer* gbuf, struct pg_light* light);
+void pg_gbuffer_draw_spotlight(struct pg_gbuffer* gbuf, struct pg_light* light);
+/*  Set mode to 1 to draw lights when the viewer is inside the light volume,
+    and 0 otherwise. Light drawing begins in mode 0 with each "begin"
+    function call.  */
+void pg_gbuffer_mode(struct pg_gbuffer* gbuf, int mode);
 void pg_gbuffer_finish(struct pg_gbuffer* gbuf, vec3 ambient_light);
