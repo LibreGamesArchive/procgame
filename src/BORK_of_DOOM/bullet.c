@@ -75,7 +75,6 @@ void bork_bullet_move(struct bork_bullet* blt, struct bork_map* map)
                 blt->flags |= BORK_BULLET_DEAD;
                 blt->dead_ticks = 10;
                 map->plr->HP -= 5;
-                printf("%d\n", map->plr->HP);
                 vec3_sub(blt->pos, new_pos, blt->dir);
                 vec3_set(blt->dir, 0, 0, 0);
                 vec3_set(blt->light_color, 2, 0.8, 0.8);
