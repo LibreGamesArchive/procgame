@@ -594,7 +594,7 @@ void pg_model_get_face_normal(struct pg_model* model, unsigned t, vec3 out)
 }
 
 /*  Collision functions */
-static void nearest_on_triangle(vec3 out, vec3 const p,
+static int nearest_on_triangle(vec3 out, vec3 const p,
                                 vec3 const a, vec3 const b, vec3 const c)
 {
     // Check if P in vertex region outside A
@@ -606,7 +606,7 @@ static void nearest_on_triangle(vec3 out, vec3 const p,
     float d2 = vec3_mul_inner(ac, ap);
     if (d1 <= 0.0f && d2 <= 0.0f) {
         vec3_dup(out, a);
-        return;
+        return 0;
     }
     // Check if P in vertex region outside B
     vec3_sub(bp, p, b);
@@ -614,7 +614,7 @@ static void nearest_on_triangle(vec3 out, vec3 const p,
     float d4 = vec3_mul_inner(ac, bp);
     if (d3 >= 0.0f && d4 <= d3) {
         vec3_dup(out, b);
-        return; // barycentric coordinates (0,1,0)
+        return 0; // barycentric coordinates (0,1,0)
     }
     // Check if P in vertex region outside C
     vec3_sub(cp, p, c);
@@ -622,7 +622,7 @@ static void nearest_on_triangle(vec3 out, vec3 const p,
     float d6 = vec3_mul_inner(ac, cp);
     if (d6 >= 0.0f && d5 <= d6) {
         vec3_dup(out, c);
-        return; // barycentric coordinates (0,0,1)
+        return 0; // barycentric coordinates (0,0,1)
     }
     // Check if P in edge region of AB, if so return projection of P onto AB
     float vc = d1*d4 - d3*d2;
@@ -631,7 +631,7 @@ static void nearest_on_triangle(vec3 out, vec3 const p,
         vec3_dup(out, ab);
         vec3_scale(out, out, v);
         vec3_add(out, out, a);
-        return; // barycentric coordinates (1-v,v,0)
+        return 0; // barycentric coordinates (1-v,v,0)
     }
     // Check if P in edge region of AC, if so return projection of P onto AC
     float vb = d5*d2 - d1*d6;
@@ -640,7 +640,7 @@ static void nearest_on_triangle(vec3 out, vec3 const p,
         vec3_dup(out, ac);
         vec3_scale(out, out, w);
         vec3_add(out, out, a);
-        return; // barycentric coordinates (1-w,0,w)
+        return 0; // barycentric coordinates (1-w,0,w)
     }
     // Check if P in edge region of BC, if so return projection of P onto BC
     float va = d3*d6 - d5*d4;
@@ -649,7 +649,7 @@ static void nearest_on_triangle(vec3 out, vec3 const p,
         vec3_sub(out, c, b);
         vec3_scale(out, out, w);
         vec3_add(out, out, b);
-        return; // barycentric coordinates (0,1-w,w)
+        return 0; // barycentric coordinates (0,1-w,w)
     }
     // P inside face region. Compute Q through its barycentric coordinates (u,v,w)
     float denom = 1.0f / (va + vb + vc);
@@ -659,6 +659,7 @@ static void nearest_on_triangle(vec3 out, vec3 const p,
     vec3_scale(ac, ac, w);
     vec3_add(ab, ab, ac);
     vec3_add(out, ab, a);
+    return 1;
 }
 
 int pg_model_collide_sphere(struct pg_model* model, vec3 out, vec3 const pos,
@@ -683,8 +684,13 @@ int pg_model_collide_sphere_sub(struct pg_model* model, vec3 out, vec3 const pos
         vec3_dup(p1, model->pos.data[tri->t[1]].v);
         vec3_dup(p2, model->pos.data[tri->t[2]].v);
         vec3 pos_to_tri;
-        nearest_on_triangle(pos_to_tri, pos, p0, p1, p2);
+        int on_tri = nearest_on_triangle(pos_to_tri, pos, p0, p1, p2);
         vec3_sub(pos_to_tri, pos, pos_to_tri);
+        if(on_tri) {
+            vec3 norm;
+            pg_model_get_face_normal(model, i, norm);
+            if(vec3_mul_inner(pos_to_tri, norm) <= 0) continue;
+        }
         float dist = vec3_len(pos_to_tri);
         if(dist < r) {
             /*  If this collision has the greatest depth so far, then
@@ -727,8 +733,13 @@ int pg_model_collide_ellipsoid_sub(struct pg_model* model, vec3 out, vec3 const 
         vec3_div(p1, p1, r);
         vec3_div(p2, p2, r);
         vec3 pos_to_tri;
-        nearest_on_triangle(pos_to_tri, sphere_pos, p0, p1, p2);
+        int on_tri = nearest_on_triangle(pos_to_tri, sphere_pos, p0, p1, p2);
         vec3_sub(pos_to_tri, sphere_pos, pos_to_tri);
+        if(on_tri) {
+            vec3 norm;
+            pg_model_get_face_normal(model, i, norm);
+            if(vec3_mul_inner(pos_to_tri, norm) <= 0) continue;
+        }
         float dist = vec3_len(pos_to_tri);
         if(dist < 1) {
             /*  If this collision has the greatest depth so far, then
