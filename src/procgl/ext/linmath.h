@@ -609,6 +609,8 @@ static inline void mat4_look_at(mat4 m, vec3 eye, vec3 center, vec3 up)
 }
 
 typedef float quat[4];
+#define quat_set vec4_set
+#define quat_normalize vec4_normalize
 static inline void quat_identity(quat q)
 {
     q[0] = q[1] = q[2] = 0.f;
@@ -657,7 +659,8 @@ static inline void quat_conj(quat r, quat q)
         r[i] = -q[i];
     r[3] = q[3];
 }
-static inline void quat_rotate(quat r, float angle, vec3 axis) {
+static inline void quat_rotate(quat r, float angle, vec3 axis)
+{
     vec3 v;
     vec3_scale(v, axis, sinf(angle / 2));
     int i;
@@ -665,14 +668,25 @@ static inline void quat_rotate(quat r, float angle, vec3 axis) {
         r[i] = v[i];
     r[3] = cosf(angle / 2);
 }
-#define quat_norm vec4_norm
+static inline void quat_vec3_to_vec3(quat q, vec3 const a, vec3 const b)
+{
+    float r = vec3_mul_inner(a, b) + 1.0f;
+    vec3 w;
+    if (r < 0.00001) {
+        r = 0.0f;
+        if(fabsf(a[0]) > fabsf(a[2])) vec3_set(w, -a[1], a[0], 0.0f);
+        else vec3_set(w, 0.0f, -a[2], a[1]);
+    } else {
+        vec3_mul_cross(w, a, b);
+    }
+    quat_set(q, w[0], w[1], w[2], r);
+    quat_normalize(q, q);
+}   
 static inline void quat_mul_vec3(vec3 r, quat q, vec3 v)
 {
-/*
- * Method by Fabian 'ryg' Giessen (of Farbrausch)
-t = 2 * cross(q.xyz, v)
-v' = v + q.w * t + cross(q.xyz, t)
- */
+/*  Method by Fabian 'ryg' Giessen (of Farbrausch)
+    t = 2 * cross(q.xyz, v)
+    v' = v + q.w * t + cross(q.xyz, t) */
     vec3 t;
     vec3 q_xyz = {q[0], q[1], q[2]};
     vec3 u = {q[0], q[1], q[2]};
