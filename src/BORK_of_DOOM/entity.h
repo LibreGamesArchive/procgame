@@ -4,12 +4,13 @@ struct bork_play_data;
 #define BORK_ENTFLAG_DEAD       (1 << 0)
 #define BORK_ENTFLAG_INACTIVE   (1 << 1)
 #define BORK_ENTFLAG_GROUND     (1 << 2)
-#define BORK_ENTFLAG_LOOKED_AT  (1 << 3)
-#define BORK_ENTFLAG_ITEM       (1 << 4)
-#define BORK_ENTFLAG_PLAYER     (1 << 5)
-#define BORK_ENTFLAG_ENEMY      (1 << 6)
-#define BORK_ENTFLAG_DESTROY_ON_USE (1 << 7)
-#define BORK_ENTFLAG_STACKS     (1 << 8)
+#define BORK_ENTFLAG_SLIDE      (1 << 3)
+#define BORK_ENTFLAG_LOOKED_AT  (1 << 4)
+#define BORK_ENTFLAG_ITEM       (1 << 5)
+#define BORK_ENTFLAG_PLAYER     (1 << 6)
+#define BORK_ENTFLAG_ENEMY      (1 << 7)
+#define BORK_ENTFLAG_DESTROY_ON_USE (1 << 8)
+#define BORK_ENTFLAG_STACKS     (1 << 9)
 
 struct bork_entity {
     vec3 pos;

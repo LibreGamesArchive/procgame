@@ -241,21 +241,26 @@ static void tick_control_play(struct bork_play_data* d)
         d->plr.flags &= ~BORK_ENTFLAG_GROUND;
     }
     float move_speed = d->player_speed * (d->plr.flags & BORK_ENTFLAG_GROUND ? 1 : 0.15);
+    d->plr.flags &= ~BORK_ENTFLAG_SLIDE;
     if(ctrl[kmap[BORK_CTRL_LEFT]]) {
         d->plr.vel[0] -= move_speed * sin(d->plr.dir[0]);
         d->plr.vel[1] += move_speed * cos(d->plr.dir[0]);
+        d->plr.flags |= BORK_ENTFLAG_SLIDE;
     }
     if(ctrl[kmap[BORK_CTRL_RIGHT]]) {
         d->plr.vel[0] += move_speed * sin(d->plr.dir[0]);
         d->plr.vel[1] -= move_speed * cos(d->plr.dir[0]);
+        d->plr.flags |= BORK_ENTFLAG_SLIDE;
     }
     if(ctrl[kmap[BORK_CTRL_UP]]) {
         d->plr.vel[0] += move_speed * cos(d->plr.dir[0]);
         d->plr.vel[1] += move_speed * sin(d->plr.dir[0]);
+        d->plr.flags |= BORK_ENTFLAG_SLIDE;
     }
     if(ctrl[kmap[BORK_CTRL_DOWN]]) {
         d->plr.vel[0] -= move_speed * cos(d->plr.dir[0]);
         d->plr.vel[1] -= move_speed * sin(d->plr.dir[0]);
+        d->plr.flags |= BORK_ENTFLAG_SLIDE;
     }
     if(ctrl[kmap[BORK_CTRL_FIRE]] && d->held_item >= 0) {
         bork_entity_t held_id = d->inventory.data[d->held_item];
@@ -377,6 +382,10 @@ static void bork_play_draw(struct pg_game_state* state)
     vec2 draw_dir;
     vec3_scale(vel_lerp, d->plr.vel, t);
     vec3_add(draw_pos, d->plr.pos, vel_lerp);
+    struct bork_collision draw_collision = {};
+    bork_map_collide(&d->map, &draw_collision, draw_pos,
+                     BORK_ENT_PROFILES[BORK_ENTITY_PLAYER].size);
+    vec3_add(draw_pos, draw_pos, draw_collision.push);
     vec3_add(draw_pos, draw_pos, (vec3){ 0, 0, 0.8 });
     vec2_add(draw_dir, d->plr.dir, d->core->mouse_motion);
     pg_viewer_set(&d->core->view, draw_pos, draw_dir);
