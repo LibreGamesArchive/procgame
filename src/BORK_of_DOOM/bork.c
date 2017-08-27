@@ -229,13 +229,12 @@ int bork_input_event(struct bork_game_core* core, uint8_t ctrl, uint8_t event)
 
 void bork_ack_input(struct bork_game_core* core)
 {
+    ++core->input_frames;
     int i;
     for(i = 0; i < core->ctrl_changed; ++i) {
         uint8_t c = core->ctrl_changes[i];
         switch(core->ctrl_state[c]) {
-        case 0:
-            core->ctrl_state[c] = BORK_CONTROL_HIT;
-            break;
+        case 0: break;
         case BORK_CONTROL_HIT:
             core->ctrl_state[c] = BORK_CONTROL_HELD;
             break;
