@@ -5,14 +5,15 @@ struct bork_play_data;
 #define BORK_ENTFLAG_INACTIVE           (1 << 1)
 #define BORK_ENTFLAG_GROUND             (1 << 2)
 #define BORK_ENTFLAG_SLIDE              (1 << 3)
-#define BORK_ENTFLAG_LOOKED_AT          (1 << 4)
-#define BORK_ENTFLAG_ITEM               (1 << 5)
-#define BORK_ENTFLAG_PLAYER             (1 << 6)
-#define BORK_ENTFLAG_ENEMY              (1 << 7)
-#define BORK_ENTFLAG_DESTROY_ON_USE     (1 << 8)
-#define BORK_ENTFLAG_STACKS             (1 << 9)
-#define BORK_ENTFLAG_NOT_INTERACTIVE    (1 << 10)
-#define BORK_ENTFLAG_IN_INVENTORY       (1 << 11)
+#define BORK_ENTFLAG_CROUCH             (1 << 4)
+#define BORK_ENTFLAG_LOOKED_AT          (1 << 5)
+#define BORK_ENTFLAG_ITEM               (1 << 6)
+#define BORK_ENTFLAG_PLAYER             (1 << 7)
+#define BORK_ENTFLAG_ENEMY              (1 << 8)
+#define BORK_ENTFLAG_DESTROY_ON_USE     (1 << 9)
+#define BORK_ENTFLAG_STACKS             (1 << 10)
+#define BORK_ENTFLAG_NOT_INTERACTIVE    (1 << 11)
+#define BORK_ENTFLAG_IN_INVENTORY       (1 << 12)
 
 struct bork_entity {
     vec3 pos;
@@ -81,7 +82,7 @@ static const struct bork_entity_profile {
         .sprite_tx = { 1, 1, 0, 0 },
         .front_frame = 1 },
     [BORK_ITEM_PLANT1] = { .name = "PLANT",
-        .base_flags = BORK_ENTFLAG_NOT_INTERACTIVE,
+        .base_flags = BORK_ENTFLAG_ITEM | BORK_ENTFLAG_NOT_INTERACTIVE,
         .size = { 0.5, 0.5, 0.5 },
         .sprite_tx = { 1, 1, 0, 0 },
         .front_frame = 3 },

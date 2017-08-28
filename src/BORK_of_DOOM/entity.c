@@ -68,11 +68,16 @@ void bork_entity_update(struct bork_entity* ent, struct bork_map* map)
 void bork_entity_move(struct bork_entity* ent, struct bork_map* map)
 {
     const struct bork_entity_profile* prof = &BORK_ENT_PROFILES[ent->type];
+    vec3 coll_size;
+    vec3_dup(coll_size, prof->size);
+    if(ent->flags & BORK_ENTFLAG_CROUCH) {
+        coll_size[2] *= 0.5;
+    }
     ent->flags &= ~BORK_ENTFLAG_GROUND;
     vec3_add(ent->vel, ent->vel, (vec3){ 0, 0, -0.02 });
     struct bork_collision coll = {};
     float curr_move = 0;
-    float max_move = vec3_vmin(prof->size);
+    float max_move = vec3_vmin(coll_size);
     float full_dist = vec3_len(ent->vel);
     vec3 max_move_dir;
     vec3_set_len(max_move_dir, ent->vel, max_move);
@@ -89,7 +94,7 @@ void bork_entity_move(struct bork_entity* ent, struct bork_map* map)
         }
         vec3_add(new_pos, new_pos, max_move_dir);
         steps = 0;
-        while(bork_map_collide(map, &coll, new_pos, prof->size) && (steps++ < 4)) {
+        while(bork_map_collide(map, &coll, new_pos, coll_size) && (steps++ < 4)) {
             float down_angle = vec3_angle_diff(coll.face_norm, PG_DIR_VEC[PG_UP]);
             if(down_angle <= 0.1) ent->flags |= BORK_ENTFLAG_GROUND;
             else if(down_angle <= 0.5) {

@@ -325,6 +325,39 @@ struct bork_tile* bork_map_tile_ptri(struct bork_map* map, int x, int y, int z)
     else return NULL;
 }
 
+int bork_map_check_ellipsoid(struct bork_map* map, vec3 const pos, vec3 const r)
+{
+    box bbox;
+    vec3 r_scaled = { r[0] * 1.25, r[1] * 1.25, r[2] * 1.25 };
+    vec3_sub(bbox[0], pos, r_scaled);
+    vec3_add(bbox[1], pos, r_scaled);
+    box_mul_vec3(bbox, bbox, (vec3){ 0.5, 0.5, 0.5 });
+    int check[2][3] = { { (int)bbox[0][0], (int)bbox[0][1], (int)bbox[0][2] },
+                        { (int)bbox[1][0], (int)bbox[1][1], (int)bbox[1][2] } };
+    /*  First check collisions against the map  */
+    struct pg_model* model = &map->model;
+    int x, y, z;
+    for(z = check[0][2]; z <= check[1][2]; ++z) {
+        for(y = check[0][1]; y <= check[1][1]; ++y) {
+            for(x = check[0][0]; x <= check[1][0]; ++x) {
+                /*  Get the map area that the checked box is in */
+                /*  Get a pointer to the tile in the map area   */
+                struct bork_tile* tile = bork_map_tile_ptri(map, x, y, z);
+                /*  If the tile is outside the map, or the tile is not
+                    collidable, move on to the next one */
+                if(!tile || tile->type < 2) continue;
+                /*  Otherwise test collisions against this tile's associated
+                    triangles in the area model */
+                vec3 tile_push;
+                int c = pg_model_collide_ellipsoid_sub(model, tile_push,
+                            pos, r, 1, tile->model_tri_idx, tile->num_tris);
+                if(c >= 0) return 1;
+            }
+        }
+    }
+    return 0;
+}
+
 int bork_map_check_sphere(struct bork_map* map, vec3 const pos, float r)
 {
     box bbox;

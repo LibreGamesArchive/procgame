@@ -282,6 +282,16 @@ static void tick_control_play(struct bork_play_data* d)
         d->plr.vel[2] = 0.3;
         d->plr.flags &= ~BORK_ENTFLAG_GROUND;
     }
+    if(ctrl[SDL_SCANCODE_LCTRL]) {
+        d->plr.flags |= BORK_ENTFLAG_CROUCH;
+    } else {
+        if(!bork_map_check_ellipsoid(&d->map,
+            (vec3){ d->plr.pos[0], d->plr.pos[1], d->plr.pos[2] + 0.5 },
+            BORK_ENT_PROFILES[BORK_ENTITY_PLAYER].size))
+        {
+            d->plr.flags &= ~BORK_ENTFLAG_CROUCH;
+        }
+    }
     float move_speed = d->player_speed * (d->plr.flags & BORK_ENTFLAG_GROUND ? 1 : 0.15);
     d->plr.flags &= ~BORK_ENTFLAG_SLIDE;
     if(ctrl[kmap[BORK_CTRL_LEFT]]) {
@@ -425,11 +435,13 @@ static void bork_play_draw(struct pg_game_state* state)
     vec2 draw_dir;
     vec3_scale(vel_lerp, d->plr.vel, t);
     vec3_add(draw_pos, d->plr.pos, vel_lerp);
+    vec3 draw_coll_size;
+    vec3_dup(draw_coll_size, BORK_ENT_PROFILES[BORK_ENTITY_PLAYER].size);
+    if(d->plr.flags & BORK_ENTFLAG_CROUCH) draw_coll_size[2] *= 0.5;
     struct bork_collision draw_collision = {};
-    bork_map_collide(&d->map, &draw_collision, draw_pos,
-                     BORK_ENT_PROFILES[BORK_ENTITY_PLAYER].size);
+    bork_map_collide(&d->map, &draw_collision, draw_pos, draw_coll_size);
     vec3_add(draw_pos, draw_pos, draw_collision.push);
-    vec3_add(draw_pos, draw_pos, (vec3){ 0, 0, 0.8 });
+    vec3_add(draw_pos, draw_pos, (vec3){ 0, 0, draw_coll_size[2] * 0.9 });
     vec2_add(draw_dir, d->plr.dir, d->core->mouse_motion);
     pg_viewer_set(&d->core->view, draw_pos, draw_dir);
     /*  Drawing */

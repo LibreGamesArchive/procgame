@@ -389,8 +389,6 @@ static void bork_editor_write_map(struct bork_editor_map* map, char* filename)
     uint32_t len = map->objs.len;
     fwrite(&len, sizeof(len), 1, file);
     fwrite(map->objs.data, sizeof(struct bork_editor_obj), len, file);
-    printf("%zu\n", map->objs.len);
-    printf("%u\n", len);
     len = map->ents.len;
     fwrite(&len, sizeof(len), 1, file);
     fwrite(map->ents.data, sizeof(struct bork_editor_entity), len, file);
@@ -399,6 +397,7 @@ static void bork_editor_write_map(struct bork_editor_map* map, char* filename)
 
 int bork_editor_load_map(struct bork_editor_map* map, char* filename)
 {
+    *map = (struct bork_editor_map){};
     FILE* file = fopen(filename, "rb");
     if(!file) {
         printf("BORK map loading error: could not open file %s\n", filename);
@@ -415,6 +414,7 @@ int bork_editor_load_map(struct bork_editor_map* map, char* filename)
     if(r != num_objs) {
         printf("WARNING! Map file did not contain the correct number of map objects!\n");
     }
+    printf("%d\n", map->objs.data[0].door.flags);
     uint32_t num_items = 0;
     r = fread(&num_items, sizeof(num_items), 1, file);
     ARR_RESERVE(map->ents, num_items);
