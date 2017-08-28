@@ -229,7 +229,6 @@ int bork_input_event(struct bork_game_core* core, uint8_t ctrl, uint8_t event)
 
 void bork_ack_input(struct bork_game_core* core)
 {
-    ++core->input_frames;
     int i;
     for(i = 0; i < core->ctrl_changed; ++i) {
         uint8_t c = core->ctrl_changes[i];
@@ -284,6 +283,7 @@ void bork_draw_backdrop(struct bork_game_core* core, vec4 color_mod, float t)
     pg_shader_2d_resolution(shader, (vec2){ core->aspect_ratio, 1 });
     pg_shader_2d_texture(shader, &core->backdrop_tex);
     pg_shader_2d_tex_weight(shader, 1);
+    pg_shader_2d_set_light(shader, (vec2){ 0, -1 }, (vec3){}, (vec3){ 1, 1, 1 });
     if(!pg_shader_is_active(shader)) pg_shader_begin(shader, NULL);
     pg_shader_2d_transform(shader, (vec2){}, (vec2){ core->aspect_ratio, 1 }, 0);
     pg_model_begin(&core->quad_2d_ctr, shader);
@@ -305,6 +305,7 @@ void bork_draw_linear_vignette(struct bork_game_core* core, vec4 color_mod)
     pg_shader_2d_transform(shader, (vec2){}, (vec2){ core->aspect_ratio, 1 }, 0);
     pg_shader_2d_texture(shader, &core->menu_vignette);
     pg_shader_2d_color_mod(shader, color_mod);
+    pg_shader_2d_set_light(shader, (vec2){ 0, -1 }, (vec3){}, (vec3){ 1, 1, 1 });
     if(!pg_shader_is_active(shader)) pg_shader_begin(shader, NULL);
     pg_model_begin(&core->quad_2d_ctr, shader);
     pg_model_draw(&core->quad_2d_ctr, NULL);

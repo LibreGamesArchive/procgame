@@ -23,13 +23,23 @@ struct bork_play_data {
     struct {
         enum {
             BORK_MENU_CLOSED,
+            BORK_MENU_DOORPAD,
             BORK_MENU_INVENTORY,
             BORK_MENU_CHARACTER,
         } state;
-        int selection_idx, scroll_idx;
+        union {
+            struct {
+                int selection_idx, scroll_idx;
+            } inv;
+            struct {
+                int unlocked_ticks;
+                int door_idx;
+                int num_chars;
+                uint8_t chars[8];
+            } doorpad;
+        };
     } menu;
     bork_entity_t looked_item;
-    int looked_idx;
 };
 void bork_play_reset_hud_anim(struct bork_play_data* d);
 

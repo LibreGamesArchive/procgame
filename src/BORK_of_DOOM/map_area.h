@@ -56,11 +56,24 @@ struct bork_tile {
     uint32_t model_tri_idx;
 };
 
-struct bork_map_door {
-    int x, y, z;
-    int dir;
-    int locked;
-    float pos;
+struct bork_map_object {
+    enum bork_map_object_type {
+        BORK_MAP_DOOR,
+        BORK_MAP_DOORPAD,
+    } type;
+    vec3 pos;
+    quat dir;
+    union {
+        struct {
+            int open;
+            int locked;
+            uint8_t code[4];
+            float pos;
+        } door;
+        struct {
+            int door_idx;
+        } doorpad;
+    };
 };
 
 struct bork_map_light_fixture {
@@ -71,7 +84,8 @@ struct bork_map_light_fixture {
 struct bork_map {
     struct pg_model model;
     struct bork_tile data[32][32][32];
-    ARR_T(struct bork_map_door) doors;
+    ARR_T(struct bork_map_object) doors;
+    ARR_T(struct bork_map_object) doorpads;
     ARR_T(struct bork_map_light_fixture) light_fixtures;
     ARR_T(bork_entity_t) enemies;
     ARR_T(bork_entity_t) items;

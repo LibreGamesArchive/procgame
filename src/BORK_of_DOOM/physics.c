@@ -56,15 +56,12 @@ int bork_map_collide(struct bork_map* map, struct bork_collision* coll_out,
             }
         }
     }
-    /*  Next check collisions against map doorects (that are close enough)   */
-    struct bork_map_door* door;
+    /*  Next check collisions against doors (that are close enough)   */
+    struct bork_map_object* obj;
     int i;
-    ARR_FOREACH_PTR(map->doors, door, i) {
-        mat4_translate(transform,
-            door->x * 2.0f + 1.0f,
-            door->y * 2.0f + 1.0f,
-            door->z * 2.0f + 1.0f + door->pos);
-        if(door->dir) mat4_rotate_Z(transform, transform, M_PI * 0.5);
+    ARR_FOREACH_PTR(map->doors, obj, i) {
+        mat4_translate(transform, obj->pos[0], obj->pos[1], obj->pos[2] + obj->door.pos);
+        mat4_mul_quat(transform, transform, obj->dir);
         mat4 tx_inv;
         mat4_invert(tx_inv, transform);
         vec4 pos_tx;
@@ -77,8 +74,7 @@ int bork_map_collide(struct bork_map* map, struct bork_collision* coll_out,
         float depth = vec3_len(door_push);
         if(depth <= deepest) continue;
         deepest = depth;
-        *coll_out = (struct bork_collision) {
-            .x = door->x, .y = door->y, .z = door->z, .tile = NULL };
+        *coll_out = (struct bork_collision) { };
         vec3_dup(coll_out->push, door_push);
         vec3_dup(coll_out->face_norm, door_norm);
         if(++hits > 3) return 1;

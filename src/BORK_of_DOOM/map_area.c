@@ -206,12 +206,18 @@ void bork_map_init_model(struct bork_map* map, struct bork_game_core* core)
     pg_shader_buffer_model(&core->shader_3d, &map->model);
     /*  And the door model  */
     pg_model_init(&map->door_model);
-    int i;
-    vec4 face_uv[6];
-    for(i = 0; i < 6; ++i) {
-        pg_texture_get_frame(&core->env_atlas, 2, face_uv[i], face_uv[i] + 2);
-    }
-    pg_model_rect_prism(&map->door_model, (vec3){ 1, 0.1, 1 }, face_uv);
+    vec4 face_uv[6] = {};
+    pg_texture_get_frame(&core->env_atlas, 2, face_uv[PG_FRONT]);
+    pg_texture_frame_flip(face_uv[PG_BACK], face_uv[PG_FRONT], 0, 1);
+    pg_texture_get_frame(&core->env_atlas, 18, face_uv[PG_TOP]);
+    pg_texture_frame_tx(face_uv[PG_TOP], face_uv[PG_TOP],
+                        (vec2){ 1, 0.125 }, (vec2){ 0, 0 });
+    pg_texture_frame_flip(face_uv[PG_BOTTOM], face_uv[PG_TOP], 0, 1);
+    pg_texture_get_frame(&core->env_atlas, 2, face_uv[PG_LEFT]);
+    pg_texture_frame_tx(face_uv[PG_LEFT], face_uv[PG_LEFT],
+                        (vec2){ 0.125, 1 }, (vec2){ -4.0f / 512.0f, 0 });
+    pg_texture_frame_flip(face_uv[PG_RIGHT], face_uv[PG_LEFT], 0, 1);
+    pg_model_rect_prism(&map->door_model, (vec3){ 1, 0.125, 1 }, face_uv);
     pg_model_precalc_ntb(&map->door_model);
     pg_shader_buffer_model(&core->shader_3d, &map->door_model);
 }
@@ -227,21 +233,19 @@ void bork_map_deinit(struct bork_map* map)
 
 void bork_map_update(struct bork_map* map, struct bork_entity* plr)
 {
-    struct bork_map_door* door;
+    struct bork_map_object* obj;
     int i;
-    ARR_FOREACH_PTR(map->doors, door, i) {
-        vec3 door_pos = { door->x * 2.0f + 1.0f,
-                         door->y * 2.0f + 1.0f,
-                         door->z * 2.0f + 1.0f };
+    ARR_FOREACH_PTR(map->doors, obj, i) {
+        vec3 door_pos = { obj->pos[0], obj->pos[1], obj->pos[2] };
         vec3 plr_to_door;
         vec3_sub(plr_to_door, door_pos, plr->pos);
         float dist = vec3_len(plr_to_door);
-        if(dist < 3) {
-            door->pos += 0.1;
-            if(door->pos > 2) door->pos = 2;
-        } else if(door->pos > 0) {
-            door->pos -= 0.1;
-            if(door->pos < 0) door->pos = 0;
+        if(obj->door.open) {
+            obj->door.pos += 0.1;
+            if(obj->door.pos > 1.9) obj->door.pos = 1.9;
+        } else if(obj->door.pos > 0) {
+            obj->door.pos -= 0.1;
+            if(obj->door.pos < 0) obj->door.pos = 0;
         }
     }
 }
@@ -257,14 +261,32 @@ void bork_map_draw(struct bork_map* map, struct bork_game_core* core)
     pg_model_draw(&map->model, model_transform);
     /*  Then draw the map doors (except lights)   */
     int i;
-    struct bork_map_door* door;
+    struct bork_map_object* obj;
     pg_model_begin(&map->door_model, shader);
-    ARR_FOREACH_PTR(map->doors, door, i) {
-        mat4_translate(model_transform,
-                       door->x * 2.0f + 1.0f,
-                       door->y * 2.0f + 1.0f,
-                       door->z * 2.0f + 1.0f + door->pos);
-        if(door->dir) mat4_rotate_Z(model_transform, model_transform, M_PI * 0.5);
+    ARR_FOREACH_PTR(map->doors, obj, i) {
+        mat4_translate(model_transform, obj->pos[0], obj->pos[1], obj->pos[2] + obj->door.pos);
+        mat4_mul_quat(model_transform, model_transform, obj->dir);
+        if(!obj->door.locked) {
+            pg_shader_3d_tex_transform(shader, (vec2){ 1, 1 },
+                                       (vec2){ 0, 96.0f / 512.0f });
+        } else {
+            pg_shader_3d_tex_transform(shader, (vec2){ 1, 1 }, (vec2){});
+        }
+        //if(obj->door.dir) mat4_rotate_Z(model_transform, model_transform, M_PI * 0.5);
+        pg_model_draw(&map->door_model, model_transform);
+    }
+    ARR_FOREACH_PTR(map->doorpads, obj, i) {
+        mat4_translate(model_transform, obj->pos[0], obj->pos[1], obj->pos[2]);
+        mat4_scale_aniso(model_transform, model_transform, 0.2, 0.2, 0.2);
+        mat4_mul_quat(model_transform, model_transform, obj->dir);
+        struct bork_map_object* door = &map->doors.data[obj->doorpad.door_idx];
+        if(!door->door.locked) {
+            pg_shader_3d_tex_transform(shader, (vec2){ 1, 1 },
+                                       (vec2){ 0, 144.0f / 512.0f });
+        } else {
+            pg_shader_3d_tex_transform(shader, (vec2){ 1, 1 },
+                                       (vec2){ 0, 48.0f / 512.0f });
+        }
         pg_model_draw(&map->door_model, model_transform);
     }
     shader = &core->shader_sprite;
@@ -433,9 +455,8 @@ static int tile_face_basic(struct bork_map* map, struct pg_texture* env_atlas,
     int num_tris = 0;
     vec3 inset_dir;
     vec3_scale(inset_dir, PG_DIR_VEC[dir], detail->face_inset[dir]);
-    vec2 tex_frame[2];
-    pg_texture_get_frame(env_atlas, detail->tex_tile[dir],
-                         tex_frame[0], tex_frame[1]);
+    vec4 tex_frame;
+    pg_texture_get_frame(env_atlas, detail->tex_tile[dir], tex_frame);
     unsigned vert_idx = model->v_count;
     /*  Generate the geometry   */
     struct pg_vertex_full new_vert = { .components =
@@ -443,7 +464,8 @@ static int tile_face_basic(struct bork_map* map, struct pg_texture* env_atlas,
     int i;
     if(!(face_flags & BORK_FACE_NO_FRONTFACE)) {
         for(i = 0; i < 4; ++i) {
-            vec2_set(new_vert.uv, tex_frame[(i < 2)][0], tex_frame[(i % 2)][1]);
+            vec2_set(new_vert.uv, tex_frame[(1 - (i < 2)) * 2],
+                     tex_frame[(1 - (i % 2)) * 2 + 1]);
             vec3_dup(new_vert.pos, vert_pos[dir][i]);
             if(face_flags & BORK_FACE_HALF_BOTTOM && new_vert.pos[2] == 0.5) {
                 new_vert.pos[2] = 0.0f;
@@ -464,7 +486,8 @@ static int tile_face_basic(struct bork_map* map, struct pg_texture* env_atlas,
     }
     if(face_flags & BORK_FACE_HAS_BACKFACE) {
         for(i = 0; i < 4; ++i) {
-            vec2_set(new_vert.uv, tex_frame[(i < 2)][0], tex_frame[(i % 2)][1]);
+            vec2_set(new_vert.uv, tex_frame[(1 - (i < 2)) * 2],
+                     tex_frame[(1 - (i % 2)) * 2 + 1]);
             vec3_dup(new_vert.pos, vert_pos[dir][i]);
             if(face_flags & BORK_FACE_HALF_BOTTOM && new_vert.pos[2] == 0.5) {
                 new_vert.pos[2] = 0.0f;
@@ -503,14 +526,15 @@ static int tile_model_ramp(struct bork_map* map, struct pg_texture* env_atlas,
     struct pg_model* model = &map->model;
     struct pg_vertex_full new_vert = { .components =
         PG_MODEL_COMPONENT_POSITION | PG_MODEL_COMPONENT_UV };
-    vec2 tex_frame[2];
-    pg_texture_get_frame(env_atlas, 6, tex_frame[0], tex_frame[1]);
+    vec4 tex_frame;
+    pg_texture_get_frame(env_atlas, 6, tex_frame);
     unsigned vert_idx = model->v_count;
     int i;
     for(i = 0; i < 8; ++i) {
         int vi = i % 4;
         vec3_dup(new_vert.pos, vert_pos[5][vi]);
-        vec2_set(new_vert.uv, tex_frame[(vi < 2)][0], tex_frame[(vi % 2)][1]);
+        vec2_set(new_vert.uv, tex_frame[(vi < 2) * 2],
+                 tex_frame[(1 - (vi % 2)) * 2 + 1]);
         if(tile->type == BORK_TILE_RAMP_TOP) new_vert.pos[2] += 0.5;
         vec3_add(new_vert.pos, new_vert.pos, (vec3){ 0.5, 0.5, 0.5 });
         vec3_add(new_vert.pos, new_vert.pos, (vec3){ x, y, z });

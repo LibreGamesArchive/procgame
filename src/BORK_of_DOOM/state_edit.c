@@ -360,6 +360,37 @@ void bork_editor_complete_entity(struct bork_entity* ent,
     };
 }
 
+void bork_editor_complete_door(struct bork_map* map, struct bork_editor_tile* tile,
+                               int x, int y, int z)
+{
+    vec3 tile_ctr = { x * 2 + 1, y * 2 + 1, z * 2 + 1 };
+    quat door_dir, pad_dir;
+    quat_identity(door_dir);
+    quat_identity(pad_dir);
+    if(tile->dir & ((1 << PG_LEFT) | (1 << PG_RIGHT)))
+        quat_rotate(door_dir, M_PI * 0.5, (vec3){ 0, 0, -1 });
+    else quat_rotate(pad_dir, M_PI * 0.5, (vec3){ 0, 0, -1 });
+    struct bork_map_object new_obj = { .type = BORK_MAP_DOOR,
+        .door = { .locked = 1 },
+        .pos = { tile_ctr[0], tile_ctr[1], tile_ctr[2] },
+        .dir = { door_dir[0], door_dir[1], door_dir[2], door_dir[3] } };
+    vec3 pad0_pos, pad1_pos = { 0.7, 0.975, 0 };
+    quat_mul_vec3(pad1_pos, pad_dir, pad1_pos);
+    vec3_sub(pad0_pos, tile_ctr, pad1_pos);
+    vec3_add(pad1_pos, tile_ctr, pad1_pos);
+    ARR_PUSH(map->doors, new_obj);
+    new_obj = (struct bork_map_object){ .type = BORK_MAP_DOORPAD,
+        .pos = { pad0_pos[0], pad0_pos[1], pad0_pos[2] },
+        .dir = { pad_dir[0], pad_dir[1], pad_dir[2], pad_dir[3] },
+        .doorpad = { .door_idx = map->doors.len - 1 } };
+    ARR_PUSH(map->doorpads, new_obj);
+    new_obj = (struct bork_map_object){ .type = BORK_MAP_DOORPAD,
+        .pos = { pad1_pos[0], pad1_pos[1], pad1_pos[2] },
+        .dir = { pad_dir[0], pad_dir[1], pad_dir[2], pad_dir[3] },
+        .doorpad = { .door_idx = map->doors.len - 1 } };
+    ARR_PUSH(map->doorpads, new_obj);
+}
+
 void bork_editor_complete_map(struct bork_map* map, struct bork_editor_map* ed_map)
 {
     int i, j, k;
@@ -372,10 +403,7 @@ void bork_editor_complete_map(struct bork_map* map, struct bork_editor_map* ed_m
                     .type = ed_tile->type,
                     .orientation = ed_tile->dir & 0x0F };
                 if(tile->type == BORK_TILE_EDITOR_DOOR) {
-                    struct bork_map_door new_door = {
-                        .x = i, .y = j, .z = k };
-                    if(tile->orientation & ((1 << PG_LEFT) | (1 << PG_RIGHT))) new_door.dir = 1;
-                    ARR_PUSH(map->doors, new_door);
+                    bork_editor_complete_door(map, ed_tile, i, j, k);
                     tile->type = BORK_TILE_ATMO;
                 } else if(tile->type == BORK_TILE_EDITOR_LIGHT1) {
                     struct pg_light new_light;
