@@ -909,7 +909,6 @@ static void tick_doorpad(struct bork_play_data* d)
             || diff[0] > 0.08 || diff[1] > 0.065) continue;
             if(i <= 10 && d->menu.doorpad.num_chars < 4) {
                 chars[d->menu.doorpad.num_chars++] = MOD(i + 1, 10);
-                printf("%u%u%u%u\n", chars[0], chars[1], chars[2], chars[3]);
             }
             if(d->menu.doorpad.num_chars == 4
             && chars[0] == door_chars[0] && chars[1] == door_chars[1]

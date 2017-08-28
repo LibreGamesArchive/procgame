@@ -44,11 +44,9 @@ struct bork_play_data {
 void bork_play_reset_hud_anim(struct bork_play_data* d);
 
 struct bork_editor_tile {
-    uint32_t type;
+    uint8_t type;
     uint8_t dir;
-    int8_t light_pos[4];
-    int8_t light_dir[4];
-    int8_t light_color[4];
+    uint16_t obj_idx;
 };
 
 struct bork_editor_data {
@@ -56,6 +54,12 @@ struct bork_editor_data {
     const uint8_t* kb_state;
     struct bork_editor_map {
         struct bork_editor_tile tiles[32][32][32];
+        ARR_T(struct bork_editor_obj {
+            uint8_t x, y, z;
+            union {
+                struct { uint8_t flags; uint8_t code[4]; } door;
+            };
+        }) objs;
         ARR_T(struct bork_editor_entity {
             uint8_t type;
             vec3 pos;
