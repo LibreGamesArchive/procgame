@@ -30,12 +30,16 @@ typedef ARR_T(char*)            arr_str_t;
 #define ARR_INIT(arr) do { (arr).len = 0; (arr).cap = 0; (arr).data = NULL; } \
                       while(0)
 
-#define ARR_DEINIT(arr) do { free((arr).data); ARR_INIT(arr); } while(0)
+#define ARR_DEINIT(arr) \
+    do { \
+        if((arr).data) free((arr).data); \
+        (arr).len = 0; (arr).cap = 0; (arr).data = NULL; \
+    } while(0)
 
 #define ARR_RESERVE(arr, count) \
     ( ((arr).cap > (count)) ? ARR_SUCCEED \
         : ((arr).data = realloc((arr).data, (count) * sizeof(*(arr).data)), \
-           (arr).data ? ((arr).cap = (count), ARR_SUCCEED) : ARR_FAIL) )  
+           (arr).data ? ((arr).cap = (count), ARR_SUCCEED) : ARR_FAIL) )
 
 #define ARR_RESERVE_CLEAR(arr, count) \
     ( ((arr).cap > (count)) ? ARR_SUCCEED \
@@ -45,20 +49,20 @@ typedef ARR_T(char*)            arr_str_t;
             ARR_SUCCEED)) )
 
 /*  Adding elements */
-#define ARR_PUSH(arr, val) \
+#define ARR_PUSH(arr, ...) \
     ( !ARR_RESERVE((arr), (arr).len + 1) ? ARR_FAIL \
-        : ((arr).data[(arr).len++] = (val), ARR_SUCCEED) )
+        : ((arr).data[(arr).len++] = (__VA_ARGS__), ARR_SUCCEED) )
 
-#define ARR_INSERT(arr, idx, val) \
+#define ARR_INSERT(arr, idx, ...) \
     ( !ARR_RESERVE((arr), (arr).len + 1) ? ARR_FAIL \
         : (memmove((arr).data + (idx) + 1, \
                    (arr).data + (idx), ((arr).len++) - (idx)), \
-            ((arr).data[idx] = (val)), ARR_SUCCEED) )
+            ((arr).data[idx] = (__VA_ARGS__)), ARR_SUCCEED) )
 
-#define ARR_SWAPINSERT(arr, idx, val) \
+#define ARR_SWAPINSERT(arr, idx, ...) \
     ( !ARR_RESERVE((arr), (arr).len + 1) ? ARR_FAIL\
-        : ((arr).data[(arr).len++] = (arr).data[idx], (arr).data[idx] = (val), \
-            ARR_SUCCEED) )
+        : ((arr).data[(arr).len++] = (arr).data[idx], \
+           (arr).data[idx] = (__VA_ARGS__), ARR_SUCCEED) )
 
 #define ARR_CONCAT(arr1, arr2) \
     ( (arr1).data == (arr2).data, \
