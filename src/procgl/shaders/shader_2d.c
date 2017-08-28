@@ -22,12 +22,16 @@ struct data_2d {
         float tex_weight;
         vec4 tex_tx;
         vec4 color_mod;
+        vec2 light_pos;
+        vec3 light_color;
+        vec3 ambient_color;
     } state;
     struct {
-        GLint tex_unit;
+        GLint tex_unit, norm_unit;
         GLint tex_weight;
         GLint tex_tx;
         GLint color_mod;
+        GLint light_pos, light_color, ambient_color;
     } unis;
 };
 
@@ -37,9 +41,13 @@ static void begin(struct pg_shader* shader, struct pg_viewer* view)
     /*  Set the uniforms    */
     if(d->unis_dirty) {
         glUniform1i(d->unis.tex_unit, d->state.tex->diffuse_slot);
+        glUniform1i(d->unis.norm_unit, d->state.tex->light_slot);
         glUniform1f(d->unis.tex_weight, d->state.tex_weight);
         glUniform4fv(d->unis.tex_tx, 1, d->state.tex_tx);
         glUniform4fv(d->unis.color_mod, 1, d->state.color_mod);
+        glUniform2fv(d->unis.light_pos, 1, d->state.light_pos);
+        glUniform3fv(d->unis.light_color, 1, d->state.light_color);
+        glUniform3fv(d->unis.ambient_color, 1, d->state.ambient_color);
         d->unis_dirty = 0;
     }
     glEnable(GL_BLEND);
@@ -63,7 +71,8 @@ int pg_shader_2d(struct pg_shader* shader)
 #endif
     if(!load) return 0;
     struct data_2d* d = malloc(sizeof(struct data_2d));
-    pg_shader_link_matrix(shader, PG_MODELVIEW_MATRIX, "transform");
+    pg_shader_link_matrix(shader, PG_MODEL_MATRIX, "model_matrix");
+    pg_shader_link_matrix(shader, PG_VIEW_MATRIX, "view_matrix");
     pg_shader_link_component(shader, PG_MODEL_COMPONENT_POSITION, "v_position");
     pg_shader_link_component(shader, PG_MODEL_COMPONENT_UV, "v_tex_coord");
     pg_shader_link_component(shader, PG_MODEL_COMPONENT_COLOR, "v_color");
@@ -72,10 +81,17 @@ int pg_shader_2d(struct pg_shader* shader)
     d->state.tex_weight = 1;
     vec4_set(d->state.color_mod, 1, 1, 1, 1);
     vec4_set(d->state.tex_tx, 1, 1, 0, 0);
+    vec2_set(d->state.light_pos, 0, 1);
+    vec3_set(d->state.light_color, 0.25, 0, 0);
+    vec3_set(d->state.ambient_color, 1, 1, 1);
     d->unis.tex_unit = glGetUniformLocation(shader->prog, "tex");
+    d->unis.norm_unit = glGetUniformLocation(shader->prog, "norm");
     d->unis.tex_weight = glGetUniformLocation(shader->prog, "tex_weight");
     d->unis.tex_tx = glGetUniformLocation(shader->prog, "tex_tx");
     d->unis.color_mod = glGetUniformLocation(shader->prog, "color_mod");
+    d->unis.light_pos = glGetUniformLocation(shader->prog, "light_pos");
+    d->unis.light_color = glGetUniformLocation(shader->prog, "light_color");
+    d->unis.ambient_color = glGetUniformLocation(shader->prog, "ambient_color");
     d->unis_dirty = 1;
     shader->data = d;
     shader->deinit = free;
@@ -120,6 +136,7 @@ void pg_shader_2d_texture(struct pg_shader* shader, struct pg_texture* tex)
     pg_shader_2d_tex_transform(shader, (vec2){ 1, 1 }, (vec2){});
     if(pg_shader_is_active(shader)) {
         glUniform1i(d->unis.tex_unit, tex->diffuse_slot);
+        glUniform1i(d->unis.norm_unit, tex->light_slot);
     } else d->unis_dirty = 1;
 }
 
@@ -171,5 +188,19 @@ void pg_shader_2d_color_mod(struct pg_shader* shader, vec4 const color)
     vec4_dup(d->state.color_mod, color);
     if(pg_shader_is_active(shader)) {
         glUniform4fv(d->unis.color_mod, 1, d->state.color_mod);
+    } else d->unis_dirty = 1;
+}
+
+void pg_shader_2d_set_light(struct pg_shader* shader, vec2 const pos,
+                            vec3 const color, vec3 const ambient)
+{
+    struct data_2d* d = shader->data;
+    vec2_dup(d->state.light_pos, pos);
+    vec3_dup(d->state.light_color, color);
+    vec3_dup(d->state.ambient_color, ambient);
+    if(pg_shader_is_active(shader)) {
+        glUniform2fv(d->unis.light_pos, 1, d->state.light_pos);
+        glUniform3fv(d->unis.light_color, 1, d->state.light_color);
+        glUniform3fv(d->unis.ambient_color, 1, d->state.ambient_color);
     } else d->unis_dirty = 1;
 }
