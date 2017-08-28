@@ -90,22 +90,22 @@ void pg_model_rect_prism(struct pg_model* model, vec3 scale, vec4* face_uv)
         vec3_add(new_vert.pos, PG_DIR_VEC[i], PG_DIR_TAN[i]);
         vec3_add(new_vert.pos, new_vert.pos, PG_DIR_BITAN[i]);
         vec3_mul(new_vert.pos, new_vert.pos, scale);
-        vec2_set(new_vert.uv, face_uv[i][0], face_uv[i][1]);
+        vec2_set(new_vert.uv, face_uv[i][2], face_uv[i][1]);
         unsigned idx = pg_model_add_vertex(model, &new_vert);
         vec3_add(new_vert.pos, PG_DIR_VEC[i], PG_DIR_TAN[i]);
         vec3_sub(new_vert.pos, new_vert.pos, PG_DIR_BITAN[i]);
         vec3_mul(new_vert.pos, new_vert.pos, scale);
-        vec2_set(new_vert.uv, face_uv[i][0], face_uv[i][3]);
+        vec2_set(new_vert.uv, face_uv[i][2], face_uv[i][3]);
         pg_model_add_vertex(model, &new_vert);
         vec3_sub(new_vert.pos, PG_DIR_VEC[i], PG_DIR_TAN[i]);
         vec3_add(new_vert.pos, new_vert.pos, PG_DIR_BITAN[i]);
         vec3_mul(new_vert.pos, new_vert.pos, scale);
-        vec2_set(new_vert.uv, face_uv[i][2], face_uv[i][1]);
+        vec2_set(new_vert.uv, face_uv[i][0], face_uv[i][1]);
         pg_model_add_vertex(model, &new_vert);
         vec3_sub(new_vert.pos, PG_DIR_VEC[i], PG_DIR_TAN[i]);
         vec3_sub(new_vert.pos, new_vert.pos, PG_DIR_BITAN[i]);
         vec3_mul(new_vert.pos, new_vert.pos, scale);
-        vec2_set(new_vert.uv, face_uv[i][2], face_uv[i][3]);
+        vec2_set(new_vert.uv, face_uv[i][0], face_uv[i][3]);
         pg_model_add_vertex(model, &new_vert);
         if(i % 2) {
             pg_model_add_triangle(model, idx, idx + 1, idx + 2);

@@ -41,5 +41,6 @@ void pg_texture_wave_to_normals(struct pg_texture* tex,
 void pg_texture_generate_mipmaps(struct pg_texture* tex);
 void pg_texture_buffer(struct pg_texture* tex);
 void pg_texture_set_atlas(struct pg_texture* tex, int frame_w, int frame_h);
-void pg_texture_get_frame(struct pg_texture* tex, int frame,
-                          vec2 start, vec2 end);
+void pg_texture_get_frame(struct pg_texture* tex, int frame, vec4 out);
+void pg_texture_frame_flip(vec4 out, vec4 const in, int x, int y);
+void pg_texture_frame_tx(vec4 out, vec4 const in, vec2 const scale, vec2 const offset);

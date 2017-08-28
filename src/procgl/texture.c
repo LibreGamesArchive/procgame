@@ -170,14 +170,39 @@ void pg_texture_set_atlas(struct pg_texture* tex, int frame_w, int frame_h)
     tex->frame_aspect_ratio = (float)frame_w / (float)frame_h;
 }
 
-void pg_texture_get_frame(struct pg_texture* tex, int frame,
-                          vec2 start, vec2 end)
+void pg_texture_get_frame(struct pg_texture* tex, int frame, vec4 out)
 {
     int frames_wide = tex->w / tex->frame_w;
     float frame_u = (float)tex->frame_w / tex->w;
     float frame_v = (float)tex->frame_h / tex->h;
     float frame_x = (float)(frame % frames_wide) * frame_u;
     float frame_y = (float)(frame / frames_wide) * frame_v;
-    if(start) vec2_set(start, frame_x, frame_y + frame_v);
-    if(end) vec2_set(end, frame_x + frame_u, frame_y);
+    vec4_set(out, frame_x, frame_y, frame_x + frame_u, frame_y + frame_v);
+}
+
+void pg_texture_frame_flip(vec4 out, vec4 const in, int x, int y)
+{
+    vec4 tmp = { in[0], in[1], in[2], in[3] };
+    if(x) {
+        tmp[0] = in[2];
+        tmp[2] = in[0];
+    }
+    if(y) {
+        tmp[1] = in[3];
+        tmp[3] = in[1];
+    }
+    vec4_dup(out, tmp);
+}
+
+void pg_texture_frame_tx(vec4 out, vec4 const in,
+                         vec2 const scale, vec2 const offset)
+{
+    vec4 tmp = { in[0], in[1], in[2], in[3] };
+    vec2 diff;
+    vec2_sub(diff, in + 2, in);
+    vec2_mul(diff, diff, scale);
+    vec2_add(tmp + 2, tmp, (vec2){ diff[0], diff[1] });
+    vec2_add(tmp, tmp, offset);
+    vec2_add(tmp + 2, tmp + 2, offset);
+    vec4_dup(out, tmp);
 }
