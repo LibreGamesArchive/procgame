@@ -730,16 +730,13 @@ static inline void mat4_from_quat(mat4 M, quat q)
     M[3][3] = 1.f;
 }
 
-static inline void mat4o_mul_quat(mat4 R, mat4 M, quat q)
+static inline void mat4_mul_quat(mat4 R, mat4 M, quat q)
 {
 /*  XXX: The way this is written only works for othogonal matrices. */
 /* TODO: Take care of non-orthogonal case. */
     quat_mul_vec3(R[0], q, M[0]);
     quat_mul_vec3(R[1], q, M[1]);
     quat_mul_vec3(R[2], q, M[2]);
-
-    R[3][0] = R[3][1] = R[3][2] = 0.f;
-    R[3][3] = 1.f;
 }
 static inline void quat_from_mat4(quat q, mat4 M)
 {
