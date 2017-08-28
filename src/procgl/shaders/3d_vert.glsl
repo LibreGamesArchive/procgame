@@ -21,9 +21,9 @@ void main()
 {
     mat3 modelview = mat3(view_matrix) * mat3(model_matrix);
     gl_Position = projview_matrix * model_matrix * vec4(v_position, 1.0);
-    f_normal = mat3(normal_matrix) * v_normal;
-    f_tangent = mat3(normal_matrix) * v_tangent;
-    f_bitangent = mat3(normal_matrix) * v_bitangent;
+    f_normal = normalize(mat3(normal_matrix) * v_normal);
+    f_tangent = normalize(mat3(normal_matrix) * v_tangent);
+    f_bitangent = normalize(mat3(normal_matrix) * v_bitangent);
     f_tex_coord = v_tex_coord * tex_tx.xy + tex_tx.zw;
 }
 
