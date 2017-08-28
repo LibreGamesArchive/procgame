@@ -1,16 +1,18 @@
 struct bork_map;
 struct bork_play_data;
 
-#define BORK_ENTFLAG_DEAD       (1 << 0)
-#define BORK_ENTFLAG_INACTIVE   (1 << 1)
-#define BORK_ENTFLAG_GROUND     (1 << 2)
-#define BORK_ENTFLAG_SLIDE      (1 << 3)
-#define BORK_ENTFLAG_LOOKED_AT  (1 << 4)
-#define BORK_ENTFLAG_ITEM       (1 << 5)
-#define BORK_ENTFLAG_PLAYER     (1 << 6)
-#define BORK_ENTFLAG_ENEMY      (1 << 7)
-#define BORK_ENTFLAG_DESTROY_ON_USE (1 << 8)
-#define BORK_ENTFLAG_STACKS     (1 << 9)
+#define BORK_ENTFLAG_DEAD               (1 << 0)
+#define BORK_ENTFLAG_INACTIVE           (1 << 1)
+#define BORK_ENTFLAG_GROUND             (1 << 2)
+#define BORK_ENTFLAG_SLIDE              (1 << 3)
+#define BORK_ENTFLAG_LOOKED_AT          (1 << 4)
+#define BORK_ENTFLAG_ITEM               (1 << 5)
+#define BORK_ENTFLAG_PLAYER             (1 << 6)
+#define BORK_ENTFLAG_ENEMY              (1 << 7)
+#define BORK_ENTFLAG_DESTROY_ON_USE     (1 << 8)
+#define BORK_ENTFLAG_STACKS             (1 << 9)
+#define BORK_ENTFLAG_NOT_INTERACTIVE    (1 << 10)
+#define BORK_ENTFLAG_IN_INVENTORY       (1 << 11)
 
 struct bork_entity {
     vec3 pos;
@@ -79,7 +81,7 @@ static const struct bork_entity_profile {
         .sprite_tx = { 1, 1, 0, 0 },
         .front_frame = 1 },
     [BORK_ITEM_PLANT1] = { .name = "PLANT",
-        .base_flags = BORK_ENTFLAG_ITEM | BORK_ENTFLAG_STACKS,
+        .base_flags = BORK_ENTFLAG_NOT_INTERACTIVE,
         .size = { 0.5, 0.5, 0.5 },
         .sprite_tx = { 1, 1, 0, 0 },
         .front_frame = 3 },
@@ -96,4 +98,3 @@ struct bork_entity* bork_entity_get(bork_entity_t ent);
 void bork_entity_init(struct bork_entity* ent, enum bork_entity_type type);
 void bork_entity_push(struct bork_entity* ent, vec3 push);
 void bork_entity_update(struct bork_entity* ent, struct bork_map* map);
-int bork_entity_ground(struct bork_entity* ent);
