@@ -7,6 +7,7 @@ struct bork_play_data {
     /*  Gameplay data   */
     struct bork_map map;
     struct bork_entity plr;
+    int flashlight_on;
     float player_speed;
     int held_item;
     int quick_item[4];
@@ -15,6 +16,7 @@ struct bork_play_data {
     ARR_T(struct bork_bullet) bullets;
     /*  The HUD-item animation  */
     vec3 hud_anim[5];
+    float hud_angle[5];
     float hud_anim_progress;
     float hud_anim_speed;
     int hud_anim_active;

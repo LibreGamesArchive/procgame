@@ -84,7 +84,6 @@ static void bork_editor_update_map(struct bork_editor_data* d)
             struct bork_editor_entity new_ent = {
                 .type = d->ent_type,
                 .pos = { click[0], click[1], d->cursor[2] + 0.5 } };
-                printf("%f %f\n", click[0], click[1]);
             ARR_PUSH(d->map.ents, new_ent);
         }
     } else if(bork_input_event(d->core, BORK_RIGHT_MOUSE, BORK_CONTROL_HIT)) {
@@ -409,12 +408,12 @@ int bork_editor_load_map(struct bork_editor_map* map, char* filename)
     }
     uint32_t num_objs = 0;
     r = fread(&num_objs, sizeof(num_objs), 1, file);
-    ARR_RESERVE(map->objs, num_objs);
+    ARR_RESERVE_CLEAR(map->objs, num_objs);
     r = fread(map->objs.data, sizeof(struct bork_editor_obj), num_objs, file);
     if(r != num_objs) {
         printf("WARNING! Map file did not contain the correct number of map objects!\n");
     }
-    printf("%d\n", map->objs.data[0].door.flags);
+    map->objs.len = r;
     uint32_t num_items = 0;
     r = fread(&num_items, sizeof(num_items), 1, file);
     ARR_RESERVE(map->ents, num_items);
@@ -490,7 +489,7 @@ void bork_editor_complete_map(struct bork_map* map, struct bork_editor_map* ed_m
                 } else if(tile->type == BORK_TILE_EDITOR_LIGHT1) {
                     struct pg_light new_light;
                     pg_light_spotlight(&new_light,
-                        (vec3){ i * 2 + 1, j * 2 + 1, k * 2 + 1.75 }, 7,
+                        (vec3){ i * 2 + 1, j * 2 + 1, k * 2 + 1.75 }, 9,
                         (vec3){ 1.5, 1.5, 1.2 }, (vec3){ 0, 0, -1 }, 1.7);
                     int push = 0;
                     if(ed_tile->dir & (1 << 7)) {
@@ -531,7 +530,7 @@ void bork_editor_complete_map(struct bork_map* map, struct bork_editor_map* ed_m
                     vec3_normalize(dir_angle, dir_angle);
                     struct pg_light new_light;
                     pg_light_spotlight(&new_light,
-                        pos, 5, (vec3){ 1.5, 1.5, 1.2 }, dir_angle, 1.15);
+                        pos, 7, (vec3){ 1.5, 1.5, 1.2 }, dir_angle, 1.15);
                     ARR_PUSH(map->spotlights, new_light);
                     struct bork_map_light_fixture new_lfix = {
                         .pos = { new_light.pos[0], new_light.pos[1], new_light.pos[2] - 0.1 },

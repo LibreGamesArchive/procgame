@@ -138,12 +138,12 @@ void bork_use_machinegun(struct bork_entity* ent, struct bork_play_data* d)
     new_bullet.pos[0] += 0.2 * sin(d->plr.dir[0]) + bullet_dir[0] * 0.3;
     new_bullet.pos[1] -= 0.2 * cos(d->plr.dir[0]) - bullet_dir[1] * 0.3;
     new_bullet.pos[2] += 0.65 + bullet_dir[2] * 0.3;
+    if(d->plr.flags & BORK_ENTFLAG_CROUCH) new_bullet.pos[2] -= 0.4;
     vec3_dup(new_bullet.dir, bullet_dir);
     ARR_PUSH(d->bullets, new_bullet);
     bork_play_reset_hud_anim(d);
-    vec3_set(d->hud_anim[0], 0.3, 0, 0.02);
-    vec3_set(d->hud_anim[1], 0.025, 0, 0);
-    vec3_set(d->hud_anim[2], 0, 0, 0);
+    vec3_set(d->hud_anim[1], 0.3, 0, 0.02);
+    vec3_set(d->hud_anim[2], 0.025, 0, 0);
     vec3_set(d->hud_anim[3], 0, 0, 0);
     d->hud_anim_speed = 0.05;
     d->hud_anim_active = 2;
@@ -167,7 +167,6 @@ void bork_use_dogfood(struct bork_entity* ent, struct bork_play_data* d)
     if(d->hud_anim_active && d->hud_anim_destroy_when_finished) return;
     bork_play_reset_hud_anim(d);
     d->plr.HP = MIN(100, d->plr.HP + 20);
-    vec3_set(d->hud_anim[0], 0, 0, 0);
     vec3_set(d->hud_anim[1], -0.3, -0.3, 0);
     vec3_set(d->hud_anim[2], 0, 0, 0);
     vec3_set(d->hud_anim[3], 0, 0, 0);
@@ -176,4 +175,17 @@ void bork_use_dogfood(struct bork_entity* ent, struct bork_play_data* d)
     if(--ent->item_quantity == 0) {
         d->hud_anim_destroy_when_finished = 1;
     }
+}
+
+void bork_use_leadpipe(struct bork_entity* ent, struct bork_play_data* d)
+{
+    if(d->hud_anim_active) return;
+    bork_play_reset_hud_anim(d);
+    vec3_set(d->hud_anim[1], 0.3, 0, 0);
+    vec3_set(d->hud_anim[2], -0.6, -0.3, 0);
+    d->hud_angle[1] = -2.0;
+    d->hud_angle[2] = 0.25;
+    d->hud_angle[3] = -0.45;
+    d->hud_anim_speed = 0.04;
+    d->hud_anim_active = 3;
 }

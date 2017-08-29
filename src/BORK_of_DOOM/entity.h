@@ -31,6 +31,7 @@ struct bork_entity {
         BORK_ITEM_BULLETS,
         BORK_ITEM_SCRAPMETAL,
         BORK_ITEM_MACHINEGUN,
+        BORK_ITEM_LEADPIPE,
         BORK_ITEM_PLANT1,
         BORK_ENTITY_TYPES,
     } type;
@@ -39,6 +40,7 @@ struct bork_entity {
 void bork_use_machinegun(struct bork_entity* ent, struct bork_play_data* d);
 void bork_hud_machinegun(struct bork_entity* ent, struct bork_play_data* d);
 void bork_use_dogfood(struct bork_entity* ent, struct bork_play_data* d);
+void bork_use_leadpipe(struct bork_entity* ent, struct bork_play_data* d);
 
 static const struct bork_entity_profile {
     char name[32];
@@ -48,6 +50,7 @@ static const struct bork_entity_profile {
     int front_frame;
     int dir_frames;
     uint8_t use_ctrl;
+    float hud_angle;
     void (*use_func)(struct bork_entity*, struct bork_play_data*);
     void (*hud_func)(struct bork_entity*, struct bork_play_data*);
 } BORK_ENT_PROFILES[] = {
@@ -64,26 +67,35 @@ static const struct bork_entity_profile {
     [BORK_ITEM_DOGFOOD] = { .name = "DOG FOOD",
         .base_flags = BORK_ENTFLAG_ITEM | BORK_ENTFLAG_DESTROY_ON_USE | BORK_ENTFLAG_STACKS,
         .size = { 0.5, 0.5, 0.5 },
+        .size = { 0.4, 0.4, 0.4 },
         .sprite_tx = { 1, 1, 0, 0 },
         .front_frame = 0,
         .use_ctrl = BORK_CONTROL_HIT,
         .use_func = bork_use_dogfood },
     [BORK_ITEM_MACHINEGUN] = { .name = "MACHINE GUN",
         .base_flags = BORK_ENTFLAG_ITEM,
-        .size = { 0.5, 0.5, 0.5 },
+        .size = { 0.4, 0.4, 0.4 },
         .sprite_tx = { 2, 1, 0, 0 },
         .front_frame = 8,
         .use_ctrl = BORK_CONTROL_HELD,
         .use_func = bork_use_machinegun,
         .hud_func = bork_hud_machinegun },
+    [BORK_ITEM_LEADPIPE] = { .name = "LEAD PIPE",
+        .base_flags = BORK_ENTFLAG_ITEM,
+        .size = { 0.4, 0.4, 0.4 },
+        .sprite_tx = { 2, 1, 0, 0 },
+        .front_frame = 10,
+        .hud_angle = -0.75,
+        .use_ctrl = BORK_CONTROL_HIT,
+        .use_func = bork_use_leadpipe },
     [BORK_ITEM_BULLETS] = { .name = "BULLETS",
         .base_flags = BORK_ENTFLAG_ITEM,
-        .size = { 0.5, 0.5, 0.5 },
+        .size = { 0.4, 0.4, 0.4 },
         .sprite_tx = { 1, 1, 0, 0 },
         .front_frame = 1 },
     [BORK_ITEM_PLANT1] = { .name = "PLANT",
         .base_flags = BORK_ENTFLAG_ITEM | BORK_ENTFLAG_NOT_INTERACTIVE,
-        .size = { 0.5, 0.5, 0.5 },
+        .size = { 0.4, 0.4, 0.4 },
         .sprite_tx = { 1, 1, 0, 0 },
         .front_frame = 3 },
     [BORK_ITEM_SCRAPMETAL] = { .name = "SCRAP METAL",

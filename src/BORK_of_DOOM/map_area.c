@@ -23,12 +23,12 @@ const char* bork_map_area_str(enum bork_area area) {
     else return BORK_AREA_STRING[BORK_AREA_EXTERIOR];
 }
 
-#define BORK_AREA_FLAG_SQUARE   (1 << 0)
-
 static int tile_model_basic(struct bork_map*, struct pg_texture*,
                             struct bork_tile*, int, int, int);
+static int tile_model_duct(struct bork_map*, struct pg_texture*,
+                           struct bork_tile*, int, int, int);
 static int tile_model_ramp(struct bork_map*, struct pg_texture*,
-                            struct bork_tile*, int, int, int);
+                           struct bork_tile*, int, int, int);
 static void bork_map_generate_model(struct bork_map* map,
                                     struct pg_texture* env_atlas);
 
@@ -172,6 +172,32 @@ struct bork_tile_detail BORK_TILE_DETAILS[] = {
         .face_inset = { 0, 0, 0, 0, [PG_TOP] = 0.5 },
         .tex_tile = { 15, 15, 15, 15, [PG_TOP] = 3 },
         .add_model = tile_model_basic },
+    [BORK_TILE_DUCT] = { .name = "DUCT-WORK",
+        .tile_flags = BORK_TILE_HAS_ORIENTATION,
+        .face_flags = { 1, 1, 1, 1, [PG_TOP] = 0, [PG_BOTTOM] = 1 },
+        .add_model = tile_model_duct },
+    [BORK_TILE_CARGO_RED] = { .name = "CARGO (RED)",
+        .face_flags = {
+            BORK_FACE_NO_SELF_OPPOSITE | BORK_FACE_HAS_SURFACE | BORK_FACE_SEETHRU_SURFACE,
+            BORK_FACE_NO_SELF_OPPOSITE | BORK_FACE_HAS_SURFACE | BORK_FACE_SEETHRU_SURFACE,
+            BORK_FACE_NO_SELF_OPPOSITE | BORK_FACE_HAS_SURFACE | BORK_FACE_SEETHRU_SURFACE,
+            BORK_FACE_NO_SELF_OPPOSITE | BORK_FACE_HAS_SURFACE | BORK_FACE_SEETHRU_SURFACE,
+            [PG_TOP] = BORK_FACE_HAS_SURFACE,
+            [PG_BOTTOM] = BORK_FACE_FORCE_SURFACE | BORK_FACE_HAS_SURFACE | BORK_FACE_SEETHRU_SURFACE },
+        .face_inset = { 0, 0, 0, 0, [PG_TOP] = 0, [PG_BOTTOM] = 0.1 },
+        .tex_tile = { 22, 22, 22, 22, [PG_TOP] = 23, [PG_BOTTOM] = 37 },
+        .add_model = tile_model_basic },
+    [BORK_TILE_CARGO_BLUE] = { .name = "CARGO (BLUE)",
+        .face_flags = {
+            BORK_FACE_NO_SELF_OPPOSITE | BORK_FACE_HAS_SURFACE | BORK_FACE_SEETHRU_SURFACE,
+            BORK_FACE_NO_SELF_OPPOSITE | BORK_FACE_HAS_SURFACE | BORK_FACE_SEETHRU_SURFACE,
+            BORK_FACE_NO_SELF_OPPOSITE | BORK_FACE_HAS_SURFACE | BORK_FACE_SEETHRU_SURFACE,
+            BORK_FACE_NO_SELF_OPPOSITE | BORK_FACE_HAS_SURFACE | BORK_FACE_SEETHRU_SURFACE,
+            [PG_TOP] = BORK_FACE_HAS_SURFACE,
+            [PG_BOTTOM] = BORK_FACE_FORCE_SURFACE | BORK_FACE_HAS_SURFACE | BORK_FACE_SEETHRU_SURFACE },
+        .face_inset = { 0, 0, 0, 0, [PG_TOP] = 0, [PG_BOTTOM] = 0.1 },
+        .tex_tile = { 38, 38, 38, 38, [PG_TOP] = 39, [PG_BOTTOM] = 37 },
+        .add_model = tile_model_basic },
     [BORK_TILE_RAMP_BOTTOM] = { .name = "RAMP BOTTOM",
         .tile_flags = BORK_TILE_HAS_ORIENTATION,
         .add_model = tile_model_ramp },
@@ -179,8 +205,7 @@ struct bork_tile_detail BORK_TILE_DETAILS[] = {
         .tile_flags = BORK_TILE_HAS_ORIENTATION,
         .add_model = tile_model_ramp },
     [BORK_TILE_EDITOR_DOOR] = { .name = "DOOR",
-        .tile_flags = BORK_TILE_HAS_ORIENTATION,
-    },
+        .tile_flags = BORK_TILE_HAS_ORIENTATION, },
     [BORK_TILE_EDITOR_LIGHT1] = { .name = "CEIL LIGHT" },
     [BORK_TILE_EDITOR_LIGHT_WALLMOUNT] = { .name = "WALL LIGHT",
         .tile_flags = BORK_TILE_HAS_ORIENTATION },
@@ -272,7 +297,6 @@ void bork_map_draw(struct bork_map* map, struct bork_game_core* core)
         } else {
             pg_shader_3d_tex_transform(shader, (vec2){ 1, 1 }, (vec2){});
         }
-        //if(obj->door.dir) mat4_rotate_Z(model_transform, model_transform, M_PI * 0.5);
         pg_model_draw(&map->door_model, model_transform);
     }
     ARR_FOREACH_PTR(map->doorpads, obj, i) {
@@ -500,10 +524,10 @@ static int tile_face_basic(struct bork_map* map, struct pg_texture* env_atlas,
             vec2_set(new_vert.uv, tex_frame[(1 - (i < 2)) * 2],
                      tex_frame[(1 - (i % 2)) * 2 + 1]);
             vec3_dup(new_vert.pos, vert_pos[dir][i]);
-            if(face_flags & BORK_FACE_HALF_BOTTOM && new_vert.pos[2] == 0.5) {
+            if(new_vert.pos[2] == 0.5 && (face_flags & BORK_FACE_HALF_BOTTOM)) {
                 new_vert.pos[2] = 0.0f;
                 new_vert.uv[1] += (16.0f / 512.0f);
-            } else if(face_flags & BORK_FACE_HALF_TOP && new_vert.pos[2] == -0.5) {
+            } else if(new_vert.pos[2] == -0.5 && (face_flags & BORK_FACE_HALF_TOP)) {
                 new_vert.pos[2] = 0.0f;
                 new_vert.uv[1] -= (16.0f / 512.0f);
             }
@@ -522,10 +546,10 @@ static int tile_face_basic(struct bork_map* map, struct pg_texture* env_atlas,
             vec2_set(new_vert.uv, tex_frame[(1 - (i < 2)) * 2],
                      tex_frame[(1 - (i % 2)) * 2 + 1]);
             vec3_dup(new_vert.pos, vert_pos[dir][i]);
-            if(face_flags & BORK_FACE_HALF_BOTTOM && new_vert.pos[2] == 0.5) {
+            if(new_vert.pos[2] == 0.5 && (face_flags & BORK_FACE_HALF_BOTTOM)) {
                 new_vert.pos[2] = 0.0f;
                 new_vert.uv[1] += (16.0f / 512.0f);
-            } else if(face_flags & BORK_FACE_HALF_TOP && new_vert.pos[2] == -0.5) {
+            } else if(new_vert.pos[2] == -0.5 && (face_flags & BORK_FACE_HALF_TOP)) {
                 new_vert.pos[2] = 0.0f;
                 new_vert.uv[1] -= (16.0f / 512.0f);
             }
@@ -550,6 +574,137 @@ static int tile_model_basic(struct bork_map* map, struct pg_texture* env_atlas,
     for(s = 0; s < 6; ++s) {
         tri_count += tile_face_basic(map, env_atlas, tile, x, y, z, s);
     }
+    return tri_count;
+}
+
+static int tile_face_duct(struct bork_map* map, struct pg_texture* env_atlas,
+                          struct bork_tile* tile, int x, int y, int z,
+                          enum pg_direction dir)
+{
+    /*  Get details for the opposing face   */
+    int opp[3] = { x + PG_DIR_VEC[dir][0], y + PG_DIR_VEC[dir][1], z + PG_DIR_VEC[dir][2] };
+    struct bork_tile* opp_tile = bork_map_tile_ptri(map, opp[0], opp[1], opp[2]);
+    struct bork_tile_detail* opp_detail = opp_tile ?
+        &BORK_TILE_DETAILS[opp_tile->type] : &BORK_TILE_DETAILS[0];
+    uint32_t opp_flags = opp_detail->face_flags[PG_DIR_OPPOSITE[dir]];
+    /*  Decide if this face of the tile needs to be generated   */
+    if(opp_tile->type == BORK_TILE_DUCT) return 0;
+    vec4 tex_frame;
+    struct pg_model* model = &map->model;
+    unsigned vert_idx = model->v_count;
+    struct pg_vertex_full new_vert = { .components =
+        PG_MODEL_COMPONENT_POSITION | PG_MODEL_COMPONENT_UV };
+    int i;
+    if(dir == PG_TOP || dir == PG_BOTTOM) {
+        pg_texture_get_frame(env_atlas, 21, tex_frame);
+        for(i = 0; i < 4; ++i) {
+            vec2_set(new_vert.uv, tex_frame[(1 - (i < 2)) * 2],
+                     tex_frame[(1 - (i % 2)) * 2 + 1]);
+            vec3_dup(new_vert.pos, vert_pos[dir][i]);
+            if(new_vert.pos[2] == 0.5) new_vert.pos[2] = 0.0f;
+            vec3_add(new_vert.pos, new_vert.pos, (vec3){ 0.5, 0.5, 0.5 });
+            vec3_add(new_vert.pos, new_vert.pos, (vec3){ x, y, z });
+            vec3_scale(new_vert.pos, new_vert.pos, 2);
+            pg_model_add_vertex(model, &new_vert);
+        }
+        for(i = 0; i < 4; ++i) {
+            vec2_set(new_vert.uv, tex_frame[(1 - (i < 2)) * 2],
+                     tex_frame[(1 - (i % 2)) * 2 + 1]);
+            vec3_dup(new_vert.pos, vert_pos[dir][i]);
+            if(new_vert.pos[2] == 0.5) new_vert.pos[2] = 0.0f;
+            vec3_add(new_vert.pos, new_vert.pos, (vec3){ 0.5, 0.5, 0.5 });
+            vec3_add(new_vert.pos, new_vert.pos, (vec3){ x, y, z });
+            vec3_scale(new_vert.pos, new_vert.pos, 2);
+            pg_model_add_vertex(model, &new_vert);
+        }
+        pg_model_add_triangle(model, vert_idx + 0, vert_idx + 1, vert_idx + 2);
+        pg_model_add_triangle(model, vert_idx + 2, vert_idx + 1, vert_idx + 3);
+        pg_model_add_triangle(model, vert_idx + 5, vert_idx + 4, vert_idx + 6);
+        pg_model_add_triangle(model, vert_idx + 5, vert_idx + 6, vert_idx + 7);
+        if(dir == PG_TOP && !(opp_flags & BORK_FACE_HAS_SURFACE))
+        {
+            pg_texture_get_frame(env_atlas, 3, tex_frame);
+            for(i = 0; i < 4; ++i) {
+                vec2_set(new_vert.uv, tex_frame[(1 - (i < 2)) * 2],
+                         tex_frame[(1 - (i % 2)) * 2 + 1]);
+                vec3_dup(new_vert.pos, vert_pos[dir][i]);
+                vec3_add(new_vert.pos, new_vert.pos, (vec3){ 0.5, 0.5, 0.5 });
+                vec3_add(new_vert.pos, new_vert.pos, (vec3){ x, y, z });
+                vec3_scale(new_vert.pos, new_vert.pos, 2);
+                pg_model_add_vertex(model, &new_vert);
+            }
+            pg_model_add_triangle(model, vert_idx + 9, vert_idx + 8, vert_idx + 10);
+            pg_model_add_triangle(model, vert_idx + 9, vert_idx + 10, vert_idx + 11);
+            return 6;
+        }
+        return 4;
+    } else if(!(tile->orientation & (1 << dir))) {
+        /*  Make the duct wall  */
+        pg_texture_get_frame(env_atlas, 21, tex_frame);
+        for(i = 0; i < 4; ++i) {
+            vec2_set(new_vert.uv, tex_frame[(1 - (i < 2)) * 2],
+                     tex_frame[(1 - (i % 2)) * 2 + 1]);
+            vec3_dup(new_vert.pos, vert_pos[dir][i]);
+            if(new_vert.pos[2] == 0.5) {
+                new_vert.pos[2] = 0.0f;
+                new_vert.uv[1] += (16.0f / 512.0f);
+            }
+            vec3_add(new_vert.pos, new_vert.pos, (vec3){ 0.5, 0.5, 0.5 });
+            vec3_add(new_vert.pos, new_vert.pos, (vec3){ x, y, z });
+            vec3_scale(new_vert.pos, new_vert.pos, 2);
+            pg_model_add_vertex(model, &new_vert);
+        }
+        for(i = 0; i < 4; ++i) {
+            vec2_set(new_vert.uv, tex_frame[(1 - (i < 2)) * 2],
+                     tex_frame[(1 - (i % 2)) * 2 + 1]);
+            vec3_dup(new_vert.pos, vert_pos[dir][i]);
+            if(new_vert.pos[2] == 0.5) {
+                new_vert.pos[2] = 0.0f;
+                new_vert.uv[1] += (16.0f / 512.0f);
+            }
+            vec3_add(new_vert.pos, new_vert.pos, (vec3){ 0.5, 0.5, 0.5 });
+            vec3_add(new_vert.pos, new_vert.pos, (vec3){ x, y, z });
+            vec3_scale(new_vert.pos, new_vert.pos, 2);
+            pg_model_add_vertex(model, &new_vert);
+        }
+        pg_model_add_triangle(model, vert_idx + 0, vert_idx + 1, vert_idx + 2);
+        pg_model_add_triangle(model, vert_idx + 2, vert_idx + 1, vert_idx + 3);
+        pg_model_add_triangle(model, vert_idx + 5, vert_idx + 4, vert_idx + 6);
+        pg_model_add_triangle(model, vert_idx + 5, vert_idx + 6, vert_idx + 7);
+        return 4;
+    } else if(!(opp_flags & BORK_FACE_HAS_SURFACE) || (opp_flags & BORK_FACE_SEETHRU_SURFACE)) {
+        /*  Make the "outward" faces ie. regular walls  */
+        pg_texture_get_frame(env_atlas, 19, tex_frame);
+        for(i = 0; i < 4; ++i) {
+            vec2_set(new_vert.uv, tex_frame[(1 - (i < 2)) * 2],
+                     tex_frame[(1 - (i % 2)) * 2 + 1]);
+            vec3_dup(new_vert.pos, vert_pos[dir][i]);
+            if(new_vert.pos[2] == -0.5) {
+                new_vert.pos[2] = 0.0f;
+                new_vert.uv[1] -= (16.0f / 512.0f);
+            }
+            vec3_add(new_vert.pos, new_vert.pos, (vec3){ 0.5, 0.5, 0.5 });
+            vec3_add(new_vert.pos, new_vert.pos, (vec3){ x, y, z });
+            vec3_scale(new_vert.pos, new_vert.pos, 2);
+            pg_model_add_vertex(model, &new_vert);
+        }
+        pg_model_add_triangle(model, vert_idx + 1, vert_idx + 0, vert_idx + 2);
+        pg_model_add_triangle(model, vert_idx + 1, vert_idx + 2, vert_idx + 3);
+        return 2;
+    }
+    return 0;
+}
+
+static int tile_model_duct(struct bork_map* map, struct pg_texture* env_atlas,
+                           struct bork_tile* tile, int x, int y, int z)
+{
+    int tri_count = 0;
+    tri_count += tile_face_duct(map, env_atlas, tile, x, y, z, PG_LEFT);
+    tri_count += tile_face_duct(map, env_atlas, tile, x, y, z, PG_RIGHT);
+    tri_count += tile_face_duct(map, env_atlas, tile, x, y, z, PG_FRONT);
+    tri_count += tile_face_duct(map, env_atlas, tile, x, y, z, PG_BACK);
+    tri_count += tile_face_duct(map, env_atlas, tile, x, y, z, PG_TOP);
+    tri_count += tile_face_duct(map, env_atlas, tile, x, y, z, PG_BOTTOM);
     return tri_count;
 }
 

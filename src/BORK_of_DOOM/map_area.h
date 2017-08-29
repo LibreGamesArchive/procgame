@@ -11,6 +11,21 @@ enum bork_area {
 };
 const char* bork_map_area_str(enum bork_area area);
 
+#define BORK_FACE_HAS_SURFACE       (1 << 0)
+#define BORK_FACE_SEETHRU_SURFACE   (1 << 1)
+#define BORK_FACE_FORCE_SURFACE     (1 << 2)
+#define BORK_FACE_FLUSH_SURFACE     (1 << 3)
+#define BORK_FACE_NO_SELF_OPPOSITE  (1 << 4)
+#define BORK_FACE_HAS_BACKFACE      (1 << 5)
+#define BORK_FACE_NO_FRONTFACE      (1 << 6)
+#define BORK_FACE_HAS_ORIENTATION   (1 << 8)
+#define BORK_FACE_HALF_BOTTOM       (1 << 9)
+#define BORK_FACE_HALF_TOP          (1 << 10)
+
+#define BORK_TILE_SPECIAL_MODEL     (1 << 0)
+#define BORK_TILE_HAS_ORIENTATION   (1 << 1)
+#define BORK_TILE_FACE_ORIENTED     (1 << 2)
+
 enum bork_tile_type {
     BORK_TILE_VAC,
     BORK_TILE_ATMO,
@@ -26,27 +41,14 @@ enum bork_tile_type {
     BORK_TILE_POWERBLOCK,
     BORK_TILE_TABLE,
     BORK_TILE_GARDEN,
+    BORK_TILE_CARGO_RED, BORK_TILE_CARGO_BLUE,
+    BORK_TILE_DUCT,
     BORK_TILE_RAMP_BOTTOM, BORK_TILE_RAMP_TOP,
     BORK_TILE_EDITOR_DOOR,
     BORK_TILE_EDITOR_LIGHT1,
     BORK_TILE_EDITOR_LIGHT_WALLMOUNT,
     BORK_TILE_COUNT,
 };
-
-#define BORK_FACE_HAS_SURFACE       (1 << 0)
-#define BORK_FACE_SEETHRU_SURFACE   (1 << 1)
-#define BORK_FACE_FORCE_SURFACE     (1 << 2)
-#define BORK_FACE_FLUSH_SURFACE     (1 << 3)
-#define BORK_FACE_NO_SELF_OPPOSITE  (1 << 4)
-#define BORK_FACE_HAS_BACKFACE      (1 << 5)
-#define BORK_FACE_NO_FRONTFACE      (1 << 6)
-#define BORK_FACE_HAS_ORIENTATION   (1 << 8)
-#define BORK_FACE_HALF_BOTTOM       (1 << 9)
-#define BORK_FACE_HALF_TOP          (1 << 10)
-
-#define BORK_TILE_SPECIAL_MODEL     (1 << 0)
-#define BORK_TILE_HAS_ORIENTATION   (1 << 1)
-#define BORK_TILE_FACE_ORIENTED     (1 << 2)
 
 struct bork_tile {
     enum bork_tile_type type;
