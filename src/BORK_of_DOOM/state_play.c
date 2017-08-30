@@ -8,6 +8,7 @@
 #include "bullet.h"
 #include "physics.h"
 #include "game_states.h"
+#include "datapad_content.h"
 
 /*  The Big Orbital Nonhuman Zone or "BONZ" consists of some main parts:
     Microgravity Utility Transit Tunnel (MUTT)
@@ -46,6 +47,7 @@ void bork_play_start(struct pg_game_state* state, struct bork_game_core* core)
         .core = core,
         .menu.state = BORK_MENU_CLOSED,
         .player_speed = 0.015,
+        .hud_datapad_id = -1,
         .looked_item = -1,
         .held_item = -1,
         .quick_item = { -1, -1, -1, -1 },
@@ -223,6 +225,7 @@ static struct bork_map_object* get_looked_map_object(struct bork_play_data* d)
 }
 
 static void tick_held_item(struct bork_play_data* d);
+static void tick_datapad(struct bork_play_data* d);
 static void tick_control_play(struct bork_play_data* d);
 static void tick_doorpad(struct bork_play_data* d);
 static void tick_control_inv_menu(struct bork_play_data* d);
@@ -264,6 +267,7 @@ static void bork_play_tick(struct pg_game_state* state)
         tick_bullets(d);
         tick_enemies(d);
         tick_items(d);
+        tick_datapad(d);
         d->looked_item = get_looked_item(d);
     }
     bork_ack_input(d->core);
@@ -282,6 +286,13 @@ static void tick_control_play(struct bork_play_data* d)
             if(item->type == BORK_ITEM_BULLETS) {
                 item->flags |= BORK_ENTFLAG_DEAD;
                 d->ammo_bullets += 30;
+            } else if(item->type == BORK_ITEM_DATAPAD) {
+                const struct bork_datapad* dp = &BORK_DATAPADS[item->counter[0]];
+                printf("%s\n%s\n", dp->title, dp->text[0]);
+                d->hud_datapad_id = item->counter[0];
+                d->hud_datapad_ticks = 5 * 60;
+                d->hud_datapad_line = 0;
+                item->flags |= BORK_ENTFLAG_DEAD;
             } else {
                 item->flags |= BORK_ENTFLAG_IN_INVENTORY;
                 add_inventory_item(d, d->looked_item);
@@ -380,6 +391,18 @@ static void tick_held_item(struct bork_play_data* d)
     }
 }
 
+static void tick_datapad(struct bork_play_data* d)
+{
+    if(d->hud_datapad_id < 0) return;
+    const struct bork_datapad* dp = &BORK_DATAPADS[d->hud_datapad_id];
+    --d->hud_datapad_ticks;
+    if(d->hud_datapad_ticks == 0) {
+        d->hud_datapad_line += 2;
+        if(d->hud_datapad_line >= dp->lines - 1) d->hud_datapad_id = -1;
+        else d->hud_datapad_ticks = 5 * 60;
+    }
+}
+
 static void tick_enemies(struct bork_play_data* d)
 {
     int i;
@@ -443,6 +466,7 @@ static void tick_bullets(struct bork_play_data* d)
 
 /*  Drawing */
 static void draw_hud_overlay(struct bork_play_data* d);
+static void draw_datapad(struct bork_play_data* d);
 static void draw_weapon(struct bork_play_data* d, float hud_anim_lerp,
                         vec3 pos_lerp, vec2 dir_lerp);
 static void draw_enemies(struct bork_play_data* d, float lerp);
@@ -505,6 +529,7 @@ static void bork_play_draw(struct pg_game_state* state)
         pg_screen_dst();
         pg_gbuffer_finish(&d->core->gbuf, (vec3){ 0.05, 0.05, 0.05 });
         draw_hud_overlay(d);
+        draw_datapad(d);
     } else {
         /*  Finish to the post-process buffer so we can do the blur effect  */
         pg_ppbuffer_dst(&d->core->ppbuf);
@@ -613,6 +638,43 @@ static void draw_hud_overlay(struct bork_play_data* d)
     pg_model_draw(&d->core->quad_2d, NULL);
 }
 
+static void draw_datapad(struct bork_play_data* d)
+{
+    if(d->hud_datapad_id < 0) return;
+    const struct bork_datapad* dp = &BORK_DATAPADS[d->hud_datapad_id];
+    struct pg_shader* shader = &d->core->shader_2d;
+    pg_shader_2d_resolution(shader, (vec2){ d->core->aspect_ratio, 1 });
+    pg_shader_2d_set_light(shader, (vec2){}, (vec3){}, (vec3){ 1, 1, 1 });
+    pg_shader_2d_color_mod(shader, (vec4){ 1, 1, 1, 1 });
+    pg_shader_begin(shader, NULL);
+    pg_model_begin(&d->core->quad_2d_ctr, shader);
+    pg_shader_2d_tex_frame(shader, 4);
+    pg_shader_2d_transform(shader, (vec2){ 0.3, 0.84 }, (vec2){ 0.1, 0.1 }, 0);
+    pg_model_draw(&d->core->quad_2d_ctr, NULL);
+    pg_shader_2d_tex_frame(shader, 52);
+    pg_shader_2d_add_tex_tx(shader, (vec2){ 4, 1.5 }, (vec2){});
+    pg_shader_2d_transform(shader, (vec2){ 0.3, 0.75 }, (vec2){ 0.25, 0.1 }, 0);
+    pg_model_draw(&d->core->quad_2d_ctr, NULL);
+    shader = &d->core->shader_text;
+    pg_shader_begin(shader, NULL);
+    pg_shader_text_resolution(shader, (vec2){ d->core->aspect_ratio, 1 });
+    pg_shader_text_transform(shader, (vec2){ 1, 1 }, (vec2){});
+    struct pg_shader_text text = { .use_blocks = 2 };
+    int len = snprintf(text.block[0], 64, "%s", dp->title);
+    vec4_set(text.block_style[0], 0.3 - (len * 0.0175 * 1.125 * 0.5), 0.95, 0.0175, 1.125);
+    vec4_set(text.block_color[0], 1, 1, 1, 1);
+    len = snprintf(text.block[1], 64, "%s", dp->text[d->hud_datapad_line]);
+    vec4_set(text.block_style[1], 0.3 - (len * 0.0175 * 1.125 * 0.5), 0.6, 0.0175, 1.125);
+    vec4_set(text.block_color[1], 1, 1, 1, 1);
+    if(d->hud_datapad_line < dp->lines - 1) {
+        text.use_blocks = 3;
+        len = snprintf(text.block[2], 64, "%s", dp->text[d->hud_datapad_line + 1]);
+        vec4_set(text.block_style[2], 0.3 - (len * 0.0175 * 1.125 * 0.5), 0.63, 0.0175, 1.125);
+        vec4_set(text.block_color[2], 1, 1, 1, 1);
+    }
+    pg_shader_text_write(shader, &text);
+}
+
 static void draw_weapon(struct bork_play_data* d, float hud_anim_lerp,
                         vec3 pos_lerp, vec2 dir_lerp)
 {
@@ -644,7 +706,7 @@ static void draw_weapon(struct bork_play_data* d, float hud_anim_lerp,
     /*  Apply the animated transform    */
     mat4_translate(offset, -0.6 + hud_pos[0], 0.3 + hud_pos[1], -0.2 + hud_pos[2]);
     mat4_mul(tx, tx, offset);
-    mat4_scale_aniso(tx, tx, prof->sprite_tx[0], prof->sprite_tx[1], 1);
+    mat4_scale_aniso(tx, tx, prof->sprite_tx[0], prof->sprite_tx[1], prof->sprite_tx[1]);
     mat4_rotate_Y(tx, tx, hud_angle);
     pg_model_begin(model, shader);
     pg_model_draw(model, tx);
@@ -957,6 +1019,14 @@ static void draw_menu_inv(struct bork_play_data* d, float t)
 
 static void tick_doorpad(struct bork_play_data* d)
 {
+    if(d->menu.doorpad.unlocked_ticks > 0) {
+        --d->menu.doorpad.unlocked_ticks;
+        if(d->menu.doorpad.unlocked_ticks == 0) {
+            d->menu.state = BORK_MENU_CLOSED;
+            bork_grab_mouse(d->core, 1);
+        }
+        return;
+    }
     float ar = d->core->aspect_ratio;
     struct bork_map_object* door = &d->map.doors.data[d->menu.doorpad.door_idx];
     uint8_t* chars = d->menu.doorpad.chars;
@@ -976,13 +1046,16 @@ static void tick_doorpad(struct bork_play_data* d)
             vec2_add(diff, diff, (vec2){ 0.025, 0.02 });
             if(diff[0] < 0 || diff[1] < 0
             || diff[0] > 0.08 || diff[1] > 0.065) continue;
-            if(i <= 10 && d->menu.doorpad.num_chars < 4) {
+            if(i < 10 && d->menu.doorpad.num_chars < 4) {
                 chars[d->menu.doorpad.num_chars++] = MOD(i + 1, 10);
-            }
-            if(d->menu.doorpad.num_chars == 4
+            } else if(i == 10) {
+                d->menu.doorpad.num_chars = MAX(0, d->menu.doorpad.num_chars - 1);
+            } else if(i == 11 && d->menu.doorpad.num_chars == 4
             && chars[0] == door_chars[0] && chars[1] == door_chars[1]
             && chars[2] == door_chars[2] && chars[3] == door_chars[3]) {
                 door->door.locked = 0;
+                door->door.open = 1;
+                d->menu.doorpad.unlocked_ticks = 60;
             }
         }
     }

@@ -6,6 +6,7 @@
 #include "entity.h"
 #include "map_area.h"
 #include "game_states.h"
+#include "datapad_content.h"
 
 static void bork_editor_write_map(struct bork_editor_map* map, char* filename);
 static void bork_editor_update(struct pg_game_state* state);
@@ -84,6 +85,7 @@ static void bork_editor_update_map(struct bork_editor_data* d)
             struct bork_editor_entity new_ent = {
                 .type = d->ent_type,
                 .pos = { click[0], click[1], d->cursor[2] + 0.5 } };
+            if(d->ent_type == BORK_ITEM_DATAPAD) new_ent.option = d->datapad_id;
             ARR_PUSH(d->map.ents, new_ent);
         }
     } else if(bork_input_event(d->core, BORK_RIGHT_MOUSE, BORK_CONTROL_HIT)) {
@@ -206,6 +208,12 @@ static void bork_editor_update_map(struct bork_editor_data* d)
                 if(d->core->ctrl_state[SDL_SCANCODE_LSHIFT]) code_idx += 2;
                 obj->door.code[code_idx] = MOD((int)obj->door.code[code_idx] + code_move, 10);
             }
+        }
+    } else if(d->ent_type == BORK_ITEM_DATAPAD) {
+        if(bork_input_event(d->core, SDL_SCANCODE_UP, BORK_CONTROL_HIT)) {
+            d->datapad_id = MOD(d->datapad_id + 1, NUM_DATAPADS);
+        } else if(bork_input_event(d->core, SDL_SCANCODE_DOWN, BORK_CONTROL_HIT)) {
+            d->datapad_id = MOD(d->datapad_id - 1, NUM_DATAPADS);
         }
     }
     if(d->select_mode == 1) {
@@ -360,18 +368,30 @@ static void bork_editor_draw(struct pg_game_state* state)
     snprintf(text.block[4], 64, "PLACING ENTITY: %s", prof->name);
     vec4_set(text.block_style[4], 1, 0.29, 0.02, 1.2);
     vec4_set(text.block_color[4], 1, 1, 1, 1);
+    if(d->ent_type == BORK_ITEM_DATAPAD) {
+        int b = text.use_blocks;
+        snprintf(text.block[b], 64, "DATAPAD ID: %d", d->datapad_id);
+        vec4_set(text.block_style[b], 1, 0.32, 0.02, 1.2);
+        vec4_set(text.block_color[b], 1, 1, 1, 1);
+        ++b;
+        snprintf(text.block[b], 64, "  %s", BORK_DATAPADS[d->datapad_id].title);
+        vec4_set(text.block_style[b], 1, 0.35, 0.02, 1.2);
+        vec4_set(text.block_color[b], 1, 1, 1, 1);
+        text.use_blocks += 2;
+    }
     if(tile->type == BORK_TILE_EDITOR_DOOR) {
+        int b = text.use_blocks;
         struct bork_editor_obj* obj = &d->map.objs.data[tile->obj_idx];
         if(obj->door.flags & 1) {
-            snprintf(text.block[5], 64, "DOOR CODE: %u%u%u%u",
+            snprintf(text.block[b], 64, "DOOR CODE: %u%u%u%u",
                 obj->door.code[0], obj->door.code[1],
                 obj->door.code[2], obj->door.code[3]);
         } else {
-            snprintf(text.block[5], 64, "NOT LOCKED");
+            snprintf(text.block[b], 64, "NOT LOCKED");
         }
-        vec4_set(text.block_style[5], 1, 0.17, 0.02, 1.2);
-        vec4_set(text.block_color[5], 1, 1, 1, 1);
-        text.use_blocks = 6;
+        vec4_set(text.block_style[b], 1, 0.17, 0.02, 1.2);
+        vec4_set(text.block_color[b], 1, 1, 1, 1);
+        ++text.use_blocks;
     }
     pg_shader_text_write(shader, &text);
     bork_editor_draw_items_text(d);
@@ -435,6 +455,7 @@ void bork_editor_complete_entity(struct bork_entity* ent,
         .item_quantity = 1,
         .type = ed->type,
     };
+    if(ed->type == BORK_ITEM_DATAPAD) ent->counter[0] = ed->option;
 }
 
 void bork_editor_complete_door(struct bork_map* map, struct bork_editor_map* ed_map,

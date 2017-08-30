@@ -33,6 +33,7 @@ struct bork_entity {
         BORK_ITEM_MACHINEGUN,
         BORK_ITEM_LEADPIPE,
         BORK_ITEM_PLANT1,
+        BORK_ITEM_DATAPAD,
         BORK_ENTITY_TYPES,
     } type;
 };
@@ -80,7 +81,7 @@ static const struct bork_entity_profile {
         .use_ctrl = BORK_CONTROL_HELD,
         .use_func = bork_use_machinegun,
         .hud_func = bork_hud_machinegun },
-    [BORK_ITEM_LEADPIPE] = { .name = "LEAD PIPE",
+    [BORK_ITEM_LEADPIPE] = { .name = "STEEL ROD",
         .base_flags = BORK_ENTFLAG_ITEM,
         .size = { 0.4, 0.4, 0.4 },
         .sprite_tx = { 2, 1, 0, 0 },
@@ -103,6 +104,11 @@ static const struct bork_entity_profile {
         .size = { 0.5, 0.5, 0.5 },
         .sprite_tx = { 1, 1, 0, 0 },
         .front_frame = 2 },
+    [BORK_ITEM_DATAPAD] = { .name = "DATA PAD",
+        .base_flags = BORK_ENTFLAG_ITEM,
+        .size = { 0.4, 0.4, 0.4 },
+        .sprite_tx = { 1, 1, 0, 0 },
+        .front_frame = 4 },
 };
 
 typedef int bork_entity_t;

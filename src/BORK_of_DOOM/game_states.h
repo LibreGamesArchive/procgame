@@ -21,6 +21,10 @@ struct bork_play_data {
     float hud_anim_speed;
     int hud_anim_active;
     int hud_anim_destroy_when_finished;
+    /*  HUD datapad info    */
+    int hud_datapad_id;
+    int hud_datapad_ticks;
+    int hud_datapad_line;
     /*  Input states    */
     struct {
         enum {
@@ -65,11 +69,13 @@ struct bork_editor_data {
         ARR_T(struct bork_editor_entity {
             uint8_t type;
             vec3 pos;
+            int option;
         }) ents;
     } map;
     struct bork_editor_tile current_tile;
     int selected_ent;
     enum bork_entity_type ent_type;
+    int datapad_id;
     int select_mode;    /*  Whether the selection is being drawn    */
     int selection[4];
     int cursor[3];
