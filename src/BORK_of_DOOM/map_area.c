@@ -254,6 +254,9 @@ void bork_map_deinit(struct bork_map* map)
     ARR_DEINIT(map->doors);
     ARR_DEINIT(map->enemies);
     ARR_DEINIT(map->items);
+    ARR_DEINIT(map->light_fixtures);
+    ARR_DEINIT(map->lights);
+    ARR_DEINIT(map->spotlights);
 }
 
 void bork_map_update(struct bork_map* map, struct bork_entity* plr)
@@ -261,10 +264,6 @@ void bork_map_update(struct bork_map* map, struct bork_entity* plr)
     struct bork_map_object* obj;
     int i;
     ARR_FOREACH_PTR(map->doors, obj, i) {
-        vec3 door_pos = { obj->pos[0], obj->pos[1], obj->pos[2] };
-        vec3 plr_to_door;
-        vec3_sub(plr_to_door, door_pos, plr->pos);
-        float dist = vec3_len(plr_to_door);
         if(obj->door.open) {
             obj->door.pos += 0.1;
             if(obj->door.pos > 1.9) obj->door.pos = 1.9;

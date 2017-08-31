@@ -237,7 +237,7 @@ static void bork_editor_draw_items(struct bork_editor_data* d)
     pg_shader_begin(shader, NULL);
     pg_shader_2d_resolution(shader, (vec2){ d->core->aspect_ratio, 1 });
     pg_shader_2d_texture(shader, &d->core->bullet_tex);
-    pg_shader_2d_tex_frame(shader, 0);
+    pg_shader_2d_tex_frame(shader, 2);
     struct pg_model* model = &d->core->quad_2d_ctr;
     pg_model_begin(model, shader);
     int i;
@@ -452,6 +452,7 @@ void bork_editor_complete_entity(struct bork_entity* ent,
     *ent = (struct bork_entity) {
         .pos = { (32 - ed->pos[0]) * 2, ed->pos[1] * 2, ed->pos[2] * 2 },
         .flags = BORK_ENT_PROFILES[ed->type].base_flags,
+        .HP = BORK_ENT_PROFILES[ed->type].base_hp,
         .item_quantity = 1,
         .type = ed->type,
     };
@@ -575,7 +576,7 @@ void bork_editor_complete_map(struct bork_map* map, struct bork_editor_map* ed_m
         bork_entity_t ent_id = ent_arr + i;
         struct bork_entity* ent = bork_entity_get(ent_id);
         bork_editor_complete_entity(ent, ed_ent);
-        if(ed_ent->type < BORK_ITEM_DOGFOOD) ARR_PUSH(map->enemies, ent_id);
+        if(ed_ent->type < BORK_ITEM_FIRSTAID) ARR_PUSH(map->enemies, ent_id);
         else ARR_PUSH(map->items, ent_id);
     }
 }

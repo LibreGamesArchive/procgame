@@ -58,12 +58,15 @@ void bork_bullet_move(struct bork_bullet* blt, struct bork_map* map)
                 }
             }
             if(closest_ent) {
-                closest_ent->flags |= BORK_ENTFLAG_DEAD;
+                closest_ent->HP -= 15;
                 blt->flags |= BORK_BULLET_DEAD;
-                blt->dead_ticks = 30;
+                blt->dead_ticks = 10;
+                vec3 knockback;
+                vec3_set_len(knockback, blt->dir, 0.3);
+                vec3_add(closest_ent->vel, closest_ent->vel, knockback);
                 vec3_sub(blt->pos, new_pos, blt->dir);
                 vec3_set(blt->dir, 0, 0, 0);
-                vec3_set(blt->light_color, 2, 0.8, 0.8);
+                vec3_set(blt->light_color, 1, 1, 0.6);
                 break;
             }
         }
@@ -74,7 +77,7 @@ void bork_bullet_move(struct bork_bullet* blt, struct bork_map* map)
             if(dist < 0.8) {
                 blt->flags |= BORK_BULLET_DEAD;
                 blt->dead_ticks = 10;
-                map->plr->HP -= 5;
+                map->plr->HP -= 20;
                 vec3_sub(blt->pos, new_pos, blt->dir);
                 vec3_set(blt->dir, 0, 0, 0);
                 vec3_set(blt->light_color, 2, 0.8, 0.8);

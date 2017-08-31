@@ -34,6 +34,11 @@ static void bork_play_deinit(void* data)
 {
     struct bork_play_data* d = data;
     bork_map_deinit(&d->map);
+    ARR_DEINIT(d->lights_buf);
+    ARR_DEINIT(d->spotlights);
+    ARR_DEINIT(d->inventory);
+    ARR_DEINIT(d->bullets);
+    bork_entpool_clear();
     free(d);
 }
 
@@ -58,7 +63,8 @@ void bork_play_start(struct pg_game_state* state, struct bork_game_core* core)
     ARR_INIT(d->lights_buf);
     ARR_INIT(d->inventory);
     vec3_set(d->plr.pos, 32, 32, 40);
-    d->plr.HP = 75;
+    d->plr.HP = 100;
+    d->ammo_plazma = 30;
     /*  Generate the BONZ station   */
     struct bork_editor_map ed_map = {};
     bork_editor_load_map(&ed_map, "test.bork_map");
@@ -92,6 +98,8 @@ void bork_play_reset_hud_anim(struct bork_play_data* d)
     d->hud_anim_speed = 0;
     d->hud_anim_active = 0;
     d->hud_anim_destroy_when_finished = 0;
+    d->hud_callback_frame = -1;
+    d->hud_anim_callback = NULL;
     vec3_set(d->hud_anim[0], 0, 0, 0);
     vec3_set(d->hud_anim[1], 0, 0, 0);
     vec3_set(d->hud_anim[2], 0, 0, 0);
@@ -171,11 +179,7 @@ static void switch_item(struct bork_play_data* d, int inv_idx)
 static bork_entity_t get_looked_item(struct bork_play_data* d)
 {
     vec3 look_dir, look_pos;
-    spherical_to_cartesian(look_dir, (vec2){ d->plr.dir[0] - M_PI,
-                                             d->plr.dir[1] - (M_PI * 0.5) });
-    vec3_dup(look_pos, d->plr.pos);
-    if(d->plr.flags & BORK_ENTFLAG_CROUCH) look_pos[2] += 0.4;
-    else look_pos[2] += 0.8;
+    bork_entity_get_eye(&d->plr, look_dir, look_pos);
     int i;
     bork_entity_t looked_id = -1;
     bork_entity_t ent_id;
@@ -192,7 +196,31 @@ static bork_entity_t get_looked_item(struct bork_play_data* d)
         float angle = acosf(vec3_mul_inner(ent_to_plr, look_dir));
         if(angle >= closest_angle) continue;
         closest_dist = dist;
-        closest_angle = angle;
+        looked_id = ent_id;
+    }
+    return looked_id;
+}
+
+static bork_entity_t get_looked_enemy(struct bork_play_data* d)
+{
+    vec3 look_dir, look_pos;
+    bork_entity_get_eye(&d->plr, look_dir, look_pos);
+    int i;
+    bork_entity_t looked_id = -1;
+    bork_entity_t ent_id;
+    struct bork_entity* ent = NULL;
+    float closest_angle = 0.75f, closest_dist = 25.0f;
+    ARR_FOREACH(d->map.enemies, ent_id, i) {
+        ent = bork_entity_get(ent_id);
+        if(!ent) continue;
+        vec3 ent_to_plr;
+        vec3_sub(ent_to_plr, ent->pos, look_pos);
+        float dist = vec3_len(ent_to_plr);
+        if(dist >= closest_dist) continue;
+        vec3_normalize(ent_to_plr, ent_to_plr);
+        float angle = acosf(vec3_mul_inner(ent_to_plr, look_dir)) * dist;
+        if(angle >= closest_angle) continue;
+        closest_dist = dist;
         looked_id = ent_id;
     }
     return looked_id;
@@ -201,10 +229,7 @@ static bork_entity_t get_looked_item(struct bork_play_data* d)
 static struct bork_map_object* get_looked_map_object(struct bork_play_data* d)
 {
     vec3 look_dir, look_pos;
-    spherical_to_cartesian(look_dir, (vec2){ d->plr.dir[0] - M_PI,
-                                             d->plr.dir[1] - (M_PI * 0.5) });
-    vec3_dup(look_pos, d->plr.pos);
-    look_pos[2] += 0.8;
+    bork_entity_get_eye(&d->plr, look_dir, look_pos);
     int i;
     struct bork_map_object* looked_obj = NULL;
     struct bork_map_object* obj;
@@ -252,16 +277,22 @@ static void bork_play_tick(struct pg_game_state* state)
             bork_grab_mouse(d->core, 0);
         }
     }
-    if(d->menu.state == BORK_MENU_CLOSED) tick_control_play(d);
-    else if(d->menu.state == BORK_MENU_INVENTORY) tick_control_inv_menu(d);
+    if(d->menu.state == BORK_MENU_INVENTORY) tick_control_inv_menu(d);
     else if(d->menu.state == BORK_MENU_DOORPAD) tick_doorpad(d);
-    /*  Player update   */
-    if(d->menu.state == BORK_MENU_CLOSED) {
+    else if(bork_input_event(d->core, SDL_SCANCODE_RETURN, BORK_CONTROL_HIT)) {
+        struct bork_game_core* core = d->core;
+        bork_play_deinit(d);
+        bork_menu_start(state, core);
+        return;
+    } else if(d->menu.state == BORK_MENU_CLOSED) {
+        tick_control_play(d);
+        /*  Player update   */
         tick_held_item(d);
         vec2_set(d->plr.dir, d->plr.dir[0] + d->core->mouse_motion[0],
                              d->plr.dir[1] + d->core->mouse_motion[1]);
         d->plr.dir[0] = fmodf(d->plr.dir[0], M_PI * 2.0f);
         bork_entity_update(&d->plr, &d->map);
+        if(d->plr.HP <= 0) d->menu.state = BORK_MENU_PLAYERDEAD;
         /*  Everything else update  */
         bork_map_update(&d->map, &d->plr);
         tick_bullets(d);
@@ -269,6 +300,7 @@ static void bork_play_tick(struct pg_game_state* state)
         tick_items(d);
         tick_datapad(d);
         d->looked_item = get_looked_item(d);
+        d->looked_enemy = get_looked_enemy(d);
     }
     bork_ack_input(d->core);
 }
@@ -286,9 +318,10 @@ static void tick_control_play(struct bork_play_data* d)
             if(item->type == BORK_ITEM_BULLETS) {
                 item->flags |= BORK_ENTFLAG_DEAD;
                 d->ammo_bullets += 30;
+            } else if(item->type == BORK_ITEM_PLAZMA) {
+                item->flags |= BORK_ENTFLAG_DEAD;
+                d->ammo_plazma += 15;
             } else if(item->type == BORK_ITEM_DATAPAD) {
-                const struct bork_datapad* dp = &BORK_DATAPADS[item->counter[0]];
-                printf("%s\n%s\n", dp->title, dp->text[0]);
                 d->hud_datapad_id = item->counter[0];
                 d->hud_datapad_ticks = 5 * 60;
                 d->hud_datapad_line = 0;
@@ -320,15 +353,16 @@ static void tick_control_play(struct bork_play_data* d)
     }
     if(ctrl[SDL_SCANCODE_LCTRL]) {
         d->plr.flags |= BORK_ENTFLAG_CROUCH;
-    } else {
+    } else if(d->plr.flags & BORK_ENTFLAG_CROUCH) {
         if(!bork_map_check_ellipsoid(&d->map,
             (vec3){ d->plr.pos[0], d->plr.pos[1], d->plr.pos[2] + 0.5 },
             BORK_ENT_PROFILES[BORK_ENTITY_PLAYER].size))
         {
             d->plr.flags &= ~BORK_ENTFLAG_CROUCH;
+            d->plr.pos[2] += 0.5;
         }
     }
-    float move_speed = d->player_speed * (d->plr.flags & BORK_ENTFLAG_GROUND ? 1 : 0.15);
+    float move_speed = d->player_speed * (d->plr.flags & BORK_ENTFLAG_GROUND ? 1 : 0.2);
     d->plr.flags &= ~BORK_ENTFLAG_SLIDE;
     if(ctrl[kmap[BORK_CTRL_LEFT]]) {
         d->plr.vel[0] -= move_speed * sin(d->plr.dir[0]);
@@ -377,14 +411,17 @@ static void tick_control_play(struct bork_play_data* d)
 static void tick_held_item(struct bork_play_data* d)
 {
     if(!d->hud_anim_active || d->held_item < 0) return;
+    struct bork_entity* item = bork_entity_get(d->inventory.data[d->held_item]);
     d->hud_anim_progress += d->hud_anim_speed;
     int anim_idx = floor(d->hud_anim_progress * 4.0f);
+    if(d->hud_callback_frame != -1 && anim_idx == d->hud_callback_frame) {
+        d->hud_anim_callback(item, d);
+        d->hud_callback_frame = -1;
+    }
     if(anim_idx >= d->hud_anim_active) {
         if(d->hud_anim_destroy_when_finished) {
-            bork_entity_t ent_id = remove_inventory_item(d, d->held_item);
-            printf("%d\n", ent_id);
-            struct bork_entity* ent = bork_entity_get(ent_id);
-            ent->flags |= BORK_ENTFLAG_DEAD;
+            remove_inventory_item(d, d->held_item);
+            item->flags |= BORK_ENTFLAG_DEAD;
             d->held_item = -1;
         }
         bork_play_reset_hud_anim(d);
@@ -398,7 +435,7 @@ static void tick_datapad(struct bork_play_data* d)
     --d->hud_datapad_ticks;
     if(d->hud_datapad_ticks == 0) {
         d->hud_datapad_line += 2;
-        if(d->hud_datapad_line >= dp->lines - 1) d->hud_datapad_id = -1;
+        if(d->hud_datapad_line >= dp->lines) d->hud_datapad_id = -1;
         else d->hud_datapad_ticks = 5 * 60;
     }
 }
@@ -414,19 +451,28 @@ static void tick_enemies(struct bork_play_data* d)
             ARR_SWAPSPLICE(d->map.enemies, i, 1);
             continue;
         }
-        vec3 ent_head, plr_head;
-        vec3_add(ent_head, ent->pos, (vec3){ 0, 0, 0.5 });
-        vec3_add(plr_head, d->plr.pos, (vec3){ 0, 0, 0.5 });
-        int vis = bork_map_check_vis(&d->map, ent_head, plr_head);
-        if(vis && ent->counter[0] < d->ticks) {
-            vec3 ent_to_plr;
-            vec3_sub(ent_to_plr, plr_head, ent_head);
-            struct bork_bullet new_bullet = { .type = 1,
-                .flags = BORK_BULLET_HURTS_PLAYER };
-            vec3_set_len(new_bullet.dir, ent_to_plr, 1);
-            vec3_add(new_bullet.pos, ent_head, new_bullet.dir);
-            ARR_PUSH(d->bullets, new_bullet);
-            ent->counter[0] = d->ticks + 60;
+        if(ent->flags & BORK_ENTFLAG_DYING) {
+            --ent->dead_ticks;
+            if(ent->dead_ticks <= 0) ent->flags |= BORK_ENTFLAG_DEAD;
+        } else if(ent->HP <= 0) {
+            ent->flags |= BORK_ENTFLAG_DYING;
+            ent->dead_ticks = 90;
+            continue;
+        } else {
+            vec3 ent_head, plr_head;
+            vec3_add(ent_head, ent->pos, (vec3){ 0, 0, 0.5 });
+            vec3_add(plr_head, d->plr.pos, (vec3){ 0, 0, 0.5 });
+            int vis = bork_map_check_vis(&d->map, ent_head, plr_head);
+            if(vis && ent->counter[0] < d->ticks) {
+                vec3 ent_to_plr;
+                vec3_sub(ent_to_plr, plr_head, ent_head);
+                struct bork_bullet new_bullet = { .type = 1,
+                    .flags = BORK_BULLET_HURTS_PLAYER };
+                vec3_set_len(new_bullet.dir, ent_to_plr, 1);
+                vec3_add(new_bullet.pos, ent_head, new_bullet.dir);
+                ARR_PUSH(d->bullets, new_bullet);
+                ent->counter[0] = d->ticks + 60;
+            }
         }
         bork_entity_update(ent, &d->map);
     }
@@ -467,6 +513,7 @@ static void tick_bullets(struct bork_play_data* d)
 /*  Drawing */
 static void draw_hud_overlay(struct bork_play_data* d);
 static void draw_datapad(struct bork_play_data* d);
+static void draw_gameover(struct bork_play_data* d, float t);
 static void draw_weapon(struct bork_play_data* d, float hud_anim_lerp,
                         vec3 pos_lerp, vec2 dir_lerp);
 static void draw_enemies(struct bork_play_data* d, float lerp);
@@ -552,6 +599,9 @@ static void bork_play_draw(struct pg_game_state* state)
             break;
         case BORK_MENU_DOORPAD:
             draw_doorpad(d, (float)state->ticks / (float)state->tick_rate);
+            break;
+        case BORK_MENU_PLAYERDEAD:
+            draw_gameover(d, (float)state->ticks / (float)state->tick_rate);
             break;
         }
     }
@@ -733,6 +783,13 @@ static void draw_enemies(struct bork_play_data* d, float lerp)
         if(!ent || (ent->flags & BORK_ENTFLAG_DEAD)) continue;
         prof = &BORK_ENT_PROFILES[ent->type];
         /*  Figure out which directional frame to draw  */
+        if((ent->flags & BORK_ENTFLAG_DYING) && ent->dead_ticks <= 30) {
+            struct pg_light new_light = {};
+            pg_light_pointlight(&new_light, ent->pos,
+                ((float)ent->dead_ticks / 30.0f) * 5.0f, (vec3){ 1.5, 0.25, 0.25 });
+            ARR_PUSH(d->lights_buf, new_light);
+            continue;
+        }
         vec3 pos_lerp;
         vec3_scale(pos_lerp, ent->vel, lerp);
         vec3_add(pos_lerp, pos_lerp, ent->pos);
@@ -1104,3 +1161,19 @@ static void draw_doorpad(struct bork_play_data* d, float t)
     pg_shader_text_write(shader, &text);
 }
 
+static void draw_gameover(struct bork_play_data* d, float t)
+{
+    float ctr = d->core->aspect_ratio * 0.5;
+    struct pg_shader* shader = &d->core->shader_text;
+    if(!pg_shader_is_active(shader)) pg_shader_begin(shader, NULL);
+    pg_shader_text_resolution(shader, (vec2){d->core->aspect_ratio, 1});
+    pg_shader_text_transform(shader, (vec2){ 1, 1 }, (vec2){});
+    struct pg_shader_text text = { .use_blocks = 3,
+        .block = { "YOU DIED", "PRESS ENTER TO RETURN", "TO THE MAIN MENU" },
+        .block_style = {
+            { ctr - (8 * 0.075 * 1.25 * 0.5), 0.35, 0.075, 1.25 },
+            { ctr - (strnlen(text.block[1], 64) * 0.04 * 1.25 * 0.5), 0.55, 0.04, 1.25 },
+            { ctr - (strnlen(text.block[2], 64) * 0.04 * 1.25 * 0.5), 0.6, 0.04, 1.25 } },
+        .block_color = { { 1, 1, 1, 1 }, { 1, 1, 1, 1 }, { 1, 1, 1, 1 } } };
+    pg_shader_text_write(shader, &text);
+}

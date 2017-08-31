@@ -11,7 +11,7 @@ struct bork_play_data {
     float player_speed;
     int held_item;
     int quick_item[4];
-    int ammo_bullets;
+    int ammo_bullets, ammo_plazma;
     ARR_T(bork_entity_t) inventory;
     ARR_T(struct bork_bullet) bullets;
     /*  The HUD-item animation  */
@@ -21,6 +21,8 @@ struct bork_play_data {
     float hud_anim_speed;
     int hud_anim_active;
     int hud_anim_destroy_when_finished;
+    void (*hud_anim_callback)(struct bork_entity* item, struct bork_play_data* d);
+    int hud_callback_frame;
     /*  HUD datapad info    */
     int hud_datapad_id;
     int hud_datapad_ticks;
@@ -32,6 +34,7 @@ struct bork_play_data {
             BORK_MENU_DOORPAD,
             BORK_MENU_INVENTORY,
             BORK_MENU_CHARACTER,
+            BORK_MENU_PLAYERDEAD,
         } state;
         union {
             struct {
@@ -46,6 +49,7 @@ struct bork_play_data {
         };
     } menu;
     bork_entity_t looked_item;
+    bork_entity_t looked_enemy;
 };
 void bork_play_reset_hud_anim(struct bork_play_data* d);
 

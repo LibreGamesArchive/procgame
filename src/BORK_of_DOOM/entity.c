@@ -10,6 +10,14 @@
 
 static ARR_T(struct bork_entity) ent_pool = {};
 
+void bork_entpool_clear(void)
+{
+    int i;
+    struct bork_entity* ent;
+    ARR_FOREACH_PTR(ent_pool, ent, i)
+        *ent = (struct bork_entity){ .flags = BORK_ENTFLAG_DEAD };
+}
+
 bork_entity_t bork_entity_new(int n)
 {
     int run = 1;
@@ -117,10 +125,24 @@ void bork_entity_move(struct bork_entity* ent, struct bork_map* map)
         friction = 1;
     } else if(ent->flags & BORK_ENTFLAG_GROUND) {
         ent->vel[2] = 0;
+        if(vec3_len(ent->vel) > 0.1) vec3_set_len(ent->vel, ent->vel, 0.1);
         friction = 1;
     }
     if(friction) vec3_scale(ent->vel, ent->vel, 0.8);
     if(vec3_len(ent->vel) < 0.0005) vec3_set(ent->vel, 0, 0, 0);
+}
+
+void bork_entity_get_eye(struct bork_entity* ent, vec3 out_dir, vec3 out_pos)
+{
+    if(out_dir) {
+        spherical_to_cartesian(out_dir,
+            (vec2){ ent->dir[0] - M_PI, ent->dir[1] - (M_PI * 0.5) });
+    }
+    if(out_pos) {
+        float eye_height = ((ent->flags & BORK_ENTFLAG_CROUCH) ? 0.5 : 0.9) *
+            BORK_ENT_PROFILES[ent->type].size[2];
+        vec3_set(out_pos, ent->pos[0], ent->pos[1], ent->pos[2] + eye_height);
+    }
 }
 
 /*  Item use functions  */
@@ -162,7 +184,48 @@ void bork_hud_machinegun(struct bork_entity* ent, struct bork_play_data* d)
     pg_shader_text_write(shader, &text);
 }
 
-void bork_use_dogfood(struct bork_entity* ent, struct bork_play_data* d)
+/*  Item use functions  */
+void bork_use_plazgun(struct bork_entity* ent, struct bork_play_data* d)
+{
+    if(ent->counter[0] > d->ticks || d->ammo_plazma <= 0) return;
+    ent->counter[0] = d->ticks + 20;
+    --d->ammo_plazma;
+    vec3 bullet_dir;
+    spherical_to_cartesian(bullet_dir, (vec2){ d->plr.dir[0] - M_PI,
+                                               d->plr.dir[1] - (M_PI * 0.5) });
+    vec3_scale(bullet_dir, bullet_dir, 0.5);
+    struct bork_bullet new_bullet = { .type = 2, .flags = BORK_BULLET_HURTS_ENEMY };
+    vec3_dup(new_bullet.pos, d->plr.pos);
+    new_bullet.pos[0] += 0.2 * sin(d->plr.dir[0]) + bullet_dir[0] * 0.3;
+    new_bullet.pos[1] -= 0.2 * cos(d->plr.dir[0]) - bullet_dir[1] * 0.3;
+    new_bullet.pos[2] += 0.65 + bullet_dir[2] * 0.3;
+    if(d->plr.flags & BORK_ENTFLAG_CROUCH) new_bullet.pos[2] -= 0.4;
+    vec3_dup(new_bullet.dir, bullet_dir);
+    ARR_PUSH(d->bullets, new_bullet);
+    bork_play_reset_hud_anim(d);
+    vec3_set(d->hud_anim[1], 0.3, 0, 0.04);
+    vec3_set(d->hud_anim[2], 0.2, 0, 0);
+    vec3_set(d->hud_anim[3], 0, 0, 0);
+    d->hud_angle[1] = -0.1;
+    d->hud_angle[2] = -0.025;
+    d->hud_anim_speed = 0.03;
+    d->hud_anim_active = 3;
+}
+
+void bork_hud_plazgun(struct bork_entity* ent, struct bork_play_data* d)
+{
+    struct pg_shader* shader = &d->core->shader_text;
+    struct pg_shader_text text = { .use_blocks = 1 };
+    float ar = d->core->aspect_ratio;
+    pg_shader_text_resolution(shader, (vec2){ ar, 1 });
+    pg_shader_text_transform(shader, (vec2){ 1, 1 }, (vec2){});
+    int len = snprintf(text.block[0], 64, "AMMO: %d", d->ammo_plazma);
+    vec4_set(text.block_style[0], ar / 2 - (len * 0.025 * 1.2 * 0.5), 0.85, 0.025, 1.2);
+    vec4_set(text.block_color[0], 1, 1, 1, 1);
+    pg_shader_text_write(shader, &text);
+}
+
+void bork_use_firstaid(struct bork_entity* ent, struct bork_play_data* d)
 {
     if(d->hud_anim_active && d->hud_anim_destroy_when_finished) return;
     bork_play_reset_hud_anim(d);
@@ -177,6 +240,22 @@ void bork_use_dogfood(struct bork_entity* ent, struct bork_play_data* d)
     }
 }
 
+static void leadpipe_callback(struct bork_entity* item, struct bork_play_data* d)
+{
+    if(d->looked_enemy == -1) return;
+    struct bork_entity* ent = bork_entity_get(d->looked_enemy);
+    if(!ent) return;
+    vec3 ent_to_plr;
+    vec3_sub(ent_to_plr, ent->pos, d->plr.pos);
+    if(vec3_len(ent_to_plr) >= 2.5) return;
+    vec3 look_dir, look_pos;
+    bork_entity_get_eye(&d->plr, look_dir, look_pos);
+    if(!bork_map_check_vis(&d->map, look_pos, ent->pos)) return;
+    vec3_scale(look_dir, look_dir, 0.3);
+    vec3_add(ent->vel, ent->vel, look_dir);
+    ent->HP -= 10;
+}
+
 void bork_use_leadpipe(struct bork_entity* ent, struct bork_play_data* d)
 {
     if(d->hud_anim_active) return;
@@ -188,4 +267,6 @@ void bork_use_leadpipe(struct bork_entity* ent, struct bork_play_data* d)
     d->hud_angle[3] = -0.45;
     d->hud_anim_speed = 0.04;
     d->hud_anim_active = 3;
+    d->hud_anim_callback = leadpipe_callback;
+    d->hud_callback_frame = 2;
 }

@@ -14,12 +14,14 @@ struct bork_play_data;
 #define BORK_ENTFLAG_STACKS             (1 << 10)
 #define BORK_ENTFLAG_NOT_INTERACTIVE    (1 << 11)
 #define BORK_ENTFLAG_IN_INVENTORY       (1 << 12)
+#define BORK_ENTFLAG_DYING              (1 << 13)
 
 struct bork_entity {
     vec3 pos;
     vec3 vel;
     vec2 dir;
     uint32_t flags;
+    int dead_ticks;
     int still_ticks;
     int HP;
     int counter[4];
@@ -27,10 +29,12 @@ struct bork_entity {
     enum bork_entity_type {
         BORK_ENTITY_PLAYER,
         BORK_ENTITY_ENEMY,
-        BORK_ITEM_DOGFOOD,
+        BORK_ITEM_FIRSTAID,
         BORK_ITEM_BULLETS,
+        BORK_ITEM_PLAZMA,
         BORK_ITEM_SCRAPMETAL,
         BORK_ITEM_MACHINEGUN,
+        BORK_ITEM_PLAZGUN,
         BORK_ITEM_LEADPIPE,
         BORK_ITEM_PLANT1,
         BORK_ITEM_DATAPAD,
@@ -40,12 +44,15 @@ struct bork_entity {
 
 void bork_use_machinegun(struct bork_entity* ent, struct bork_play_data* d);
 void bork_hud_machinegun(struct bork_entity* ent, struct bork_play_data* d);
-void bork_use_dogfood(struct bork_entity* ent, struct bork_play_data* d);
+void bork_use_plazgun(struct bork_entity* ent, struct bork_play_data* d);
+void bork_hud_plazgun(struct bork_entity* ent, struct bork_play_data* d);
+void bork_use_firstaid(struct bork_entity* ent, struct bork_play_data* d);
 void bork_use_leadpipe(struct bork_entity* ent, struct bork_play_data* d);
 
 static const struct bork_entity_profile {
     char name[32];
     uint32_t base_flags;
+    int base_hp;
     vec3 size;
     vec4 sprite_tx;
     int front_frame;
@@ -61,18 +68,29 @@ static const struct bork_entity_profile {
         .sprite_tx = { 1, 1, 0, 0 } },
     [BORK_ENTITY_ENEMY] = { .name = "Enemy",
         .base_flags = BORK_ENTFLAG_ENEMY,
+        .base_hp = 30,
         .size = { 1, 1, 1 },
         .sprite_tx = { 1, 1, 0, 0 },
         .front_frame = 192,
         .dir_frames = 4 },
-    [BORK_ITEM_DOGFOOD] = { .name = "DOG FOOD",
+    [BORK_ITEM_FIRSTAID] = { .name = "FIRST AID KIT",
         .base_flags = BORK_ENTFLAG_ITEM | BORK_ENTFLAG_DESTROY_ON_USE | BORK_ENTFLAG_STACKS,
         .size = { 0.5, 0.5, 0.5 },
         .size = { 0.4, 0.4, 0.4 },
         .sprite_tx = { 1, 1, 0, 0 },
         .front_frame = 0,
         .use_ctrl = BORK_CONTROL_HIT,
-        .use_func = bork_use_dogfood },
+        .use_func = bork_use_firstaid },
+    [BORK_ITEM_BULLETS] = { .name = "BULLETS",
+        .base_flags = BORK_ENTFLAG_ITEM,
+        .size = { 0.4, 0.4, 0.4 },
+        .sprite_tx = { 1, 1, 0, 0 },
+        .front_frame = 1 },
+    [BORK_ITEM_PLAZMA] = { .name = "PLAZMA",
+        .base_flags = BORK_ENTFLAG_ITEM,
+        .size = { 0.4, 0.4, 0.4 },
+        .sprite_tx = { 1, 1, 0, 0 },
+        .front_frame = 5 },
     [BORK_ITEM_MACHINEGUN] = { .name = "MACHINE GUN",
         .base_flags = BORK_ENTFLAG_ITEM,
         .size = { 0.4, 0.4, 0.4 },
@@ -81,6 +99,14 @@ static const struct bork_entity_profile {
         .use_ctrl = BORK_CONTROL_HELD,
         .use_func = bork_use_machinegun,
         .hud_func = bork_hud_machinegun },
+    [BORK_ITEM_PLAZGUN] = { .name = "PLAZ-GUN",
+        .base_flags = BORK_ENTFLAG_ITEM,
+        .size = { 0.4, 0.4, 0.4 },
+        .sprite_tx = { 2, 1, 0, 0 },
+        .front_frame = 12,
+        .use_ctrl = BORK_CONTROL_HELD,
+        .use_func = bork_use_plazgun,
+        .hud_func = bork_hud_plazgun },
     [BORK_ITEM_LEADPIPE] = { .name = "STEEL ROD",
         .base_flags = BORK_ENTFLAG_ITEM,
         .size = { 0.4, 0.4, 0.4 },
@@ -89,11 +115,6 @@ static const struct bork_entity_profile {
         .hud_angle = -0.75,
         .use_ctrl = BORK_CONTROL_HIT,
         .use_func = bork_use_leadpipe },
-    [BORK_ITEM_BULLETS] = { .name = "BULLETS",
-        .base_flags = BORK_ENTFLAG_ITEM,
-        .size = { 0.4, 0.4, 0.4 },
-        .sprite_tx = { 1, 1, 0, 0 },
-        .front_frame = 1 },
     [BORK_ITEM_PLANT1] = { .name = "PLANT",
         .base_flags = BORK_ENTFLAG_ITEM | BORK_ENTFLAG_NOT_INTERACTIVE,
         .size = { 0.4, 0.4, 0.4 },
@@ -114,6 +135,8 @@ static const struct bork_entity_profile {
 typedef int bork_entity_t;
 bork_entity_t bork_entity_new(int n);
 struct bork_entity* bork_entity_get(bork_entity_t ent);
+void bork_entpool_clear(void);
 void bork_entity_init(struct bork_entity* ent, enum bork_entity_type type);
 void bork_entity_push(struct bork_entity* ent, vec3 push);
 void bork_entity_update(struct bork_entity* ent, struct bork_map* map);
+void bork_entity_get_eye(struct bork_entity* ent, vec3 out_dir, vec3 out_pos);
