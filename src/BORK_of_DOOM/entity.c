@@ -124,7 +124,6 @@ void bork_entity_move(struct bork_entity* ent, struct bork_map* map)
         else ent->vel[2] = -0.05;
         friction = 1;
     } else if(ent->flags & BORK_ENTFLAG_GROUND) {
-        ent->vel[2] = 0;
         if(vec3_len(ent->vel) > 0.1) vec3_set_len(ent->vel, ent->vel, 0.1);
         friction = 1;
     }
