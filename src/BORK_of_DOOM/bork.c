@@ -20,7 +20,7 @@ void bork_init(struct bork_game_core* core)
             [BORK_CTRL_LEFT] = SDL_SCANCODE_A,
             [BORK_CTRL_RIGHT] = SDL_SCANCODE_D,
             [BORK_CTRL_JUMP] = SDL_SCANCODE_SPACE,
-            [BORK_CTRL_FIRE] = BORK_LEFT_MOUSE,
+            [BORK_CTRL_FIRE] = PG_LEFT_MOUSE,
             [BORK_CTRL_SELECT] = SDL_SCANCODE_E,
             [BORK_CTRL_ESCAPE] = SDL_SCANCODE_ESCAPE,
             [BORK_CTRL_BIND1] = SDL_SCANCODE_1,
@@ -41,6 +41,7 @@ void bork_init(struct bork_game_core* core)
     pg_shader_text(&core->shader_text);
     pg_ppbuffer_init(&core->ppbuf, sw, sh, 24, 25);
     pg_postproc_blur(&core->post_blur, PG_BLUR7);
+    pg_postproc_screen(&core->post_screen);
     /*  Get the models, textures, sounds, etc.*    */
     bork_load_assets(core);
     /*  Attach the font texture to the text shader  */
@@ -166,96 +167,6 @@ void bork_load_assets(struct bork_game_core* core)
     };
     pg_audio_alloc(&core->menu_sound, 0.15);
     pg_audio_generate(&core->menu_sound, 0.15, &PG_WAVE_ARRAY(menu_wave, 4), &env);
-}
-
-void bork_poll_input(struct bork_game_core* core)
-{
-    SDL_Event e;
-    while(SDL_PollEvent(&e)) {
-        if(e.type == SDL_QUIT) core->user_exit = 1;
-        else if(e.type == SDL_MOUSEBUTTONDOWN || e.type == SDL_MOUSEBUTTONUP) {
-            int down = (e.type == SDL_MOUSEBUTTONDOWN);
-            switch(e.button.button) {
-            case SDL_BUTTON_LEFT:
-                core->ctrl_state[BORK_LEFT_MOUSE] =
-                    down ? BORK_CONTROL_HIT : BORK_CONTROL_RELEASED;
-                core->ctrl_changes[core->ctrl_changed++] = BORK_LEFT_MOUSE;
-                break;
-            case SDL_BUTTON_RIGHT:
-                core->ctrl_state[BORK_RIGHT_MOUSE] =
-                    down ? BORK_CONTROL_HIT : BORK_CONTROL_RELEASED;
-                core->ctrl_changes[core->ctrl_changed++] = BORK_RIGHT_MOUSE;
-                break;
-            case SDL_BUTTON_MIDDLE:
-                core->ctrl_state[BORK_MIDDLE_MOUSE] =
-                    down ? BORK_CONTROL_HIT : BORK_CONTROL_RELEASED;
-                core->ctrl_changes[core->ctrl_changed++] = BORK_MIDDLE_MOUSE;
-                break;
-            }
-        } else if(e.type == SDL_KEYDOWN) {
-            if(core->ctrl_state[e.key.keysym.scancode] != BORK_CONTROL_HELD) {
-                core->ctrl_state[e.key.keysym.scancode] = BORK_CONTROL_HIT;
-                core->ctrl_changes[core->ctrl_changed++] = e.key.keysym.scancode;
-            }
-        } else if(e.type == SDL_KEYUP) {
-            core->ctrl_state[e.key.keysym.scancode] = BORK_CONTROL_RELEASED;
-            core->ctrl_changes[core->ctrl_changed++] = e.key.keysym.scancode;
-        }
-    }
-    int mx, my;
-    if(core->mouse_relative) {
-        SDL_GetRelativeMouseState(&mx, &my);
-        vec2 motion = { -(float)mx * core->mouse_sensitivity,
-                        -(float)my * core->mouse_sensitivity };
-        vec2_add(core->mouse_motion, core->mouse_motion, motion);
-        vec2_add(core->mouse_pos, core->mouse_pos, motion);
-    } else {
-        SDL_GetMouseState(&mx, &my);
-        vec2_set(core->mouse_pos, mx, my);
-    }
-}
-
-int bork_input_event(struct bork_game_core* core, uint8_t ctrl, uint8_t event)
-{
-    if(core->ctrl_state[ctrl] == event) return 1;
-    int changes = 0;
-    int i;
-    for(i = 0; i < core->ctrl_changed; ++i) {
-        changes += (core->ctrl_changes[i] == ctrl);
-        if(changes > 1) return 1;
-    }
-    return 0;
-}
-
-void bork_ack_input(struct bork_game_core* core)
-{
-    int i;
-    for(i = 0; i < core->ctrl_changed; ++i) {
-        uint8_t c = core->ctrl_changes[i];
-        switch(core->ctrl_state[c]) {
-        case 0: break;
-        case BORK_CONTROL_HIT:
-            core->ctrl_state[c] = BORK_CONTROL_HELD;
-            break;
-        case BORK_CONTROL_HELD: case BORK_CONTROL_RELEASED:
-            core->ctrl_state[c] = 0;
-            break;
-        }
-    }
-    vec2_set(core->mouse_motion, 0, 0);
-    core->ctrl_changed = 0;
-}
-
-void bork_grab_mouse(struct bork_game_core* core, int grab)
-{
-    if(grab) {
-        SDL_SetRelativeMouseMode(SDL_ENABLE);
-        SDL_GetRelativeMouseState(NULL, NULL);
-        core->mouse_relative = 1;
-    } else {
-        SDL_SetRelativeMouseMode(SDL_DISABLE);
-        core->mouse_relative = 0;
-    }
 }
 
 void bork_draw_fps(struct bork_game_core* core)

@@ -28,6 +28,7 @@ struct bork_play_data {
     int hud_datapad_ticks;
     int hud_datapad_line;
     /*  Input states    */
+    vec2 mouse_motion;
     struct {
         enum {
             BORK_MENU_CLOSED,

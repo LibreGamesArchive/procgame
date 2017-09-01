@@ -16,7 +16,7 @@ void bork_editor_start(struct pg_game_state* state, struct bork_game_core* core)
 {
     /*  Set up the game state, 60 ticks per second, keyboard input   */
     pg_game_state_init(state, pg_time(), 60, 3);
-    bork_grab_mouse(core, 0);
+    pg_mouse_mode(0);
     struct bork_editor_data* d = malloc(sizeof(*d));
     *d = (struct bork_editor_data) {
         .core = core,
@@ -31,8 +31,9 @@ void bork_editor_start(struct pg_game_state* state, struct bork_game_core* core)
 
 static int bork_editor_get_hovered_ent(struct bork_editor_data* d)
 {
-    vec2 mouse = { d->core->mouse_pos[0] / d->core->screen_size[1],
-                   d->core->mouse_pos[1] / d->core->screen_size[1] };
+    vec2 mouse;
+    pg_mouse_pos(mouse);
+    vec2_scale(mouse, mouse, 1 / d->core->screen_size[1]);
     vec2_sub(mouse, mouse, (vec2){ 0.19, 0.19 });
     vec2_scale(mouse, mouse, (1 / (0.02 * 32)) * 32);
     int i;
@@ -75,10 +76,12 @@ static void bork_editor_place_tile(struct bork_editor_data* d,
 
 static void bork_editor_update_map(struct bork_editor_data* d)
 {
-    uint8_t* ctrl = d->core->ctrl_state;
-    if(bork_input_event(d->core, BORK_LEFT_MOUSE, BORK_CONTROL_HIT)) {
-        vec2 click = { d->core->mouse_pos[0] / d->core->screen_size[1],
-                       d->core->mouse_pos[1] / d->core->screen_size[1] };
+    int ctrl = pg_check_input(SDL_SCANCODE_LCTRL, PG_CONTROL_HIT | PG_CONTROL_HELD);
+    int shift = pg_check_input(SDL_SCANCODE_LSHIFT, PG_CONTROL_HIT | PG_CONTROL_HELD);
+    if(pg_check_input(PG_LEFT_MOUSE, PG_CONTROL_HIT)) {
+        vec2 click;
+        pg_mouse_pos(click);
+        vec2_scale(click, click, 1 / d->core->screen_size[1]);
         vec2_sub(click, click, (vec2){ 0.19, 0.19 });
         vec2_scale(click, click, (1 / (0.02 * 32)) * 32);
         if(!(click[0] < 0 || click[0] >= 32 || click[1] < 0 || click[1] >= 32)) {
@@ -88,63 +91,63 @@ static void bork_editor_update_map(struct bork_editor_data* d)
             if(d->ent_type == BORK_ITEM_DATAPAD) new_ent.option = d->datapad_id;
             ARR_PUSH(d->map.ents, new_ent);
         }
-    } else if(bork_input_event(d->core, BORK_RIGHT_MOUSE, BORK_CONTROL_HIT)) {
+    } else if(pg_check_input(PG_RIGHT_MOUSE, PG_CONTROL_HIT)) {
         int hovered = bork_editor_get_hovered_ent(d);
         if(hovered >= 0) {
             ARR_SWAPSPLICE(d->map.ents, hovered, 1);
         }
     }
-    if(bork_input_event(d->core, SDL_SCANCODE_ESCAPE, BORK_CONTROL_HIT)) {
+    if(pg_check_input(SDL_SCANCODE_ESCAPE, PG_CONTROL_HIT)) {
         d->select_mode = MAX(d->select_mode - 1, -1);
     }
-    if(bork_input_event(d->core, SDL_SCANCODE_H, BORK_CONTROL_HIT)) {
-        if(ctrl[SDL_SCANCODE_LCTRL]) {
-            if(ctrl[SDL_SCANCODE_LSHIFT]) {
+    if(pg_check_input(SDL_SCANCODE_H, PG_CONTROL_HIT)) {
+        if(ctrl) {
+            if(shift) {
                 d->current_tile.dir |= 1 << PG_LEFT;
             } else d->current_tile.dir = 1 << PG_LEFT;
-        } else if(ctrl[SDL_SCANCODE_LSHIFT]) {
+        } else if(shift) {
             d->cursor[0] = MOD(d->cursor[0] - 10, 32);
         } else {
             d->cursor[0] = MOD(d->cursor[0] - 1, 32);
         }
     }
-    if(bork_input_event(d->core, SDL_SCANCODE_L, BORK_CONTROL_HIT)) {
-        if(ctrl[SDL_SCANCODE_LCTRL]) {
-            if(ctrl[SDL_SCANCODE_LSHIFT]) {
+    if(pg_check_input(SDL_SCANCODE_L, PG_CONTROL_HIT)) {
+        if(ctrl) {
+            if(shift) {
                 d->current_tile.dir |= 1 << PG_RIGHT;
             } else d->current_tile.dir = 1 << PG_RIGHT;
-        } else if(ctrl[SDL_SCANCODE_LSHIFT]) {
+        } else if(shift) {
             d->cursor[0] = MOD(d->cursor[0] + 10, 32);
         } else {
             d->cursor[0] = MOD(d->cursor[0] + 1, 32);
         }
     }
-    if(bork_input_event(d->core, SDL_SCANCODE_J, BORK_CONTROL_HIT)) {
-        if(ctrl[SDL_SCANCODE_LCTRL]) {
-            if(ctrl[SDL_SCANCODE_LSHIFT]) {
+    if(pg_check_input(SDL_SCANCODE_J, PG_CONTROL_HIT)) {
+        if(ctrl) {
+            if(shift) {
                 d->current_tile.dir |= 1 << PG_FRONT;
             } else d->current_tile.dir = 1 << PG_FRONT;
-        } else if(ctrl[SDL_SCANCODE_LSHIFT]) {
+        } else if(shift) {
             d->cursor[1] = MOD(d->cursor[1] + 10, 32);
         } else {
             d->cursor[1] = MOD(d->cursor[1] + 1, 32);
         }
     }
-    if(bork_input_event(d->core, SDL_SCANCODE_K, BORK_CONTROL_HIT)) {
-        if(ctrl[SDL_SCANCODE_LCTRL]) {
-            if(ctrl[SDL_SCANCODE_LSHIFT]) {
+    if(pg_check_input(SDL_SCANCODE_K, PG_CONTROL_HIT)) {
+        if(ctrl) {
+            if(shift) {
                 d->current_tile.dir |= 1 << PG_BACK;
             } else d->current_tile.dir = 1 << PG_BACK;
-        } else if(ctrl[SDL_SCANCODE_LSHIFT]) {
+        } else if(shift) {
             d->cursor[1] = MOD(d->cursor[1] - 10, 32);
         } else {
             d->cursor[1] = MOD(d->cursor[1] - 1, 32);
         }
     }
-    if(bork_input_event(d->core, SDL_SCANCODE_N, BORK_CONTROL_HIT)) {
-        if(ctrl[SDL_SCANCODE_LCTRL]) d->current_tile.dir = 0;
+    if(pg_check_input(SDL_SCANCODE_N, PG_CONTROL_HIT)) {
+        if(ctrl) d->current_tile.dir = 0;
     }
-    if(bork_input_event(d->core, SDL_SCANCODE_V, BORK_CONTROL_HIT)) {
+    if(pg_check_input(SDL_SCANCODE_V, PG_CONTROL_HIT)) {
         if(d->select_mode < 1) {
             d->select_mode = 1;
             d->selection[0] = d->cursor[0];
@@ -153,28 +156,28 @@ static void bork_editor_update_map(struct bork_editor_data* d)
             d->selection[3] = d->cursor[1];
         } else d->select_mode = 0;
     }
-    if(bork_input_event(d->core, SDL_SCANCODE_U, BORK_CONTROL_HIT)) {
-        if(ctrl[SDL_SCANCODE_LCTRL])
+    if(pg_check_input(SDL_SCANCODE_U, PG_CONTROL_HIT)) {
+        if(ctrl)
             d->cursor[2] = MOD(d->cursor[2] + 1, 32);
-        else if(ctrl[SDL_SCANCODE_LSHIFT])
+        else if(shift)
             d->ent_type = MOD((int)d->ent_type + 1, BORK_ENTITY_TYPES);
         else d->current_tile.type = MOD((int)d->current_tile.type + 1, BORK_TILE_COUNT);
     }
-    if(bork_input_event(d->core, SDL_SCANCODE_Y, BORK_CONTROL_HIT)) {
-        if(ctrl[SDL_SCANCODE_LCTRL])
+    if(pg_check_input(SDL_SCANCODE_Y, PG_CONTROL_HIT)) {
+        if(ctrl)
             d->cursor[2] = MOD(d->cursor[2] - 1, 32);
-        else if(ctrl[SDL_SCANCODE_LSHIFT])
+        else if(shift)
             d->ent_type = MOD((int)d->ent_type - 1, BORK_ENTITY_TYPES);
         else d->current_tile.type = MOD((int)d->current_tile.type - 1, BORK_TILE_COUNT);
     }
-    if(bork_input_event(d->core, SDL_SCANCODE_R, BORK_CONTROL_HIT)) {
-        if(ctrl[SDL_SCANCODE_LCTRL]) bork_editor_write_map(&d->map, "test.bork_map");
-        else if(ctrl[SDL_SCANCODE_LSHIFT]) bork_editor_load_map(&d->map, "test.bork_map");
+    if(pg_check_input(SDL_SCANCODE_R, PG_CONTROL_HIT)) {
+        if(ctrl) bork_editor_write_map(&d->map, "test.bork_map");
+        else if(shift) bork_editor_load_map(&d->map, "test.bork_map");
     }
-    if(bork_input_event(d->core, SDL_SCANCODE_P, BORK_CONTROL_HIT)) {
+    if(pg_check_input(SDL_SCANCODE_P, PG_CONTROL_HIT)) {
         d->current_tile.dir ^=  (1 << 7);
     }
-    if(bork_input_event(d->core, SDL_SCANCODE_SPACE, BORK_CONTROL_HIT)) {
+    if(pg_check_input(SDL_SCANCODE_SPACE, PG_CONTROL_HIT)) {
         if(d->select_mode == -1) {
             bork_editor_place_tile(d, &d->current_tile, 31 - d->cursor[0], d->cursor[1], d->cursor[2]);
         } else {
@@ -194,25 +197,25 @@ static void bork_editor_update_map(struct bork_editor_data* d)
     struct bork_editor_tile* tile = &d->map.tiles[31 - d->cursor[0]][d->cursor[1]][d->cursor[2]];
     if(tile->type == BORK_TILE_EDITOR_DOOR) {
         struct bork_editor_obj* obj = &d->map.objs.data[tile->obj_idx];
-        if(bork_input_event(d->core, SDL_SCANCODE_D, BORK_CONTROL_HIT)) {
+        if(pg_check_input(SDL_SCANCODE_D, PG_CONTROL_HIT)) {
                 obj->door.flags ^= 1;
         } else {
             int code_move = 0, code_idx = 0;
-            if(bork_input_event(d->core, SDL_SCANCODE_UP, BORK_CONTROL_HIT)) {
+            if(pg_check_input(SDL_SCANCODE_UP, PG_CONTROL_HIT)) {
                 code_move = 1;
-            } else if(bork_input_event(d->core, SDL_SCANCODE_DOWN, BORK_CONTROL_HIT)) {
+            } else if(pg_check_input(SDL_SCANCODE_DOWN, PG_CONTROL_HIT)) {
                 code_move = -1;
             }
             if(code_move) {
-                if(d->core->ctrl_state[SDL_SCANCODE_LCTRL]) code_idx += 1;
-                if(d->core->ctrl_state[SDL_SCANCODE_LSHIFT]) code_idx += 2;
+                if(ctrl) code_idx += 1;
+                if(shift) code_idx += 2;
                 obj->door.code[code_idx] = MOD((int)obj->door.code[code_idx] + code_move, 10);
             }
         }
     } else if(d->ent_type == BORK_ITEM_DATAPAD) {
-        if(bork_input_event(d->core, SDL_SCANCODE_UP, BORK_CONTROL_HIT)) {
+        if(pg_check_input(SDL_SCANCODE_UP, PG_CONTROL_HIT)) {
             d->datapad_id = MOD(d->datapad_id + 1, NUM_DATAPADS);
-        } else if(bork_input_event(d->core, SDL_SCANCODE_DOWN, BORK_CONTROL_HIT)) {
+        } else if(pg_check_input(SDL_SCANCODE_DOWN, PG_CONTROL_HIT)) {
             d->datapad_id = MOD(d->datapad_id - 1, NUM_DATAPADS);
         }
     }
@@ -220,14 +223,14 @@ static void bork_editor_update_map(struct bork_editor_data* d)
         d->selection[2] = d->cursor[0];
         d->selection[3] = d->cursor[1];
     }
+    pg_flush_input();
 }
 
 static void bork_editor_update(struct pg_game_state* state)
 {
     struct bork_editor_data* d = state->data;
-    bork_ack_input(d->core);
-    bork_poll_input(d->core);
-    if(d->core->user_exit) state->running = 0;
+    pg_poll_input();
+    if(pg_user_exit()) state->running = 0;
     bork_editor_update_map(d);
 }
 

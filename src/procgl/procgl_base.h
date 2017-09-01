@@ -43,6 +43,24 @@ void pg_screen_size(int* w, int* h);
 void pg_screen_swap(void);
 void pg_screen_dst(void);
 
+/*  The possible control states */
+#define PG_CONTROL_OFF          (1 << 1)
+#define PG_CONTROL_RELEASED     (1 << 2)
+#define PG_CONTROL_HIT          (1 << 3)
+#define PG_CONTROL_HELD         (1 << 4)
+/*  Special mouse control codes, mapped to unused SDL scancodes */
+#define PG_LEFT_MOUSE           253
+#define PG_RIGHT_MOUSE          254
+#define PG_MIDDLE_MOUSE         255
+/*  Input functions */
+void pg_poll_input(void);
+void pg_flush_input(void);
+int pg_check_input(uint8_t ctrl, uint8_t state);
+int pg_user_exit(void);
+void pg_mouse_mode(int grab);
+void pg_mouse_pos(vec2 out);
+void pg_mouse_motion(vec2 out);
+
 /*  Returns the time in seconds since the last call to this function, or 0
     the first time it is called. If dump is non-zero, the value will not be
     used toward framerate calculations and will not reset the delta time for
