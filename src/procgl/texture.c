@@ -10,9 +10,6 @@
 #include "heightmap.h"
 #include "texture.h"
 
-
-
-
 void pg_texture_init_from_file(struct pg_texture* tex,
                                const char* diffuse_file, const char* light_file)
 {

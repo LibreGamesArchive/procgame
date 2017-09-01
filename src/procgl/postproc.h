@@ -30,3 +30,6 @@ void pg_postproc_load(struct pg_postproc* pp,
                       const char* color_name, const char* size_name);
 void pg_postproc_deinit(struct pg_postproc* pp);
 void pg_postproc_apply(struct pg_postproc* pp, struct pg_ppbuffer* src);
+
+/*  The basic no-post-process post-process  */
+void pg_postproc_screen(struct pg_postproc* pp);
