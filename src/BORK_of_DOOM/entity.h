@@ -23,6 +23,7 @@ struct bork_entity {
     uint32_t flags;
     int dead_ticks;
     int still_ticks;
+    int pain_ticks;
     int HP;
     int counter[4];
     int item_quantity;
@@ -31,17 +32,25 @@ struct bork_entity {
         BORK_ENTITY_ENEMY,
         BORK_ITEM_FIRSTAID,
         BORK_ITEM_BULLETS,
+        BORK_ITEM_SHELLS,
         BORK_ITEM_PLAZMA,
         BORK_ITEM_SCRAPMETAL,
+        BORK_ITEM_PISTOL,
+        BORK_ITEM_SHOTGUN,
         BORK_ITEM_MACHINEGUN,
         BORK_ITEM_PLAZGUN,
         BORK_ITEM_LEADPIPE,
+        BORK_ITEM_BEAMSWORD,
         BORK_ITEM_PLANT1,
         BORK_ITEM_DATAPAD,
         BORK_ENTITY_TYPES,
     } type;
 };
 
+void bork_use_pistol(struct bork_entity* ent, struct bork_play_data* d);
+void bork_hud_pistol(struct bork_entity* ent, struct bork_play_data* d);
+void bork_use_shotgun(struct bork_entity* ent, struct bork_play_data* d);
+void bork_hud_shotgun(struct bork_entity* ent, struct bork_play_data* d);
 void bork_use_machinegun(struct bork_entity* ent, struct bork_play_data* d);
 void bork_hud_machinegun(struct bork_entity* ent, struct bork_play_data* d);
 void bork_use_plazgun(struct bork_entity* ent, struct bork_play_data* d);
@@ -86,11 +95,32 @@ static const struct bork_entity_profile {
         .size = { 0.4, 0.4, 0.4 },
         .sprite_tx = { 1, 1, 0, 0 },
         .front_frame = 1 },
+    [BORK_ITEM_SHELLS] = { .name = "SHELLS",
+        .base_flags = BORK_ENTFLAG_ITEM,
+        .size = { 0.4, 0.4, 0.4 },
+        .sprite_tx = { 1, 1, 0, 0 },
+        .front_frame = 1 },
     [BORK_ITEM_PLAZMA] = { .name = "PLAZMA",
         .base_flags = BORK_ENTFLAG_ITEM,
         .size = { 0.4, 0.4, 0.4 },
         .sprite_tx = { 1, 1, 0, 0 },
         .front_frame = 5 },
+    [BORK_ITEM_PISTOL] = { .name = "PISTOL",
+        .base_flags = BORK_ENTFLAG_ITEM,
+        .size = { 0.4, 0.4, 0.4 },
+        .sprite_tx = { 1, 1, 0, 0 },
+        .front_frame = 16,
+        .use_ctrl = PG_CONTROL_HIT,
+        .use_func = bork_use_pistol,
+        .hud_func = bork_hud_pistol },
+    [BORK_ITEM_SHOTGUN] = { .name = "SHOTGUN",
+        .base_flags = BORK_ENTFLAG_ITEM,
+        .size = { 0.4, 0.4, 0.4 },
+        .sprite_tx = { 1.5, 1, 0, 0 },
+        .front_frame = 14,
+        .use_ctrl = PG_CONTROL_HIT,
+        .use_func = bork_use_shotgun,
+        .hud_func = bork_hud_shotgun },
     [BORK_ITEM_MACHINEGUN] = { .name = "MACHINE GUN",
         .base_flags = BORK_ENTFLAG_ITEM,
         .size = { 0.4, 0.4, 0.4 },
@@ -112,6 +142,14 @@ static const struct bork_entity_profile {
         .size = { 0.4, 0.4, 0.4 },
         .sprite_tx = { 2, 1, 0, 0 },
         .front_frame = 10,
+        .hud_angle = -0.75,
+        .use_ctrl = PG_CONTROL_HIT,
+        .use_func = bork_use_leadpipe },
+    [BORK_ITEM_BEAMSWORD] = { .name = "BEAM SWORD",
+        .base_flags = BORK_ENTFLAG_ITEM,
+        .size = { 0.4, 0.4, 0.4 },
+        .sprite_tx = { 2, 1, 0, 0 },
+        .front_frame = 18,
         .hud_angle = -0.75,
         .use_ctrl = PG_CONTROL_HIT,
         .use_func = bork_use_leadpipe },

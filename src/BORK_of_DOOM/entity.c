@@ -82,7 +82,7 @@ void bork_entity_move(struct bork_entity* ent, struct bork_map* map)
         coll_size[2] *= 0.5;
     }
     ent->flags &= ~BORK_ENTFLAG_GROUND;
-    vec3_add(ent->vel, ent->vel, (vec3){ 0, 0, -0.02 });
+    vec3_add(ent->vel, ent->vel, (vec3){ 0, 0, -0.005 });
     struct bork_collision coll = {};
     float curr_move = 0;
     float max_move = vec3_vmin(coll_size);
@@ -103,7 +103,7 @@ void bork_entity_move(struct bork_entity* ent, struct bork_map* map)
         vec3_add(new_pos, new_pos, max_move_dir);
         steps = 0;
         while(bork_map_collide(map, &coll, new_pos, coll_size) && (steps++ < 4)) {
-            float down_angle = vec3_angle_diff(coll.face_norm, PG_DIR_VEC[PG_UP]);
+            float down_angle = vec3_angle_diff(coll.push, PG_DIR_VEC[PG_UP]);
             if(down_angle <= 0.1) ent->flags |= BORK_ENTFLAG_GROUND;
             else if(down_angle <= 0.5) {
                 ent->flags |= BORK_ENTFLAG_GROUND;
@@ -145,15 +145,61 @@ void bork_entity_get_eye(struct bork_entity* ent, vec3 out_dir, vec3 out_pos)
 }
 
 /*  Item use functions  */
-void bork_use_machinegun(struct bork_entity* ent, struct bork_play_data* d)
+void bork_use_pistol(struct bork_entity* ent, struct bork_play_data* d)
 {
     if(ent->counter[0] > d->ticks || d->ammo_bullets <= 0) return;
-    ent->counter[0] = d->ticks + 10;
+    ent->counter[0] = d->ticks + 20;
     --d->ammo_bullets;
     vec3 bullet_dir;
     spherical_to_cartesian(bullet_dir, (vec2){ d->plr.dir[0] - M_PI,
                                                d->plr.dir[1] - (M_PI * 0.5) });
-    vec3_scale(bullet_dir, bullet_dir, 1);
+    vec3_scale(bullet_dir, bullet_dir, 0.5);
+    struct bork_bullet new_bullet = { .type = 0, .flags = BORK_BULLET_HURTS_ENEMY };
+    vec3_dup(new_bullet.pos, d->plr.pos);
+    new_bullet.pos[0] += 0.2 * sin(d->plr.dir[0]) + bullet_dir[0] * 0.3;
+    new_bullet.pos[1] -= 0.2 * cos(d->plr.dir[0]) - bullet_dir[1] * 0.3;
+    new_bullet.pos[2] += 0.65 + bullet_dir[2] * 0.3;
+    if(d->plr.flags & BORK_ENTFLAG_CROUCH) new_bullet.pos[2] -= 0.4;
+    vec3_dup(new_bullet.dir, bullet_dir);
+    ARR_PUSH(d->bullets, new_bullet);
+    bork_play_reset_hud_anim(d);
+    vec3_set(d->hud_anim[1], 0.2, 0, 0);
+    d->hud_angle[1] = -0.3;
+    d->hud_anim_speed = 0.04;
+    d->hud_anim_active = 2;
+}
+
+void bork_hud_pistol(struct bork_entity* ent, struct bork_play_data* d)
+{
+    struct pg_shader* shader = &d->core->shader_text;
+    struct pg_shader_text text = { .use_blocks = 1 };
+    float ar = d->core->aspect_ratio;
+    pg_shader_text_resolution(shader, (vec2){ ar, 1 });
+    pg_shader_text_transform(shader, (vec2){ 1, 1 }, (vec2){});
+    int len = snprintf(text.block[0], 64, "AMMO: %d", d->ammo_bullets);
+    vec4_set(text.block_style[0], ar / 2 - (len * 0.025 * 1.2 * 0.5), 0.85, 0.025, 1.2);
+    vec4_set(text.block_color[0], 1, 1, 1, 1);
+    pg_shader_text_write(shader, &text);
+}
+
+void bork_use_shotgun(struct bork_entity* ent, struct bork_play_data* d)
+{
+
+}
+void bork_hud_shotgun(struct bork_entity* ent, struct bork_play_data* d)
+{
+
+}
+
+void bork_use_machinegun(struct bork_entity* ent, struct bork_play_data* d)
+{
+    if(ent->counter[0] > d->ticks || d->ammo_bullets <= 0) return;
+    ent->counter[0] = d->ticks + 20;
+    --d->ammo_bullets;
+    vec3 bullet_dir;
+    spherical_to_cartesian(bullet_dir, (vec2){ d->plr.dir[0] - M_PI,
+                                               d->plr.dir[1] - (M_PI * 0.5) });
+    vec3_scale(bullet_dir, bullet_dir, 0.5);
     struct bork_bullet new_bullet = { .type = 0, .flags = BORK_BULLET_HURTS_ENEMY };
     vec3_dup(new_bullet.pos, d->plr.pos);
     new_bullet.pos[0] += 0.2 * sin(d->plr.dir[0]) + bullet_dir[0] * 0.3;
@@ -166,7 +212,7 @@ void bork_use_machinegun(struct bork_entity* ent, struct bork_play_data* d)
     vec3_set(d->hud_anim[1], 0.3, 0, 0.02);
     vec3_set(d->hud_anim[2], 0.025, 0, 0);
     vec3_set(d->hud_anim[3], 0, 0, 0);
-    d->hud_anim_speed = 0.05;
+    d->hud_anim_speed = 0.035;
     d->hud_anim_active = 2;
 }
 
@@ -187,12 +233,12 @@ void bork_hud_machinegun(struct bork_entity* ent, struct bork_play_data* d)
 void bork_use_plazgun(struct bork_entity* ent, struct bork_play_data* d)
 {
     if(ent->counter[0] > d->ticks || d->ammo_plazma <= 0) return;
-    ent->counter[0] = d->ticks + 20;
+    ent->counter[0] = d->ticks + 40;
     --d->ammo_plazma;
     vec3 bullet_dir;
     spherical_to_cartesian(bullet_dir, (vec2){ d->plr.dir[0] - M_PI,
                                                d->plr.dir[1] - (M_PI * 0.5) });
-    vec3_scale(bullet_dir, bullet_dir, 0.5);
+    vec3_scale(bullet_dir, bullet_dir, 0.25);
     struct bork_bullet new_bullet = { .type = 2, .flags = BORK_BULLET_HURTS_ENEMY };
     vec3_dup(new_bullet.pos, d->plr.pos);
     new_bullet.pos[0] += 0.2 * sin(d->plr.dir[0]) + bullet_dir[0] * 0.3;
@@ -207,7 +253,7 @@ void bork_use_plazgun(struct bork_entity* ent, struct bork_play_data* d)
     vec3_set(d->hud_anim[3], 0, 0, 0);
     d->hud_angle[1] = -0.1;
     d->hud_angle[2] = -0.025;
-    d->hud_anim_speed = 0.03;
+    d->hud_anim_speed = 0.015;
     d->hud_anim_active = 3;
 }
 
@@ -232,7 +278,7 @@ void bork_use_firstaid(struct bork_entity* ent, struct bork_play_data* d)
     vec3_set(d->hud_anim[1], -0.3, -0.3, 0);
     vec3_set(d->hud_anim[2], 0, 0, 0);
     vec3_set(d->hud_anim[3], 0, 0, 0);
-    d->hud_anim_speed = 0.02;
+    d->hud_anim_speed = 0.005;
     d->hud_anim_active = 2;
     if(--ent->item_quantity == 0) {
         d->hud_anim_destroy_when_finished = 1;
@@ -264,7 +310,7 @@ void bork_use_leadpipe(struct bork_entity* ent, struct bork_play_data* d)
     d->hud_angle[1] = -2.0;
     d->hud_angle[2] = 0.25;
     d->hud_angle[3] = -0.45;
-    d->hud_anim_speed = 0.04;
+    d->hud_anim_speed = 0.02;
     d->hud_anim_active = 3;
     d->hud_anim_callback = leadpipe_callback;
     d->hud_callback_frame = 2;

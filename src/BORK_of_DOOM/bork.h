@@ -37,6 +37,7 @@ struct bork_game_core {
     /*  Generated assets    */
     struct pg_texture backdrop_tex;
     struct pg_texture menu_vignette;
+    struct pg_texture radial_vignette;
     struct pg_model quad_2d;
     struct pg_model quad_2d_ctr;
     struct pg_model bullet_model;
@@ -47,6 +48,7 @@ struct bork_game_core {
     uint8_t ctrl_map[BORK_CTRL_NULL];
     float mouse_sensitivity;
     int mouse_relative;
+    SDL_GameController* gpad;
 };
 
 void bork_init(struct bork_game_core* core);

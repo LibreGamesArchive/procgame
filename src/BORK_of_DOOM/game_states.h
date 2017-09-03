@@ -11,7 +11,7 @@ struct bork_play_data {
     float player_speed;
     int held_item;
     int quick_item[4];
-    int ammo_bullets, ammo_plazma;
+    int ammo_bullets, ammo_shells, ammo_plazma;
     ARR_T(bork_entity_t) inventory;
     ARR_T(struct bork_bullet) bullets;
     /*  The HUD-item animation  */

@@ -31,14 +31,6 @@ void bork_bullet_move(struct bork_bullet* blt, struct bork_map* map)
             curr_move += max_move;
         }
         vec3_add(new_pos, new_pos, max_move_dir);
-        if(bork_map_collide(map, &coll, new_pos, (vec3){ 0.1, 0.1, 0.1 })) {
-            blt->flags |= BORK_BULLET_DEAD;
-            blt->dead_ticks = 10;
-            vec3_set(blt->dir, 0, 0, 0);
-            vec3_sub(blt->pos, new_pos, max_move_dir);
-            vec3_set(blt->light_color, 1, 1, 0.6);
-            break;
-        }
         if(blt->flags & BORK_BULLET_HURTS_ENEMY) {
             /*  Hit the closest enemy  */
             float closest = 100;
@@ -67,7 +59,7 @@ void bork_bullet_move(struct bork_bullet* blt, struct bork_map* map)
                 vec3_sub(blt->pos, new_pos, blt->dir);
                 vec3_set(blt->dir, 0, 0, 0);
                 vec3_set(blt->light_color, 1, 1, 0.6);
-                break;
+                return;
             }
         }
         if(blt->flags & BORK_BULLET_HURTS_PLAYER) {
@@ -77,12 +69,21 @@ void bork_bullet_move(struct bork_bullet* blt, struct bork_map* map)
             if(dist < 0.8) {
                 blt->flags |= BORK_BULLET_DEAD;
                 blt->dead_ticks = 10;
-                map->plr->HP -= 20;
+                map->plr->pain_ticks = 120;
+                map->plr->HP -= 15;
                 vec3_sub(blt->pos, new_pos, blt->dir);
                 vec3_set(blt->dir, 0, 0, 0);
                 vec3_set(blt->light_color, 2, 0.8, 0.8);
-                break;
+                return;
             }
+        }
+        if(bork_map_collide(map, &coll, new_pos, (vec3){ 0.1, 0.1, 0.1 })) {
+            blt->flags |= BORK_BULLET_DEAD;
+            blt->dead_ticks = 10;
+            vec3_set(blt->dir, 0, 0, 0);
+            vec3_sub(blt->pos, new_pos, max_move_dir);
+            vec3_set(blt->light_color, 1, 1, 0.6);
+            return;
         }
     }
     vec3_dup(blt->pos, new_pos);

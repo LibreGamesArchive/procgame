@@ -50,6 +50,8 @@ void bork_init(struct bork_game_core* core)
     pg_shader_2d_texture(&core->shader_2d, &core->editor_atlas);
     pg_shader_sprite_texture(&core->shader_sprite, &core->bullet_tex);
     pg_shader_sprite_tex_frame(&core->shader_sprite, 0);
+    pg_gamepad_config(0.125, 0.6, 0.125, 0.75);
+    if(SDL_NumJoysticks()) pg_use_gamepad(0);
 }
 
 static void backdrop_color_func(vec4 out, vec2 p, struct pg_wave* wave)
@@ -85,8 +87,10 @@ void bork_load_assets(struct bork_game_core* core)
     /*  Generate the backdrop texture (cloudy reddish fog)  */
     pg_texture_init(&core->backdrop_tex, 256, 256);
     pg_texture_init(&core->menu_vignette, 256, 256);
+    pg_texture_init(&core->radial_vignette, 256, 256);
     pg_texture_bind(&core->backdrop_tex, 13, -1);
     pg_texture_bind(&core->menu_vignette, 14, -1);
+    pg_texture_bind(&core->radial_vignette, 15, -1);
     float seed = (float)rand() / RAND_MAX * 1000;
     struct pg_wave backdrop_wave[8] = {
         PG_WAVE_MOD_SEAMLESS_2D(.scale = 0.5),
@@ -96,12 +100,18 @@ void bork_load_assets(struct bork_game_core* core)
     struct pg_wave vignette_wave[8] = {
         PG_WAVE_FUNC_MAX(.frequency = {0.5, 1.4}, .scale = 10, .add = -9),
     };
+    struct pg_wave radial_vignette_wave[8] = {
+        PG_WAVE_FUNC_DISTANCE()
+    };
     pg_texture_wave_to_colors(&core->backdrop_tex, &PG_WAVE_ARRAY(backdrop_wave, 8),
                               backdrop_color_func);
     pg_texture_wave_to_colors(&core->menu_vignette, &PG_WAVE_ARRAY(vignette_wave, 8),
                               vignette_color_func);
+    pg_texture_wave_to_colors(&core->radial_vignette, &PG_WAVE_ARRAY(radial_vignette_wave, 8),
+                              vignette_color_func);
     pg_texture_buffer(&core->backdrop_tex);
     pg_texture_buffer(&core->menu_vignette);
+    pg_texture_buffer(&core->radial_vignette);
     /*  Generate the basic models, just quads for now   */
     mat4 transform;
     mat4_identity(transform);
