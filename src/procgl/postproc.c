@@ -146,11 +146,15 @@ void pg_postproc_apply(struct pg_postproc* pp, struct pg_ppbuffer* src)
     glBindVertexArray(0);
 }
 
+#ifdef PROCGL_STATIC_SHADERS
+#include "procgl/shaders/screen.glsl.h"
+#endif
+
 void pg_postproc_screen(struct pg_postproc* pp)
 {
 #ifdef PROCGL_STATIC_SHADERS
     pg_postproc_load_static(pp, screen_vert_glsl, screen_vert_glsl_len,
-                            post_screen_frag_glsl, post_screen_frag_glsl_len,
+                            screen_frag_glsl, screen_frag_glsl_len,
                             "color", "resolution");
 #else
     pg_postproc_load(pp, "src/procgl/shaders/screen_vert.glsl",

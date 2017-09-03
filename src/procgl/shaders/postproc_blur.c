@@ -8,6 +8,7 @@
 #include "procgl/shaders/shaders.h"
 
 #ifdef PROCGL_STATIC_SHADERS
+#include "procgl/shaders/screen.glsl.h"
 #include "procgl/shaders/post_blur.glsl.h"
 #endif
 

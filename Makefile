@@ -1,7 +1,7 @@
 CC := gcc
 CC_WINDOWS := i686-w64-mingw32-gcc
 CFLAGS_DEBUG := -Wall -g -O0
-CFLAGS_RELEASE := -Wall -O2
+CFLAGS_RELEASE := -Wall -O3 -flto
 INCLUDES := -Isrc
 # On Linux, only static link with my custom libcurl
 LIBS_LINUX := -l:src/libs/linux/libcurl/libcurl.a \
@@ -169,7 +169,8 @@ dump_shaders: src/procgl/shaders/*.glsl
     xxd -i sprite_frag.glsl >> sprite.glsl.h && \
     xxd -i cubetex_vert.glsl >> cubetex.glsl.h && \
     xxd -i cubetex_frag.glsl >> cubetex.glsl.h && \
-    xxd -i screen_vert.glsl >> post_blur.glsl.h && \
+    xxd -i screen_frag.glsl >> screen.glsl.h && \
+    xxd -i screen_vert.glsl >> screen.glsl.h && \
     xxd -i post_blur3_frag.glsl >> post_blur.glsl.h && \
     xxd -i post_blur5_frag.glsl >> post_blur.glsl.h && \
     xxd -i post_blur7_frag.glsl >> post_blur.glsl.h && \
