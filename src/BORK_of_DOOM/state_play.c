@@ -45,13 +45,13 @@ static void bork_play_deinit(void* data)
 void bork_play_start(struct pg_game_state* state, struct bork_game_core* core)
 {
     /*  Set up the game state, 60 ticks per second, keyboard input   */
-    pg_game_state_init(state, pg_time(), 60, 2);
+    pg_game_state_init(state, pg_time(), 120, 3);
     pg_mouse_mode(1);
     struct bork_play_data* d = malloc(sizeof(*d));
     *d = (struct bork_play_data) {
         .core = core,
         .menu.state = BORK_MENU_CLOSED,
-        .player_speed = 0.015,
+        .player_speed = 0.008,
         .hud_datapad_id = -1,
         .looked_item = -1,
         .held_item = -1,
@@ -86,10 +86,18 @@ static void bork_play_update(struct pg_game_state* state)
 {
     struct bork_play_data* d = state->data;
     pg_poll_input();
-    vec2 mouse_motion;
-    pg_mouse_motion(mouse_motion);
-    vec2_scale(mouse_motion, mouse_motion, d->core->mouse_sensitivity);
-    vec2_sub(d->mouse_motion, d->mouse_motion, mouse_motion);
+    if(d->menu.state == BORK_MENU_CLOSED) {
+        vec2 mouse_motion;
+        pg_mouse_motion(mouse_motion);
+        vec2_scale(mouse_motion, mouse_motion, d->core->mouse_sensitivity);
+        vec2_sub(d->mouse_motion, d->mouse_motion, mouse_motion);
+        if(pg_have_gamepad()) {
+            vec2 stick;
+            pg_gamepad_stick(1, stick);
+            vec2_scale(stick, stick, 0.05);
+            vec2_sub(d->mouse_motion, d->mouse_motion, stick);
+        }
+    }
     if(pg_user_exit()) state->running = 0;
 }
 
@@ -179,6 +187,19 @@ static void switch_item(struct bork_play_data* d, int inv_idx)
     d->hud_angle[0] = prof->hud_angle;
 }
 
+static void set_quick_item(struct bork_play_data* d, int quick_idx, int inv_idx)
+{
+    int i;
+    for(i = 0; i < 4; ++i) {
+        if(i == quick_idx) continue;
+        if(d->quick_item[i] == inv_idx) {
+            d->quick_item[i] = d->quick_item[quick_idx];
+            break;
+        }
+    }
+    d->quick_item[quick_idx] = inv_idx;
+}
+
 /*  Update code */
 static bork_entity_t get_looked_item(struct bork_play_data* d)
 {
@@ -266,21 +287,7 @@ static void bork_play_tick(struct pg_game_state* state)
 {
     struct bork_play_data* d = state->data;
     d->ticks = state->ticks;
-    uint8_t* kmap = d->core->ctrl_map;
     /*  Handle input    */
-    if(pg_check_input(kmap[BORK_CTRL_ESCAPE], PG_CONTROL_HIT)) {
-        if(d->menu.state == BORK_MENU_INVENTORY
-        || d->menu.state == BORK_MENU_DOORPAD) {
-            d->menu.state = BORK_MENU_CLOSED;
-            pg_mouse_mode(1);
-        } else {
-            d->menu.state = BORK_MENU_INVENTORY;
-            d->menu.inv.selection_idx = 0;
-            d->menu.inv.scroll_idx = 0;
-            SDL_ShowCursor(SDL_ENABLE);
-            pg_mouse_mode(0);
-        }
-    }
     if(d->menu.state == BORK_MENU_INVENTORY) tick_control_inv_menu(d);
     else if(d->menu.state == BORK_MENU_DOORPAD) tick_doorpad(d);
     else if(pg_check_input(SDL_SCANCODE_RETURN, PG_CONTROL_HIT)) {
@@ -289,6 +296,7 @@ static void bork_play_tick(struct pg_game_state* state)
         bork_menu_start(state, core);
         return;
     } else if(d->menu.state == BORK_MENU_CLOSED) {
+        if(d->plr.pain_ticks > 0) --d->plr.pain_ticks;
         tick_control_play(d);
         /*  Player update   */
         tick_held_item(d);
@@ -313,7 +321,16 @@ static void bork_play_tick(struct pg_game_state* state)
 static void tick_control_play(struct bork_play_data* d)
 {
     uint8_t* kmap = d->core->ctrl_map;
-    if(pg_check_input(kmap[BORK_CTRL_SELECT], PG_CONTROL_HIT)) {
+    if(pg_check_input(SDL_SCANCODE_TAB, PG_CONTROL_HIT)
+    || pg_check_gamepad(SDL_CONTROLLER_BUTTON_LEFTSHOULDER, PG_CONTROL_HIT)) {
+        d->menu.state = BORK_MENU_INVENTORY;
+        d->menu.inv.selection_idx = 0;
+        d->menu.inv.scroll_idx = 0;
+        SDL_ShowCursor(SDL_ENABLE);
+        pg_mouse_mode(0);
+    }
+    if(pg_check_input(kmap[BORK_CTRL_SELECT], PG_CONTROL_HIT)
+    || pg_check_gamepad(SDL_CONTROLLER_BUTTON_X, PG_CONTROL_HIT)) {
         struct bork_entity* item = bork_entity_get(d->looked_item);
         vec3 eye_pos = { d->plr.pos[0], d->plr.pos[1], d->plr.pos[2] };
         if(d->plr.flags & BORK_ENTFLAG_CROUCH) eye_pos[2] += 0.2;
@@ -322,6 +339,9 @@ static void tick_control_play(struct bork_play_data* d)
             if(item->type == BORK_ITEM_BULLETS) {
                 item->flags |= BORK_ENTFLAG_DEAD;
                 d->ammo_bullets += 30;
+            } else if(item->type == BORK_ITEM_SHELLS) {
+                item->flags |= BORK_ENTFLAG_DEAD;
+                d->ammo_shells += 10;
             } else if(item->type == BORK_ITEM_PLAZMA) {
                 item->flags |= BORK_ENTFLAG_DEAD;
                 d->ammo_plazma += 15;
@@ -339,6 +359,8 @@ static void tick_control_play(struct bork_play_data* d)
             if(obj) {
                 struct bork_map_object* door = &d->map.doors.data[obj->doorpad.door_idx];
                 if(door->door.locked) {
+                    d->menu.doorpad.selection[0] = -1;
+                    d->menu.doorpad.selection[1] = 0;
                     d->menu.doorpad.num_chars = 0;
                     d->menu.doorpad.door_idx = obj->doorpad.door_idx;
                     d->menu.state = BORK_MENU_DOORPAD;
@@ -350,12 +372,14 @@ static void tick_control_play(struct bork_play_data* d)
             }
         }
     }
-    if(pg_check_input(kmap[BORK_CTRL_JUMP], PG_CONTROL_HIT)
+    if((pg_check_input(kmap[BORK_CTRL_JUMP], PG_CONTROL_HIT)
+        || pg_check_gamepad(SDL_CONTROLLER_BUTTON_A, PG_CONTROL_HIT))
     && d->plr.flags & BORK_ENTFLAG_GROUND) {
-        d->plr.vel[2] = 0.3;
+        d->plr.vel[2] = 0.15;
         d->plr.flags &= ~BORK_ENTFLAG_GROUND;
     }
-    if(pg_check_input(SDL_SCANCODE_LCTRL, PG_CONTROL_HELD)) {
+    if(pg_check_input(SDL_SCANCODE_LCTRL, PG_CONTROL_HELD)
+    || pg_check_gamepad(SDL_CONTROLLER_BUTTON_LEFTSTICK, PG_CONTROL_HELD)) {
         d->plr.flags |= BORK_ENTFLAG_CROUCH;
     } else if(d->plr.flags & BORK_ENTFLAG_CROUCH) {
         if(!bork_map_check_ellipsoid(&d->map,
@@ -366,29 +390,41 @@ static void tick_control_play(struct bork_play_data* d)
             d->plr.pos[2] += 0.5;
         }
     }
-    float move_speed = d->player_speed * (d->plr.flags & BORK_ENTFLAG_GROUND ? 1 : 0.2);
+    int kbd_input = 0;
+    float move_speed = d->player_speed * (d->plr.flags & BORK_ENTFLAG_GROUND ? 1 : 0.1);
     d->plr.flags &= ~BORK_ENTFLAG_SLIDE;
     if(pg_check_input(kmap[BORK_CTRL_LEFT], PG_CONTROL_HIT | PG_CONTROL_HELD)) {
         d->plr.vel[0] -= move_speed * sin(d->plr.dir[0]);
         d->plr.vel[1] += move_speed * cos(d->plr.dir[0]);
-        d->plr.flags |= BORK_ENTFLAG_SLIDE;
+        kbd_input = 1;
     }
     if(pg_check_input(kmap[BORK_CTRL_RIGHT], PG_CONTROL_HIT | PG_CONTROL_HELD)) {
         d->plr.vel[0] += move_speed * sin(d->plr.dir[0]);
         d->plr.vel[1] -= move_speed * cos(d->plr.dir[0]);
-        d->plr.flags |= BORK_ENTFLAG_SLIDE;
+        kbd_input = 1;
     }
     if(pg_check_input(kmap[BORK_CTRL_UP], PG_CONTROL_HIT | PG_CONTROL_HELD)) {
         d->plr.vel[0] += move_speed * cos(d->plr.dir[0]);
         d->plr.vel[1] += move_speed * sin(d->plr.dir[0]);
-        d->plr.flags |= BORK_ENTFLAG_SLIDE;
+        kbd_input = 1;
     }
     if(pg_check_input(kmap[BORK_CTRL_DOWN], PG_CONTROL_HIT | PG_CONTROL_HELD)) {
         d->plr.vel[0] -= move_speed * cos(d->plr.dir[0]);
         d->plr.vel[1] -= move_speed * sin(d->plr.dir[0]);
-        d->plr.flags |= BORK_ENTFLAG_SLIDE;
+        kbd_input = 1;
     }
-    if(pg_check_input(SDL_SCANCODE_F, PG_CONTROL_HIT)) {
+    if(!kbd_input) {
+        vec2 stick;
+        pg_gamepad_stick(0, stick);
+        float c = cos(-d->plr.dir[0]), s = sin(d->plr.dir[0]);
+        vec2 stick_rot = {
+            stick[0] * s - stick[1] * c,
+            stick[0] * c + stick[1] * s };
+        d->plr.vel[0] += move_speed * stick_rot[0];
+        d->plr.vel[1] -= move_speed * stick_rot[1];
+    }
+    if(pg_check_input(SDL_SCANCODE_F, PG_CONTROL_HIT)
+    || pg_check_gamepad(SDL_CONTROLLER_BUTTON_Y, PG_CONTROL_HIT)) {
         d->flashlight_on = 1 - d->flashlight_on;
     }
     if(d->held_item != -1) {
@@ -396,18 +432,23 @@ static void tick_control_play(struct bork_play_data* d)
         struct bork_entity* held_ent = bork_entity_get(held_id);
         if(held_ent) {
             const struct bork_entity_profile* prof = &BORK_ENT_PROFILES[held_ent->type];
-            if(prof->use_ctrl && pg_check_input(kmap[BORK_CTRL_FIRE], prof->use_ctrl)) {
+            if(prof->use_ctrl && (pg_check_input(kmap[BORK_CTRL_FIRE], prof->use_ctrl)
+            || pg_check_gamepad(PG_RIGHT_TRIGGER, prof->use_ctrl))) {
                 prof->use_func(held_ent, d);
             }
         }
     }
-    if(pg_check_input(kmap[BORK_CTRL_BIND1], PG_CONTROL_HIT)) {
+    if(pg_check_input(kmap[BORK_CTRL_BIND1], PG_CONTROL_HIT)
+    || pg_check_gamepad(SDL_CONTROLLER_BUTTON_DPAD_UP, PG_CONTROL_HIT)) {
         switch_item(d, d->quick_item[0]);
-    } else if(pg_check_input(kmap[BORK_CTRL_BIND2], PG_CONTROL_HIT)) {
+    } else if(pg_check_input(kmap[BORK_CTRL_BIND2], PG_CONTROL_HIT)
+    || pg_check_gamepad(SDL_CONTROLLER_BUTTON_DPAD_LEFT, PG_CONTROL_HIT)) {
         switch_item(d, d->quick_item[1]);
-    } else if(pg_check_input(kmap[BORK_CTRL_BIND3], PG_CONTROL_HIT)) {
+    } else if(pg_check_input(kmap[BORK_CTRL_BIND3], PG_CONTROL_HIT)
+    || pg_check_gamepad(SDL_CONTROLLER_BUTTON_DPAD_RIGHT, PG_CONTROL_HIT)) {
         switch_item(d, d->quick_item[2]);
-    } else if(pg_check_input(kmap[BORK_CTRL_BIND4], PG_CONTROL_HIT)) {
+    } else if(pg_check_input(kmap[BORK_CTRL_BIND4], PG_CONTROL_HIT)
+    || pg_check_gamepad(SDL_CONTROLLER_BUTTON_DPAD_DOWN, PG_CONTROL_HIT)) {
         switch_item(d, d->quick_item[3]);
     }
 }
@@ -475,7 +516,9 @@ static void tick_enemies(struct bork_play_data* d)
                 vec3_set_len(new_bullet.dir, ent_to_plr, 1);
                 vec3_add(new_bullet.pos, ent_head, new_bullet.dir);
                 ARR_PUSH(d->bullets, new_bullet);
-                ent->counter[0] = d->ticks + 60;
+                float angle = atan2f(ent_to_plr[0], ent_to_plr[1]) + M_PI;
+                ent->dir[0] = (M_PI * 2 - angle) - M_PI * 0.5;
+                ent->counter[0] = d->ticks + 120;
             }
         }
         bork_entity_update(ent, &d->map);
@@ -690,6 +733,13 @@ static void draw_hud_overlay(struct bork_play_data* d)
     pg_shader_2d_add_tex_tx(&d->core->shader_2d, (vec2){ hp_frac * 4, 1 }, (vec2){ 0, 0 });
     pg_shader_2d_transform(&d->core->shader_2d, (vec2){ ar / 2 - 0.2, 0.86 }, (vec2){ 0.4 * hp_frac, 0.1 }, 0);
     pg_model_draw(&d->core->quad_2d, NULL);
+    if(d->plr.pain_ticks > 0) {
+        pg_shader_2d_transform(&d->core->shader_2d, (vec2){}, (vec2){ ar, 1 }, 0);
+        pg_shader_2d_texture(&d->core->shader_2d, &d->core->radial_vignette);
+        float hurt_alpha = (float)d->plr.pain_ticks / 120 * 0.5;
+        pg_shader_2d_color_mod(&d->core->shader_2d, (vec4){ 0.5, 0, 0, hurt_alpha });
+        pg_model_draw(&d->core->quad_2d, NULL);
+    }
 }
 
 static void draw_datapad(struct bork_play_data* d)
@@ -800,9 +850,8 @@ static void draw_enemies(struct bork_play_data* d, float lerp)
         vec2 ent_to_plr;
         vec2_sub(ent_to_plr, pos_lerp, plr_pos);
         float dir_adjust = 1.0f / (float)prof->dir_frames + 0.5f;
-        float angle = atan2(ent_to_plr[0], ent_to_plr[1]) + (M_PI * dir_adjust) + ent->dir[0];
-        if(angle < 0) angle += M_PI * 2;
-        else if(angle > (M_PI * 2)) angle = fmodf(angle, M_PI * 2);
+        float angle = atan2(ent_to_plr[0], ent_to_plr[1]) - dir_adjust + M_PI + ent->dir[0];
+        angle = fmodf(angle, M_PI * 2);
         float angle_f = angle / (M_PI * 2);
         int frame = (int)(angle_f * (float)prof->dir_frames) + prof->front_frame;
         if(frame != current_frame) {
@@ -918,26 +967,42 @@ static void draw_map_lights(struct bork_play_data* d)
 static void tick_control_inv_menu(struct bork_play_data* d)
 {
     uint8_t* kmap = d->core->ctrl_map;
+    if(pg_check_input(SDL_SCANCODE_ESCAPE, PG_CONTROL_HIT)
+    || pg_check_gamepad(SDL_CONTROLLER_BUTTON_B, PG_CONTROL_HIT)
+    || pg_check_gamepad(SDL_CONTROLLER_BUTTON_LEFTSHOULDER, PG_CONTROL_HIT)) {
+        d->menu.state = BORK_MENU_CLOSED;
+        pg_mouse_mode(1);
+    }
     if(d->inventory.len == 0) return;
-    if(pg_check_input(kmap[BORK_CTRL_DOWN], PG_CONTROL_HIT)) {
+    int stick_ctrl = 0;
+    if(pg_check_gamepad(PG_LEFT_STICK, PG_CONTROL_HIT)) {
+        vec2 stick;
+        pg_gamepad_stick(0, stick);
+        if(fabsf(stick[1]) > 0.6) stick_ctrl = SGN(stick[1]);
+    }
+    if(pg_check_input(kmap[BORK_CTRL_DOWN], PG_CONTROL_HIT) || stick_ctrl == 1) {
         d->menu.inv.selection_idx = MIN(d->menu.inv.selection_idx + 1, d->inventory.len - 1);
         if(d->menu.inv.selection_idx >= d->menu.inv.scroll_idx + 10) ++d->menu.inv.scroll_idx;
     }
-    if(pg_check_input(kmap[BORK_CTRL_UP], PG_CONTROL_HIT)) {
+    if(pg_check_input(kmap[BORK_CTRL_UP], PG_CONTROL_HIT) || stick_ctrl == -1) {
         d->menu.inv.selection_idx = MAX(d->menu.inv.selection_idx - 1, 0);
         if(d->menu.inv.selection_idx < d->menu.inv.scroll_idx) --d->menu.inv.scroll_idx;
     }
-    if(pg_check_input(kmap[BORK_CTRL_BIND1], PG_CONTROL_HIT)) {
-        d->quick_item[0] = d->menu.inv.selection_idx;
+    if(pg_check_input(kmap[BORK_CTRL_BIND1], PG_CONTROL_HIT)
+    || pg_check_gamepad(SDL_CONTROLLER_BUTTON_DPAD_UP, PG_CONTROL_HIT)) {
+        set_quick_item(d, 0, d->menu.inv.selection_idx);
     }
-    if(pg_check_input(kmap[BORK_CTRL_BIND2], PG_CONTROL_HIT)) {
-        d->quick_item[1] = d->menu.inv.selection_idx;
+    if(pg_check_input(kmap[BORK_CTRL_BIND2], PG_CONTROL_HIT)
+    || pg_check_gamepad(SDL_CONTROLLER_BUTTON_DPAD_LEFT, PG_CONTROL_HIT)) {
+        set_quick_item(d, 1, d->menu.inv.selection_idx);
     }
-    if(pg_check_input(kmap[BORK_CTRL_BIND3], PG_CONTROL_HIT)) {
-        d->quick_item[2] = d->menu.inv.selection_idx;
+    if(pg_check_input(kmap[BORK_CTRL_BIND3], PG_CONTROL_HIT)
+    || pg_check_gamepad(SDL_CONTROLLER_BUTTON_DPAD_RIGHT, PG_CONTROL_HIT)) {
+        set_quick_item(d, 2, d->menu.inv.selection_idx);
     }
-    if(pg_check_input(kmap[BORK_CTRL_BIND4], PG_CONTROL_HIT)) {
-        d->quick_item[3] = d->menu.inv.selection_idx;
+    if(pg_check_input(kmap[BORK_CTRL_BIND4], PG_CONTROL_HIT)
+    || pg_check_gamepad(SDL_CONTROLLER_BUTTON_DPAD_DOWN, PG_CONTROL_HIT)) {
+        set_quick_item(d, 3, d->menu.inv.selection_idx);
     }
 
 }
@@ -1088,6 +1153,12 @@ static void tick_doorpad(struct bork_play_data* d)
         }
         return;
     }
+    if(pg_check_input(SDL_SCANCODE_ESCAPE, PG_CONTROL_HIT)
+    || pg_check_gamepad(SDL_CONTROLLER_BUTTON_B, PG_CONTROL_HIT)
+    || pg_check_gamepad(SDL_CONTROLLER_BUTTON_LEFTSHOULDER, PG_CONTROL_HIT)) {
+        d->menu.state = BORK_MENU_CLOSED;
+        pg_mouse_mode(1);
+    }
     float ar = d->core->aspect_ratio;
     struct bork_map_object* door = &d->map.doors.data[d->menu.doorpad.door_idx];
     uint8_t* chars = d->menu.doorpad.chars;
@@ -1122,6 +1193,34 @@ static void tick_doorpad(struct bork_play_data* d)
             }
         }
     }
+    if(pg_check_gamepad(PG_LEFT_STICK, PG_CONTROL_HIT)) {
+        if(d->menu.doorpad.selection[0] == -1) d->menu.doorpad.selection[0] = 0;
+        else {
+            vec2 stick;
+            pg_gamepad_stick(0, stick);
+            if(fabsf(stick[0]) > fabsf(stick[1])) {
+                int x = SGN(stick[0]);
+                d->menu.doorpad.selection[0] = MOD(d->menu.doorpad.selection[0] + x, 3);
+            } else {
+                int y = SGN(stick[1]);
+                d->menu.doorpad.selection[1] = MOD(d->menu.doorpad.selection[1] + y, 4);
+            }
+        }
+    }
+    if(pg_check_gamepad(SDL_CONTROLLER_BUTTON_A, PG_CONTROL_HIT)) {
+        int b = d->menu.doorpad.selection[0] + d->menu.doorpad.selection[1] * 3;
+        if(b < 10 && d->menu.doorpad.num_chars < 4) {
+            chars[d->menu.doorpad.num_chars++] = MOD(b + 1, 10);
+        } else if(b == 10) {
+            d->menu.doorpad.num_chars = MAX(0, d->menu.doorpad.num_chars - 1);
+        } else if(b == 11 && d->menu.doorpad.num_chars == 4
+        && chars[0] == door_chars[0] && chars[1] == door_chars[1]
+        && chars[2] == door_chars[2] && chars[3] == door_chars[3]) {
+            door->door.locked = 0;
+            door->door.open = 1;
+            d->menu.doorpad.unlocked_ticks = 60;
+        }
+    }
 }
 
 static void draw_doorpad(struct bork_play_data* d, float t)
@@ -1152,11 +1251,16 @@ static void draw_doorpad(struct bork_play_data* d, float t)
     struct pg_shader_text text = { .use_blocks = 13,
         .block = { "1", "2", "3", "4", "5", "6", "7", "8", "9", "0", "X", ">" }
     };
+    int b;
+    if(d->menu.doorpad.selection[0] != -1) {
+        b = d->menu.doorpad.selection[0] + d->menu.doorpad.selection[1] * 3;
+    } else b = -1;
     int i;
     for(i = 0; i < 12; ++i) {
         vec4_set(text.block_style[i], (i % 3) * 0.1325 + ar * 0.5 - 0.06,
                                       (i / 3) * 0.11 + 0.39, 0.03, 0);
-        vec4_set(text.block_color[i], 1, 1, 1, 1);
+        if(b == -1 ||  b == i) vec4_set(text.block_color[i], 1, 1, 1, 1);
+        else vec4_set(text.block_color[i], 0.8, 0.8, 0.8, 0.6);
     };
     for(i = 0; i < d->menu.doorpad.num_chars; ++i) {
         text.block[12][i] = '0' + d->menu.doorpad.chars[i];

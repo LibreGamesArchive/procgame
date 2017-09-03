@@ -44,10 +44,10 @@ void pg_screen_swap(void);
 void pg_screen_dst(void);
 
 /*  The possible control states */
-#define PG_CONTROL_OFF          (1 << 1)
-#define PG_CONTROL_RELEASED     (1 << 2)
-#define PG_CONTROL_HIT          (1 << 3)
-#define PG_CONTROL_HELD         (1 << 4)
+#define PG_CONTROL_OFF          (1 << 0)
+#define PG_CONTROL_RELEASED     (1 << 1)
+#define PG_CONTROL_HIT          (1 << 2)
+#define PG_CONTROL_HELD         (1 << 3)
 /*  Special mouse control codes, mapped to unused SDL scancodes */
 #define PG_LEFT_MOUSE           253
 #define PG_RIGHT_MOUSE          254
@@ -60,6 +60,18 @@ int pg_user_exit(void);
 void pg_mouse_mode(int grab);
 void pg_mouse_pos(vec2 out);
 void pg_mouse_motion(vec2 out);
+
+#define PG_LEFT_STICK       (SDL_CONTROLLER_BUTTON_MAX + 1)
+#define PG_RIGHT_STICK      (SDL_CONTROLLER_BUTTON_MAX + 2)
+#define PG_LEFT_TRIGGER     (SDL_CONTROLLER_BUTTON_MAX + 3)
+#define PG_RIGHT_TRIGGER    (SDL_CONTROLLER_BUTTON_MAX + 4)
+void pg_use_gamepad(int gpad_idx);
+int pg_have_gamepad(void);
+void pg_gamepad_config(float stick_dead_zone, float stick_threshold,
+                       float trigger_dead_zone, float trigger_threshold);
+int pg_check_gamepad(uint8_t ctrl, uint8_t state);
+void pg_gamepad_stick(int side, vec2 out);
+float pg_gamepad_trigger(int side);
 
 /*  Returns the time in seconds since the last call to this function, or 0
     the first time it is called. If dump is non-zero, the value will not be

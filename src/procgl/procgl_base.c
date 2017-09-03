@@ -1,3 +1,4 @@
+#include <stdio.h>
 #include <GL/glew.h>
 #include <SDL2/SDL.h>
 #include "ext/linmath.h"
@@ -5,18 +6,28 @@
 #include "audio.h"
 #include "procgl_base.h"
 
-SDL_GLContext pg_context;
-SDL_Window* pg_window;
+static SDL_GLContext pg_context;
+static SDL_Window* pg_window;
 int screen_w, screen_h;
 int render_w, render_h;
 
-static uint8_t ctrl_state[256];
-static uint8_t ctrl_changes[16];
-static uint8_t ctrl_changed;
-static vec2 mouse_pos;
-static vec2 mouse_motion;
-static int mouse_relative;
-static int user_exit;
+static SDL_GameController* pg_gamepad = NULL;
+static SDL_JoystickID gamepad_id = -1;
+static uint8_t gamepad_state[32] = {};
+static uint8_t gamepad_changes[16] = {};
+static uint8_t gamepad_changed = 0;
+static vec2 gamepad_stick[2] = {};
+static float gamepad_trigger[2] = {};
+float pg_stick_dead_zone, pg_stick_threshold;
+float pg_trigger_dead_zone, pg_trigger_threshold;
+
+static uint8_t ctrl_state[256] = {};
+static uint8_t ctrl_changes[16] = {};
+static uint8_t ctrl_changed = 0;
+static vec2 mouse_pos = {};
+static vec2 mouse_motion = {};
+static int mouse_relative = 0;
+static int user_exit = 0;
 
 int pg_init(int w, int h, int fullscreen, const char* window_title)
 {
@@ -46,6 +57,8 @@ int pg_init(int w, int h, int fullscreen, const char* window_title)
     glGetError();
     /*  Init audio system   */
     pg_init_audio();
+    /*  Load gamepad mappings   */
+    SDL_GameControllerAddMappingsFromFile("gamecontrollerdb.txt");
     return 1;
 }
 
@@ -134,6 +147,21 @@ void pg_poll_input(void)
         } else if(e.type == SDL_KEYUP) {
             ctrl_state[e.key.keysym.scancode] = PG_CONTROL_RELEASED;
             ctrl_changes[ctrl_changed++] = e.key.keysym.scancode;
+        } else if(e.type == SDL_CONTROLLERBUTTONDOWN && e.cbutton.which == gamepad_id) {
+            if(gamepad_state[e.cbutton.button] != PG_CONTROL_HELD) {
+                gamepad_state[e.cbutton.button] = PG_CONTROL_HIT;
+                gamepad_changes[gamepad_changed++] = e.cbutton.button;
+            }
+        } else if(e.type == SDL_CONTROLLERBUTTONUP && e.cbutton.which == gamepad_id) {
+            gamepad_state[e.cbutton.button] = PG_CONTROL_RELEASED;
+            gamepad_changes[gamepad_changed++] = e.cbutton.button;
+        } else if(e.type == SDL_CONTROLLERDEVICEREMOVED && e.cdevice.which == gamepad_id) {
+            printf("Gamepad disconnected.\n");
+            SDL_GameControllerClose(pg_gamepad);
+            pg_gamepad = NULL;
+        } else if(e.type == SDL_CONTROLLERDEVICEADDED && !pg_gamepad) {
+            pg_use_gamepad(e.cdevice.which);
+            printf("Gamepad connected.\n");
         }
     }
     int mx, my;
@@ -148,6 +176,62 @@ void pg_poll_input(void)
         mx = ((float)mx / screen_w) * render_w;
         my = ((float)my / screen_h) * render_h;
         vec2_set(mouse_pos, mx, my);
+    }
+    if(pg_gamepad) {
+        int16_t left[2], right[2], trigger[2];
+        left[0] = SDL_GameControllerGetAxis(pg_gamepad, SDL_CONTROLLER_AXIS_LEFTX);
+        left[1] = SDL_GameControllerGetAxis(pg_gamepad, SDL_CONTROLLER_AXIS_LEFTY);
+        right[0] = SDL_GameControllerGetAxis(pg_gamepad, SDL_CONTROLLER_AXIS_RIGHTX);
+        right[1] = SDL_GameControllerGetAxis(pg_gamepad, SDL_CONTROLLER_AXIS_RIGHTY);
+        trigger[0] = SDL_GameControllerGetAxis(pg_gamepad, SDL_CONTROLLER_AXIS_TRIGGERLEFT);
+        trigger[1] = SDL_GameControllerGetAxis(pg_gamepad, SDL_CONTROLLER_AXIS_TRIGGERRIGHT);
+        vec2_set(gamepad_stick[0], (float)left[0] / INT16_MAX, (float)left[1] / INT16_MAX);
+        vec2_set(gamepad_stick[1], (float)right[0] / INT16_MAX, (float)right[1] / INT16_MAX);
+        gamepad_trigger[0] = trigger[0] / INT16_MAX;
+        gamepad_trigger[1] = trigger[1] / INT16_MAX;
+        if(fabsf(gamepad_stick[0][0]) < pg_stick_dead_zone) gamepad_stick[0][0] = 0;
+        if(fabsf(gamepad_stick[0][1]) < pg_stick_dead_zone) gamepad_stick[0][1] = 0;
+        if(fabsf(gamepad_stick[1][0]) < pg_stick_dead_zone) gamepad_stick[1][0] = 0;
+        if(fabsf(gamepad_stick[1][1]) < pg_stick_dead_zone) gamepad_stick[1][1] = 0;
+        if(gamepad_trigger[0] < pg_trigger_dead_zone) gamepad_trigger[0] = 0;
+        if(gamepad_trigger[1] < pg_trigger_dead_zone) gamepad_trigger[1] = 0;
+        /*  Also provide a button-like interface to the joysticks and triggers  */
+        if(vec2_len(gamepad_stick[0]) > pg_stick_threshold) {
+            if(gamepad_state[PG_LEFT_STICK] != PG_CONTROL_HELD) {
+                gamepad_state[PG_LEFT_STICK] = PG_CONTROL_HIT;
+                gamepad_changes[gamepad_changed++] = PG_LEFT_STICK;
+            }
+        } else if(gamepad_state[PG_LEFT_STICK] == PG_CONTROL_HELD) {
+            gamepad_state[PG_LEFT_STICK] = PG_CONTROL_RELEASED;
+            gamepad_changes[gamepad_changed++] = PG_LEFT_STICK;
+        }
+        if(vec2_len(gamepad_stick[1]) > pg_stick_threshold) {
+            if(gamepad_state[PG_RIGHT_STICK] != PG_CONTROL_HELD) {
+                gamepad_state[PG_RIGHT_STICK] = PG_CONTROL_HIT;
+                gamepad_changes[gamepad_changed++] = PG_RIGHT_STICK;
+            }
+        } else if(gamepad_state[PG_RIGHT_STICK] == PG_CONTROL_HELD) {
+            gamepad_state[PG_RIGHT_STICK] = PG_CONTROL_RELEASED;
+            gamepad_changes[gamepad_changed++] = PG_RIGHT_STICK;
+        }
+        if(gamepad_trigger[0] > pg_trigger_threshold) {
+            if(gamepad_state[PG_LEFT_TRIGGER] != PG_CONTROL_HELD) {
+                gamepad_state[PG_LEFT_TRIGGER] = PG_CONTROL_HIT;
+                gamepad_changes[gamepad_changed++] = PG_LEFT_TRIGGER;
+            }
+        } else if(gamepad_state[PG_LEFT_TRIGGER] == PG_CONTROL_HELD) {
+            gamepad_state[PG_LEFT_TRIGGER] = PG_CONTROL_RELEASED;
+            gamepad_changes[gamepad_changed++] = PG_LEFT_TRIGGER;
+        }
+        if(gamepad_trigger[1] > pg_trigger_threshold) {
+            if(gamepad_state[PG_RIGHT_TRIGGER] != PG_CONTROL_HELD) {
+                gamepad_state[PG_RIGHT_TRIGGER] = PG_CONTROL_HIT;
+                gamepad_changes[gamepad_changed++] = PG_RIGHT_TRIGGER;
+            }
+        } else if(gamepad_state[PG_RIGHT_TRIGGER] == PG_CONTROL_HELD) {
+            gamepad_state[PG_RIGHT_TRIGGER] = PG_CONTROL_RELEASED;
+            gamepad_changes[gamepad_changed++] = PG_RIGHT_TRIGGER;
+        }
     }
 }
 
@@ -174,12 +258,26 @@ void pg_flush_input(void)
             ctrl_state[c] = PG_CONTROL_HELD;
             break;
         case PG_CONTROL_HELD: case PG_CONTROL_RELEASED:
-            ctrl_state[c] = 0;
+            ctrl_state[c] = PG_CONTROL_OFF;
             break;
         }
     }
     vec2_set(mouse_motion, 0, 0);
     ctrl_changed = 0;
+    if(!pg_gamepad) return;
+    for(i = 0; i < gamepad_changed; ++i) {
+        uint8_t c = gamepad_changes[i];
+        switch(gamepad_state[c]) {
+        case 0: break;
+        case PG_CONTROL_HIT:
+            gamepad_state[c] = PG_CONTROL_HELD;
+            break;
+        case PG_CONTROL_HELD: case PG_CONTROL_RELEASED:
+            gamepad_state[c] = PG_CONTROL_OFF;
+            break;
+        }
+    }
+    gamepad_changed = 0;
 }
 
 void pg_mouse_mode(int grab)
@@ -204,3 +302,54 @@ void pg_mouse_motion(vec2 out)
     vec2_dup(out, mouse_motion);
 }
 
+void pg_use_gamepad(int gpad_idx)
+{
+    pg_gamepad = SDL_GameControllerOpen(gpad_idx);
+    if(!pg_gamepad) {
+        printf("procgame failed to open gamepad %d\n", gpad_idx);
+        gamepad_id = -1;
+    } else {
+        gamepad_id = gpad_idx;
+        SDL_Joystick* joy = SDL_GameControllerGetJoystick(pg_gamepad);
+        gamepad_id = SDL_JoystickInstanceID(joy);
+    }
+}
+
+int pg_have_gamepad(void)
+{
+    if(pg_gamepad) return 1;
+    else return 0;
+}
+
+void pg_gamepad_config(float stick_dead_zone, float stick_threshold,
+                       float trigger_dead_zone, float trigger_threshold)
+{
+    pg_stick_dead_zone = stick_dead_zone;
+    pg_stick_threshold = stick_threshold;
+    pg_trigger_dead_zone = trigger_dead_zone;
+    pg_trigger_threshold = trigger_threshold;
+}
+
+int pg_check_gamepad(uint8_t ctrl, uint8_t state)
+{
+    if(gamepad_state[ctrl] & state) return 1;
+    //printf("Button state for %d: %d, checking for %d\n", (int)ctrl, (int)gamepad_state[ctrl], (int)state);
+    int changes = 0;
+    int i;
+    for(i = 0; i < gamepad_changed; ++i) {
+        changes += (gamepad_changes[i] == ctrl);
+        if(changes > 1) return 1;
+    }
+    return 0;
+}
+
+void pg_gamepad_stick(int side, vec2 out)
+{
+    side = side % 2;
+    vec2_dup(out, gamepad_stick[side]);
+}
+
+float pg_gamepad_trigger(int side)
+{
+    return gamepad_trigger[side % 2];
+}

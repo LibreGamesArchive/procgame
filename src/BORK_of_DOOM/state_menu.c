@@ -54,28 +54,25 @@ void bork_menu_start(struct pg_game_state* state, struct bork_game_core* core)
 static void bork_menu_tick(struct pg_game_state* state)
 {
     struct bork_menu_data* d = state->data;
-    SDL_Event e;
-    while(SDL_PollEvent(&e)) {
-        if(e.type == SDL_QUIT) state->running = 0;
-        else if(e.type == SDL_KEYDOWN) {
-            switch(e.key.keysym.scancode) {
-            case SDL_SCANCODE_DOWN:
-                d->current_selection = MOD(d->current_selection + 1, BORK_MENU_COUNT);
-                pg_audio_play(&d->core->menu_sound, 0.2);
-                break;
-            case SDL_SCANCODE_UP:
-                d->current_selection = MOD(d->current_selection - 1, BORK_MENU_COUNT);
-                pg_audio_play(&d->core->menu_sound, 0.2);
-                break;
-            case SDL_SCANCODE_RETURN:
-                if(d->current_selection == BORK_MENU_NEW_GAME)
-                    bork_play_start(state, d->core);
-                else if(d->current_selection == BORK_MENU_EDITOR)
-                    bork_editor_start(state, d->core);
-                break;
-            default: break;
-            }
-        }
+    pg_poll_input();
+    if(pg_user_exit()) state->running = 0;
+    int stick_ctrl = 0;
+    if(pg_check_gamepad(PG_LEFT_STICK, PG_CONTROL_HIT)) {
+        vec2 stick;
+        pg_gamepad_stick(0, stick);
+        if(fabsf(stick[1]) > 0.6) stick_ctrl = SGN(stick[1]);
+    }
+    if(pg_check_input(SDL_SCANCODE_DOWN, PG_CONTROL_HIT) || stick_ctrl == 1) {
+        d->current_selection = MOD(d->current_selection + 1, BORK_MENU_COUNT);
+        pg_audio_play(&d->core->menu_sound, 0.2);
+    }
+    if(pg_check_input(SDL_SCANCODE_UP, PG_CONTROL_HIT) || stick_ctrl == -1) {
+        d->current_selection = MOD(d->current_selection - 1, BORK_MENU_COUNT);
+        pg_audio_play(&d->core->menu_sound, 0.2);
+        if(d->current_selection == BORK_MENU_NEW_GAME)
+            bork_play_start(state, d->core);
+        else if(d->current_selection == BORK_MENU_EDITOR)
+            bork_editor_start(state, d->core);
     }
 }
 

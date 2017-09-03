@@ -29,6 +29,9 @@ struct bork_play_data {
     int hud_datapad_line;
     /*  Input states    */
     vec2 mouse_motion;
+    int crouch_toggle;
+    int joystick_held[2];
+    int trigger_held[2];
     struct {
         enum {
             BORK_MENU_CLOSED,
@@ -42,6 +45,7 @@ struct bork_play_data {
                 int selection_idx, scroll_idx;
             } inv;
             struct {
+                int selection[2];
                 int unlocked_ticks;
                 int door_idx;
                 int num_chars;
