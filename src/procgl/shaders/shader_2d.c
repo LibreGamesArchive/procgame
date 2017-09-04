@@ -42,6 +42,9 @@ static void begin(struct pg_shader* shader, struct pg_viewer* view)
     if(d->unis_dirty) {
         glUniform1i(d->unis.tex_unit, d->state.tex->diffuse_slot);
         glUniform1i(d->unis.norm_unit, d->state.tex->light_slot);
+        if(d->state.tex->light_slot >= 0)
+            glUniform1i(d->unis.norm_unit, d->state.tex->light_slot);
+        else glUniform1i(d->unis.norm_unit, d->state.tex->diffuse_slot);
         glUniform1f(d->unis.tex_weight, d->state.tex_weight);
         glUniform4fv(d->unis.tex_tx, 1, d->state.tex_tx);
         glUniform4fv(d->unis.color_mod, 1, d->state.color_mod);
@@ -136,7 +139,8 @@ void pg_shader_2d_texture(struct pg_shader* shader, struct pg_texture* tex)
     pg_shader_2d_tex_transform(shader, (vec2){ 1, 1 }, (vec2){});
     if(pg_shader_is_active(shader)) {
         glUniform1i(d->unis.tex_unit, tex->diffuse_slot);
-        glUniform1i(d->unis.norm_unit, tex->light_slot);
+        if(tex->light_slot >= 0) glUniform1i(d->unis.norm_unit, tex->light_slot);
+        else glUniform1i(d->unis.norm_unit, tex->diffuse_slot);
     } else d->unis_dirty = 1;
 }
 

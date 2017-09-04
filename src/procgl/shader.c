@@ -8,7 +8,7 @@
 #include "shader.h"
 
 /*  Shadow state for the currently used OpenGL shader   */
-static struct pg_shader* pg_active_shader;
+static struct pg_shader* pg_active_shader = NULL;
 
 /*  Code for loading shaders dumped to headers  */
 static GLuint compile_glsl_static(const char* src, int len, GLenum type)
@@ -159,7 +159,7 @@ void pg_shader_set_matrix(struct pg_shader* shader, enum pg_matrix type,
                           mat4 matrix)
 {
     mat4_dup(shader->matrix[type], matrix);
-    if(shader->mat_idx[type] != -1) {
+    if(pg_active_shader == shader && shader->mat_idx[type] != -1) {
         glUniformMatrix4fv(shader->mat_idx[type], 1, GL_FALSE, *matrix);
     }
 }
