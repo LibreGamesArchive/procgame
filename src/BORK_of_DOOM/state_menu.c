@@ -1,3 +1,4 @@
+#include <stdio.h>
 #include <stdlib.h>
 #include <limits.h>
 #include "procgl/procgl.h"
@@ -69,11 +70,15 @@ static void bork_menu_tick(struct pg_game_state* state)
     if(pg_check_input(SDL_SCANCODE_UP, PG_CONTROL_HIT) || stick_ctrl == -1) {
         d->current_selection = MOD(d->current_selection - 1, BORK_MENU_COUNT);
         pg_audio_play(&d->core->menu_sound, 0.2);
+    }
+    if(pg_check_input(SDL_SCANCODE_RETURN, PG_CONTROL_HIT)
+    || pg_check_gamepad(SDL_CONTROLLER_BUTTON_A, PG_CONTROL_HIT)) {
         if(d->current_selection == BORK_MENU_NEW_GAME)
             bork_play_start(state, d->core);
         else if(d->current_selection == BORK_MENU_EDITOR)
             bork_editor_start(state, d->core);
     }
+    pg_flush_input();
 }
 
 static struct pg_shader_text main_menu_text = {
