@@ -32,6 +32,7 @@ struct bork_game_core {
     struct pg_texture env_atlas;
     struct pg_texture editor_atlas;
     struct pg_texture bullet_tex;
+    struct pg_texture particle_tex;
     struct pg_texture item_tex;
     struct pg_texture font;
     /*  Generated assets    */

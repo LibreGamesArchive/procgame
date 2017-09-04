@@ -1,3 +1,4 @@
+#include <stdio.h>
 #include <stdlib.h>
 #include <limits.h>
 #include <time.h>
@@ -84,13 +85,16 @@ void bork_load_assets(struct bork_game_core* core)
     pg_texture_init_from_file(&core->item_tex, "res/items.png", "res/items_lightmap.png");
     pg_texture_set_atlas(&core->item_tex, 16, 16);
     pg_texture_bind(&core->item_tex, 11, 12);
+    pg_texture_init_from_file(&core->particle_tex, "res/particles.png", "res/particles_lightmap.png");
+    pg_texture_set_atlas(&core->particle_tex, 16, 16);
+    pg_texture_bind(&core->particle_tex, 13, 14);
     /*  Generate the backdrop texture (cloudy reddish fog)  */
     pg_texture_init(&core->backdrop_tex, 256, 256);
     pg_texture_init(&core->menu_vignette, 256, 256);
     pg_texture_init(&core->radial_vignette, 256, 256);
-    pg_texture_bind(&core->backdrop_tex, 13, -1);
-    pg_texture_bind(&core->menu_vignette, 14, -1);
-    pg_texture_bind(&core->radial_vignette, 15, -1);
+    pg_texture_bind(&core->backdrop_tex, 16, -1);
+    pg_texture_bind(&core->menu_vignette, 17, -1);
+    pg_texture_bind(&core->radial_vignette, 18, -1);
     float seed = (float)rand() / RAND_MAX * 1000;
     struct pg_wave backdrop_wave[8] = {
         PG_WAVE_MOD_SEAMLESS_2D(.scale = 0.5),
@@ -201,11 +205,11 @@ void bork_draw_backdrop(struct bork_game_core* core, vec4 color_mod, float t)
     static float f[3] = { 0.01, -0.05, 0.1 };
     static float off[3] = { 2, 0.3, 0.5 };
     struct pg_shader* shader = &core->shader_2d;
+    if(!pg_shader_is_active(shader)) pg_shader_begin(shader, NULL);
     pg_shader_2d_resolution(shader, (vec2){ core->aspect_ratio, 1 });
     pg_shader_2d_texture(shader, &core->backdrop_tex);
     pg_shader_2d_tex_weight(shader, 1);
     pg_shader_2d_set_light(shader, (vec2){ 0, -1 }, (vec3){}, (vec3){ 1, 1, 1 });
-    if(!pg_shader_is_active(shader)) pg_shader_begin(shader, NULL);
     pg_shader_2d_transform(shader, (vec2){}, (vec2){ core->aspect_ratio, 1 }, 0);
     pg_model_begin(&core->quad_2d_ctr, shader);
     int i;

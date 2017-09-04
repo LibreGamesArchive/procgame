@@ -6,6 +6,7 @@ struct bork_bullet {
     uint16_t flags;
     uint8_t dead_ticks;
     uint8_t type;
+    uint8_t damage;
     vec3 light_color;
     vec3 pos;
     vec3 dir;

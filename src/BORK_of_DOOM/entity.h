@@ -15,6 +15,7 @@ struct bork_play_data;
 #define BORK_ENTFLAG_NOT_INTERACTIVE    (1 << 11)
 #define BORK_ENTFLAG_IN_INVENTORY       (1 << 12)
 #define BORK_ENTFLAG_DYING              (1 << 13)
+#define BORK_ENTFLAG_SMOKING            (1 << 14)
 
 struct bork_entity {
     vec3 pos;
@@ -30,19 +31,22 @@ struct bork_entity {
     enum bork_entity_type {
         BORK_ENTITY_PLAYER,
         BORK_ENTITY_ENEMY,
+        BORK_ITEM_PLANT1,
         BORK_ITEM_FIRSTAID,
+        BORK_ITEM_DATAPAD,
         BORK_ITEM_BULLETS,
         BORK_ITEM_SHELLS,
         BORK_ITEM_PLAZMA,
-        BORK_ITEM_SCRAPMETAL,
         BORK_ITEM_PISTOL,
         BORK_ITEM_SHOTGUN,
         BORK_ITEM_MACHINEGUN,
         BORK_ITEM_PLAZGUN,
+        BORK_ITEM_KNIFE,
         BORK_ITEM_LEADPIPE,
         BORK_ITEM_BEAMSWORD,
-        BORK_ITEM_PLANT1,
-        BORK_ITEM_DATAPAD,
+        BORK_ITEM_SCRAPMETAL,
+        BORK_ITEM_WIRES,
+        BORK_ITEM_STEELPLATE,
         BORK_ENTITY_TYPES,
     } type;
 };
@@ -56,7 +60,7 @@ void bork_hud_machinegun(struct bork_entity* ent, struct bork_play_data* d);
 void bork_use_plazgun(struct bork_entity* ent, struct bork_play_data* d);
 void bork_hud_plazgun(struct bork_entity* ent, struct bork_play_data* d);
 void bork_use_firstaid(struct bork_entity* ent, struct bork_play_data* d);
-void bork_use_leadpipe(struct bork_entity* ent, struct bork_play_data* d);
+void bork_use_melee(struct bork_entity* ent, struct bork_play_data* d);
 
 static const struct bork_entity_profile {
     char name[32];
@@ -66,6 +70,8 @@ static const struct bork_entity_profile {
     vec4 sprite_tx;
     int front_frame;
     int dir_frames;
+    int melee_damage;
+    float melee_speed;
     uint8_t use_ctrl;
     float hud_angle;
     void (*use_func)(struct bork_entity*, struct bork_play_data*);
@@ -99,7 +105,7 @@ static const struct bork_entity_profile {
         .base_flags = BORK_ENTFLAG_ITEM,
         .size = { 0.4, 0.4, 0.4 },
         .sprite_tx = { 1, 1, 0, 0 },
-        .front_frame = 1 },
+        .front_frame = 2 },
     [BORK_ITEM_PLAZMA] = { .name = "PLAZMA",
         .base_flags = BORK_ENTFLAG_ITEM,
         .size = { 0.4, 0.4, 0.4 },
@@ -137,32 +143,56 @@ static const struct bork_entity_profile {
         .use_ctrl = PG_CONTROL_HELD,
         .use_func = bork_use_plazgun,
         .hud_func = bork_hud_plazgun },
+    [BORK_ITEM_KNIFE] = { .name = "COMBAT KNIFE",
+        .base_flags = BORK_ENTFLAG_ITEM,
+        .size = { 0.4, 0.4, 0.4 },
+        .sprite_tx = { 1, 1, 0, 0 },
+        .front_frame = 17,
+        .hud_angle = -0.75,
+        .melee_damage = 10,
+        .melee_speed = 0.03,
+        .use_ctrl = PG_CONTROL_HIT,
+        .use_func = bork_use_melee },
     [BORK_ITEM_LEADPIPE] = { .name = "STEEL ROD",
         .base_flags = BORK_ENTFLAG_ITEM,
         .size = { 0.4, 0.4, 0.4 },
         .sprite_tx = { 2, 1, 0, 0 },
         .front_frame = 10,
         .hud_angle = -0.75,
+        .melee_damage = 10,
+        .melee_speed = 0.02,
         .use_ctrl = PG_CONTROL_HIT,
-        .use_func = bork_use_leadpipe },
+        .use_func = bork_use_melee },
     [BORK_ITEM_BEAMSWORD] = { .name = "BEAM SWORD",
         .base_flags = BORK_ENTFLAG_ITEM,
         .size = { 0.4, 0.4, 0.4 },
         .sprite_tx = { 2, 1, 0, 0 },
         .front_frame = 18,
         .hud_angle = -0.75,
+        .melee_damage = 15,
+        .melee_speed = 0.025,
         .use_ctrl = PG_CONTROL_HIT,
-        .use_func = bork_use_leadpipe },
+        .use_func = bork_use_melee },
     [BORK_ITEM_PLANT1] = { .name = "PLANT",
         .base_flags = BORK_ENTFLAG_ITEM | BORK_ENTFLAG_NOT_INTERACTIVE,
         .size = { 0.4, 0.4, 0.4 },
         .sprite_tx = { 1, 1, 0, 0 },
         .front_frame = 3 },
-    [BORK_ITEM_SCRAPMETAL] = { .name = "SCRAP METAL",
-        .base_flags = BORK_ENTFLAG_ITEM,
+    [BORK_ITEM_SCRAPMETAL] = { .name = "CHUNK OF METAL",
+        .base_flags = BORK_ENTFLAG_ITEM | BORK_ENTFLAG_STACKS,
         .size = { 0.5, 0.5, 0.5 },
         .sprite_tx = { 1, 1, 0, 0 },
-        .front_frame = 2 },
+        .front_frame = 24 },
+    [BORK_ITEM_WIRES] = { .name = "FRAYED WIRING",
+        .base_flags = BORK_ENTFLAG_ITEM | BORK_ENTFLAG_STACKS,
+        .size = { 0.5, 0.5, 0.5 },
+        .sprite_tx = { 1, 1, 0, 0 },
+        .front_frame = 25 },
+    [BORK_ITEM_STEELPLATE] = { .name = "STEEL PLATING",
+        .base_flags = BORK_ENTFLAG_ITEM | BORK_ENTFLAG_STACKS,
+        .size = { 0.5, 0.5, 0.5 },
+        .sprite_tx = { 1, 1, 0, 0 },
+        .front_frame = 26 },
     [BORK_ITEM_DATAPAD] = { .name = "DATA PAD",
         .base_flags = BORK_ENTFLAG_ITEM,
         .size = { 0.4, 0.4, 0.4 },

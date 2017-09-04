@@ -14,6 +14,7 @@ struct bork_play_data {
     int ammo_bullets, ammo_shells, ammo_plazma;
     ARR_T(bork_entity_t) inventory;
     ARR_T(struct bork_bullet) bullets;
+    ARR_T(struct bork_particle) particles;
     /*  The HUD-item animation  */
     vec3 hud_anim[5];
     float hud_angle[5];

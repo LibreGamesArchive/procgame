@@ -209,6 +209,8 @@ struct bork_tile_detail BORK_TILE_DETAILS[] = {
     [BORK_TILE_EDITOR_LIGHT1] = { .name = "CEIL LIGHT" },
     [BORK_TILE_EDITOR_LIGHT_WALLMOUNT] = { .name = "WALL LIGHT",
         .tile_flags = BORK_TILE_HAS_ORIENTATION },
+    [BORK_TILE_EDITOR_LIGHT_SMALLMOUNT] = { .name = "SMALL LIGHT",
+        .tile_flags = BORK_TILE_HAS_ORIENTATION },
 };
 
 const struct bork_tile_detail* bork_tile_detail(enum bork_tile_type type)
