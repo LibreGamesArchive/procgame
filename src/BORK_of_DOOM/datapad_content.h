@@ -5,11 +5,12 @@ static const struct bork_datapad {
     char text[32][32];
     int lines;
 } BORK_DATAPADS[] = {
-    { .title = "MYSTERIOUS DATAPAD", .lines = 4,
-      .text = { "THE STATION AI HAS TAKEN",
-                "OVER! IF IT DID NOT CHANGE",
-                "THE CODE, YOU SHOULD BE",
-                "ABLE TO USE '0451' TO ESCAPE!" } },
+    { .title = "MYSTERIOUS DATAPAD", .lines = 5,
+      .text = { "THE DOGS HAVE TAKEN OVER",
+                "THE STATION! IF THEY DIDN'T",
+                "CHANGE THE DOOR CODE, YOU CAN",
+                "USE '0451' TO GET OUT!",
+                "THEY MUST BE STOPPED" } },
     { .title = "NOT COMING HOME", .lines = 5,
       .text = { "IF YOU ARE READING THIS I",
                 "MUST BE DEAD... I LOCKED",

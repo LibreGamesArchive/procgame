@@ -11,7 +11,8 @@ struct bork_play_data {
     float player_speed;
     int held_item;
     int quick_item[4];
-    int ammo_bullets, ammo_shells, ammo_plazma;
+    int reload_ticks, reload_length;
+    int ammo[BORK_AMMO_TYPES];
     ARR_T(bork_entity_t) inventory;
     ARR_T(struct bork_bullet) bullets;
     ARR_T(struct bork_particle) particles;
@@ -44,6 +45,7 @@ struct bork_play_data {
         union {
             struct {
                 int selection_idx, scroll_idx;
+                int ammo_select;
             } inv;
             struct {
                 int selection[2];

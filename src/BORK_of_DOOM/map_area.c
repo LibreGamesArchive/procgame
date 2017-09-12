@@ -766,3 +766,13 @@ int bork_map_load_editor_map(struct bork_map* map, char* filename)
     else bork_editor_complete_map(map, &ed_map);
     return 1;
 }
+
+void bork_map_create_fire(struct bork_map* map, vec3 pos, int lifetime)
+{
+    struct bork_fire new_fire = {
+        .pos = { pos[0], pos[1], pos[2] },
+        .lifetime = lifetime
+    };
+    ARR_PUSH(map->fires, new_fire);
+}
+

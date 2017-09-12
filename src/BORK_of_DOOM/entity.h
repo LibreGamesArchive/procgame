@@ -16,6 +16,10 @@ struct bork_play_data;
 #define BORK_ENTFLAG_IN_INVENTORY       (1 << 12)
 #define BORK_ENTFLAG_DYING              (1 << 13)
 #define BORK_ENTFLAG_SMOKING            (1 << 14)
+#define BORK_ENTFLAG_ON_FIRE            (1 << 15)
+#define BORK_ENTFLAG_IS_GUN             (1 << 16)
+#define BORK_ENTFLAG_IS_MELEE           (1 << 17)
+#define BORK_ENTFLAG_IS_AMMO            (1 << 18)
 
 struct bork_entity {
     vec3 pos;
@@ -26,6 +30,8 @@ struct bork_entity {
     int still_ticks;
     int pain_ticks;
     int HP;
+    int ammo;
+    int ammo_type;
     int counter[4];
     int item_quantity;
     enum bork_entity_type {
@@ -35,8 +41,14 @@ struct bork_entity {
         BORK_ITEM_FIRSTAID,
         BORK_ITEM_DATAPAD,
         BORK_ITEM_BULLETS,
+        BORK_ITEM_BULLETS_AP,
+        BORK_ITEM_BULLETS_INC,
         BORK_ITEM_SHELLS,
+        BORK_ITEM_SHELLS_AP,
+        BORK_ITEM_SHELLS_INC,
         BORK_ITEM_PLAZMA,
+        BORK_ITEM_PLAZMA_SUPER,
+        BORK_ITEM_PLAZMA_ICE,
         BORK_ITEM_PISTOL,
         BORK_ITEM_SHOTGUN,
         BORK_ITEM_MACHINEGUN,
@@ -50,6 +62,8 @@ struct bork_entity {
         BORK_ENTITY_TYPES,
     } type;
 };
+
+#define BORK_AMMO_TYPES 9
 
 void bork_use_pistol(struct bork_entity* ent, struct bork_play_data* d);
 void bork_hud_pistol(struct bork_entity* ent, struct bork_play_data* d);
@@ -68,10 +82,16 @@ static const struct bork_entity_profile {
     int base_hp;
     vec3 size;
     vec4 sprite_tx;
+    float inv_height, inv_angle;
     int front_frame;
     int dir_frames;
-    int melee_damage;
-    float melee_speed;
+    int reload_time;
+    int speed;
+    int damage;
+    int armor_pierce;
+    int ammo_capacity;
+    enum bork_entity_type use_ammo[4];
+    int ammo_types;
     uint8_t use_ctrl;
     float hud_angle;
     void (*use_func)(struct bork_entity*, struct bork_play_data*);
@@ -97,80 +117,159 @@ static const struct bork_entity_profile {
         .use_ctrl = PG_CONTROL_HIT,
         .use_func = bork_use_firstaid },
     [BORK_ITEM_BULLETS] = { .name = "BULLETS",
-        .base_flags = BORK_ENTFLAG_ITEM,
+        .base_flags = BORK_ENTFLAG_ITEM | BORK_ENTFLAG_IS_AMMO,
+        .ammo_capacity = 30,
         .size = { 0.4, 0.4, 0.4 },
         .sprite_tx = { 1, 1, 0, 0 },
         .front_frame = 1 },
+    [BORK_ITEM_BULLETS_AP] = { .name = "ARMOR-PIERCING BULLETS",
+        .base_flags = BORK_ENTFLAG_ITEM | BORK_ENTFLAG_IS_AMMO,
+        .ammo_capacity = 30,
+        .armor_pierce = 10,
+        .size = { 0.4, 0.4, 0.4 },
+        .sprite_tx = { 1, 1, 0, 0 },
+        .front_frame = 32 },
+    [BORK_ITEM_BULLETS_INC] = { .name = "INCENDIARY BULLETS",
+        .base_flags = BORK_ENTFLAG_ITEM | BORK_ENTFLAG_IS_AMMO,
+        .ammo_capacity = 30,
+        .size = { 0.4, 0.4, 0.4 },
+        .sprite_tx = { 1, 1, 0, 0 },
+        .front_frame = 33 },
     [BORK_ITEM_SHELLS] = { .name = "SHELLS",
-        .base_flags = BORK_ENTFLAG_ITEM,
+        .base_flags = BORK_ENTFLAG_ITEM | BORK_ENTFLAG_IS_AMMO,
+        .ammo_capacity = 10,
         .size = { 0.4, 0.4, 0.4 },
         .sprite_tx = { 1, 1, 0, 0 },
         .front_frame = 2 },
+    [BORK_ITEM_SHELLS_AP] = { .name = "ARMOR-PIERCING SHELLS",
+        .base_flags = BORK_ENTFLAG_ITEM | BORK_ENTFLAG_IS_AMMO,
+        .ammo_capacity = 10,
+        .armor_pierce = 10,
+        .size = { 0.4, 0.4, 0.4 },
+        .sprite_tx = { 1, 1, 0, 0 },
+        .front_frame = 40 },
+    [BORK_ITEM_SHELLS_INC] = { .name = "INCENDIARY SHELLS",
+        .base_flags = BORK_ENTFLAG_ITEM | BORK_ENTFLAG_IS_AMMO,
+        .ammo_capacity = 10,
+        .size = { 0.4, 0.4, 0.4 },
+        .sprite_tx = { 1, 1, 0, 0 },
+        .front_frame = 41 },
     [BORK_ITEM_PLAZMA] = { .name = "PLAZMA",
-        .base_flags = BORK_ENTFLAG_ITEM,
+        .base_flags = BORK_ENTFLAG_ITEM | BORK_ENTFLAG_IS_AMMO,
+        .ammo_capacity = 20,
         .size = { 0.4, 0.4, 0.4 },
         .sprite_tx = { 1, 1, 0, 0 },
         .front_frame = 5 },
+    [BORK_ITEM_PLAZMA_SUPER] = { .name = "SUPER PLAZMA",
+        .base_flags = BORK_ENTFLAG_ITEM | BORK_ENTFLAG_IS_AMMO,
+        .ammo_capacity = 10,
+        .damage = 20,
+        .armor_pierce = 10,
+        .size = { 0.4, 0.4, 0.4 },
+        .sprite_tx = { 1, 1, 0, 0 },
+        .front_frame = 6 },
+    [BORK_ITEM_PLAZMA_ICE] = { .name = "FREEZE PLAZMA",
+        .base_flags = BORK_ENTFLAG_ITEM | BORK_ENTFLAG_IS_AMMO,
+        .ammo_capacity = 10,
+        .damage = -10,
+        .armor_pierce = -10,
+        .size = { 0.4, 0.4, 0.4 },
+        .sprite_tx = { 1, 1, 0, 0 },
+        .front_frame = 7 },
     [BORK_ITEM_PISTOL] = { .name = "PISTOL",
-        .base_flags = BORK_ENTFLAG_ITEM,
+        .base_flags = BORK_ENTFLAG_ITEM | BORK_ENTFLAG_IS_GUN,
         .size = { 0.4, 0.4, 0.4 },
         .sprite_tx = { 1, 1, 0, 0 },
         .front_frame = 16,
+        .reload_time = 120,
+        .speed = 5,
+        .damage = 10,
+        .armor_pierce = 5,
+        .ammo_capacity = 12,
+        .use_ammo = { BORK_ITEM_BULLETS, BORK_ITEM_BULLETS_AP, BORK_ITEM_BULLETS_INC },
+        .ammo_types = 3,
         .use_ctrl = PG_CONTROL_HIT,
         .use_func = bork_use_pistol,
         .hud_func = bork_hud_pistol },
     [BORK_ITEM_SHOTGUN] = { .name = "SHOTGUN",
-        .base_flags = BORK_ENTFLAG_ITEM,
+        .base_flags = BORK_ENTFLAG_ITEM | BORK_ENTFLAG_IS_GUN,
         .size = { 0.4, 0.4, 0.4 },
         .sprite_tx = { 1.5, 1, 0, 0 },
         .front_frame = 14,
+        .reload_time = 300,
+        .speed = 2,
+        .damage = 5,
+        .armor_pierce = 0,
+        .ammo_capacity = 6,
+        .use_ammo = { BORK_ITEM_SHELLS, BORK_ITEM_SHELLS_AP, BORK_ITEM_SHELLS_INC },
+        .ammo_types = 3,
         .use_ctrl = PG_CONTROL_HIT,
         .use_func = bork_use_shotgun,
-        .hud_func = bork_hud_shotgun },
+        .hud_func = bork_hud_pistol },
     [BORK_ITEM_MACHINEGUN] = { .name = "MACHINE GUN",
-        .base_flags = BORK_ENTFLAG_ITEM,
+        .base_flags = BORK_ENTFLAG_ITEM | BORK_ENTFLAG_IS_GUN,
         .size = { 0.4, 0.4, 0.4 },
         .sprite_tx = { 2, 1, 0, 0 },
         .front_frame = 8,
+        .reload_time = 180,
+        .speed = 10,
+        .damage = 10,
+        .armor_pierce = 5,
+        .ammo_capacity = 30,
+        .use_ammo = { BORK_ITEM_BULLETS, BORK_ITEM_BULLETS_AP, BORK_ITEM_BULLETS_INC },
+        .ammo_types = 3,
         .use_ctrl = PG_CONTROL_HELD,
         .use_func = bork_use_machinegun,
-        .hud_func = bork_hud_machinegun },
+        .hud_func = bork_hud_pistol },
     [BORK_ITEM_PLAZGUN] = { .name = "PLAZ-GUN",
-        .base_flags = BORK_ENTFLAG_ITEM,
+        .base_flags = BORK_ENTFLAG_ITEM | BORK_ENTFLAG_IS_GUN,
         .size = { 0.4, 0.4, 0.4 },
         .sprite_tx = { 2, 1, 0, 0 },
         .front_frame = 12,
+        .reload_time = 360,
+        .damage = 20,
+        .armor_pierce = 10,
+        .ammo_capacity = 20,
+        .use_ammo = { BORK_ITEM_PLAZMA, BORK_ITEM_PLAZMA_SUPER, BORK_ITEM_PLAZMA_ICE },
+        .ammo_types = 3,
         .use_ctrl = PG_CONTROL_HELD,
         .use_func = bork_use_plazgun,
-        .hud_func = bork_hud_plazgun },
+        .hud_func = bork_hud_pistol },
     [BORK_ITEM_KNIFE] = { .name = "COMBAT KNIFE",
-        .base_flags = BORK_ENTFLAG_ITEM,
+        .base_flags = BORK_ENTFLAG_ITEM | BORK_ENTFLAG_IS_MELEE,
         .size = { 0.4, 0.4, 0.4 },
         .sprite_tx = { 1, 1, 0, 0 },
         .front_frame = 17,
+        .inv_height = 0.5,
+        .inv_angle = 0.3,
         .hud_angle = -0.75,
-        .melee_damage = 10,
-        .melee_speed = 0.03,
+        .speed = 5,
+        .damage = 10,
+        .armor_pierce = 0,
         .use_ctrl = PG_CONTROL_HIT,
         .use_func = bork_use_melee },
     [BORK_ITEM_LEADPIPE] = { .name = "STEEL ROD",
-        .base_flags = BORK_ENTFLAG_ITEM,
+        .base_flags = BORK_ENTFLAG_ITEM | BORK_ENTFLAG_IS_MELEE,
         .size = { 0.4, 0.4, 0.4 },
         .sprite_tx = { 2, 1, 0, 0 },
         .front_frame = 10,
+        .inv_height = 0.5,
+        .inv_angle = 0.3,
         .hud_angle = -0.75,
-        .melee_damage = 10,
-        .melee_speed = 0.02,
+        .speed = 3,
+        .damage = 10,
         .use_ctrl = PG_CONTROL_HIT,
         .use_func = bork_use_melee },
     [BORK_ITEM_BEAMSWORD] = { .name = "BEAM SWORD",
-        .base_flags = BORK_ENTFLAG_ITEM,
+        .base_flags = BORK_ENTFLAG_ITEM | BORK_ENTFLAG_IS_MELEE,
         .size = { 0.4, 0.4, 0.4 },
         .sprite_tx = { 2, 1, 0, 0 },
         .front_frame = 18,
+        .inv_height = 0.5,
+        .inv_angle = 0.3,
         .hud_angle = -0.75,
-        .melee_damage = 15,
-        .melee_speed = 0.025,
+        .speed = 4,
+        .damage = 15,
         .use_ctrl = PG_CONTROL_HIT,
         .use_func = bork_use_melee },
     [BORK_ITEM_PLANT1] = { .name = "PLANT",

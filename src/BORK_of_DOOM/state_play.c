@@ -65,7 +65,6 @@ void bork_play_start(struct pg_game_state* state, struct bork_game_core* core)
     ARR_INIT(d->inventory);
     vec3_set(d->plr.pos, 32, 32, 40);
     d->plr.HP = 100;
-    d->ammo_plazma = 30;
     /*  Generate the BONZ station   */
     struct bork_editor_map ed_map = {};
     bork_editor_load_map(&ed_map, "test.bork_map");
@@ -107,6 +106,8 @@ void bork_play_reset_hud_anim(struct bork_play_data* d)
 {
     struct bork_entity* held_item;
     const struct bork_entity_profile* prof;
+    d->reload_ticks = 0;
+    d->reload_length = 0;
     d->hud_anim_progress = 0;
     d->hud_anim_speed = 0;
     d->hud_anim_active = 0;
@@ -353,6 +354,7 @@ static void tick_enemies(struct bork_play_data* d);
 static void tick_items(struct bork_play_data* d);
 static void tick_bullets(struct bork_play_data* d);
 static void tick_particles(struct bork_play_data* d);
+static void tick_fires(struct bork_play_data* d);
 
 static void bork_play_tick(struct pg_game_state* state)
 {
@@ -361,11 +363,14 @@ static void bork_play_tick(struct pg_game_state* state)
     /*  Handle input    */
     if(d->menu.state == BORK_MENU_INVENTORY) tick_control_inv_menu(d);
     else if(d->menu.state == BORK_MENU_DOORPAD) tick_doorpad(d);
-    else if(pg_check_input(SDL_SCANCODE_RETURN, PG_CONTROL_HIT)) {
-        struct bork_game_core* core = d->core;
-        bork_play_deinit(d);
-        bork_menu_start(state, core);
-        return;
+    else if(d->menu.state == BORK_MENU_PLAYERDEAD) {
+        if(pg_check_input(SDL_SCANCODE_RETURN, PG_CONTROL_HIT)) {
+            struct bork_game_core* core = d->core;
+            bork_play_deinit(d);
+            bork_menu_start(state, core);
+            pg_flush_input();
+            return;
+        }
     } else if(d->menu.state == BORK_MENU_CLOSED) {
         if(d->plr.pain_ticks > 0) --d->plr.pain_ticks;
         tick_control_play(d);
@@ -382,6 +387,7 @@ static void bork_play_tick(struct pg_game_state* state)
         tick_bullets(d);
         tick_enemies(d);
         tick_items(d);
+        tick_fires(d);
         tick_particles(d);
         tick_datapad(d);
         d->looked_item = get_looked_item(d);
@@ -408,15 +414,11 @@ static void tick_control_play(struct bork_play_data* d)
         if(d->plr.flags & BORK_ENTFLAG_CROUCH) eye_pos[2] += 0.2;
         else eye_pos[2] += 0.8;
         if(item && bork_map_check_vis(&d->map, eye_pos, item->pos)) {
-            if(item->type == BORK_ITEM_BULLETS) {
+            const struct bork_entity_profile* prof = &BORK_ENT_PROFILES[item->type];
+            if(item->flags & BORK_ENTFLAG_IS_AMMO) {
+                int ammo_type = item->type - BORK_ITEM_BULLETS;
+                d->ammo[ammo_type] += prof->ammo_capacity;
                 item->flags |= BORK_ENTFLAG_DEAD;
-                d->ammo_bullets += 30;
-            } else if(item->type == BORK_ITEM_SHELLS) {
-                item->flags |= BORK_ENTFLAG_DEAD;
-                d->ammo_shells += 10;
-            } else if(item->type == BORK_ITEM_PLAZMA) {
-                item->flags |= BORK_ENTFLAG_DEAD;
-                d->ammo_plazma += 15;
             } else if(item->type == BORK_ITEM_DATAPAD) {
                 d->hud_datapad_id = item->counter[0];
                 d->hud_datapad_ticks = 5 * 60;
@@ -431,6 +433,7 @@ static void tick_control_play(struct bork_play_data* d)
             if(obj) {
                 struct bork_map_object* door = &d->map.doors.data[obj->doorpad.door_idx];
                 if(door->door.locked) {
+                    d->menu.doorpad.unlocked_ticks = 0;
                     d->menu.doorpad.selection[0] = -1;
                     d->menu.doorpad.selection[1] = 0;
                     d->menu.doorpad.num_chars = 0;
@@ -441,6 +444,19 @@ static void tick_control_play(struct bork_play_data* d)
                 } else {
                     door->door.open = 1 - door->door.open;
                 }
+            }
+        }
+    }
+    if(d->held_item >= 0 && pg_check_input(SDL_SCANCODE_R, PG_CONTROL_HIT)) {
+        struct bork_entity* ent = bork_entity_get(d->inventory.data[d->held_item]);
+        const struct bork_entity_profile* prof = &BORK_ENT_PROFILES[ent->type];
+        if(ent->flags & BORK_ENTFLAG_IS_GUN) {
+            int ammo_type = prof->use_ammo[ent->ammo_type] - BORK_ITEM_BULLETS;
+            int ammo_missing = prof->ammo_capacity - ent->ammo;
+            int ammo_held = MIN(d->ammo[ammo_type], ammo_missing);
+            if(ammo_held > 0) {
+                d->reload_ticks = prof->reload_time;
+                d->reload_length = prof->reload_time;
             }
         }
     }
@@ -504,7 +520,7 @@ static void tick_control_play(struct bork_play_data* d)
         struct bork_entity* held_ent = bork_entity_get(held_id);
         if(held_ent) {
             const struct bork_entity_profile* prof = &BORK_ENT_PROFILES[held_ent->type];
-            if(prof->use_ctrl && (pg_check_input(kmap[BORK_CTRL_FIRE], prof->use_ctrl)
+            if(!d->reload_ticks && prof->use_ctrl && (pg_check_input(kmap[BORK_CTRL_FIRE], prof->use_ctrl)
             || pg_check_gamepad(PG_RIGHT_TRIGGER, prof->use_ctrl))) {
                 prof->use_func(held_ent, d);
             }
@@ -523,28 +539,40 @@ static void tick_control_play(struct bork_play_data* d)
     || pg_check_gamepad(SDL_CONTROLLER_BUTTON_DPAD_DOWN, PG_CONTROL_HIT)) {
         switch_item(d, d->quick_item[3]);
     }
-    if(d->ticks % 60 == 0) {
-        //create_spark(d, d->plr.pos);
-    }
 }
 
 static void tick_held_item(struct bork_play_data* d)
 {
-    if(!d->hud_anim_active || d->held_item < 0) return;
+    if(d->held_item < 0) return;
     struct bork_entity* item = bork_entity_get(d->inventory.data[d->held_item]);
-    d->hud_anim_progress += d->hud_anim_speed;
-    int anim_idx = floor(d->hud_anim_progress * 4.0f);
-    if(d->hud_callback_frame != -1 && anim_idx == d->hud_callback_frame) {
-        d->hud_anim_callback(item, d);
-        d->hud_callback_frame = -1;
-    }
-    if(anim_idx >= d->hud_anim_active) {
-        if(d->hud_anim_destroy_when_finished) {
-            remove_inventory_item(d, d->held_item);
-            item->flags |= BORK_ENTFLAG_DEAD;
-            d->held_item = -1;
+    const struct bork_entity_profile* prof = &BORK_ENT_PROFILES[item->type];
+    if(d->reload_ticks) {
+        --d->reload_ticks;
+        if(d->reload_ticks == d->reload_length / 2) {
+            int ammo_type = prof->use_ammo[item->ammo_type] - BORK_ITEM_BULLETS;
+            int ammo_missing = prof->ammo_capacity - item->ammo;
+            int ammo_held = MIN(d->ammo[ammo_type], ammo_missing);
+            if(ammo_held > 0) {
+                d->ammo[ammo_type] -= ammo_held;
+                item->ammo += ammo_held;
+            }
         }
-        bork_play_reset_hud_anim(d);
+        return;
+    } else if(d->hud_anim_active) {
+        d->hud_anim_progress += d->hud_anim_speed;
+        int anim_idx = floor(d->hud_anim_progress * 4.0f);
+        if(d->hud_callback_frame != -1 && anim_idx == d->hud_callback_frame) {
+            d->hud_anim_callback(item, d);
+            d->hud_callback_frame = -1;
+        }
+        if(anim_idx >= d->hud_anim_active) {
+            if(d->hud_anim_destroy_when_finished) {
+                remove_inventory_item(d, d->held_item);
+                item->flags |= BORK_ENTFLAG_DEAD;
+                d->held_item = -1;
+            }
+            bork_play_reset_hud_anim(d);
+        }
     }
 }
 
@@ -599,14 +627,38 @@ static void tick_enemies(struct bork_play_data* d)
             if(vis && ent->counter[0] < d->ticks) {
                 vec3 ent_to_plr;
                 vec3_sub(ent_to_plr, plr_head, ent_head);
-                struct bork_bullet new_bullet = { .type = 1,
-                    .flags = BORK_BULLET_HURTS_PLAYER };
-                vec3_set_len(new_bullet.dir, ent_to_plr, 1);
+                struct bork_bullet new_bullet = { .type = 6,
+                    .flags = BORK_BULLET_HURTS_PLAYER,
+                    .damage = 15 };
+                vec3_set_len(new_bullet.dir, ent_to_plr, 0.4);
                 vec3_add(new_bullet.pos, ent_head, new_bullet.dir);
                 ARR_PUSH(d->bullets, new_bullet);
                 float angle = atan2f(ent_to_plr[0], ent_to_plr[1]) + M_PI;
                 ent->dir[0] = (M_PI * 2 - angle) - M_PI * 0.5;
                 ent->counter[0] = d->ticks + 120;
+            }
+            if(ent->flags & BORK_ENTFLAG_ON_FIRE) {
+                if(ent->counter[2] % 41 == 0) {
+                    create_smoke(d,
+                        (vec3){ ent->pos[0] + (RANDF - 0.5) * 0.5,
+                                ent->pos[1] + (RANDF - 0.5) * 0.5,
+                                ent->pos[2] + (RANDF - 0.5) * 0.5 },
+                        (vec3){}, 180);
+                } else if(ent->counter[2] % 31 == 0) {
+                    struct bork_particle new_part = {
+                        .flags = BORK_PARTICLE_SPRITE | BORK_PARTICLE_BOUYANT | BORK_PARTICLE_DECELERATE,
+                        .pos = { ent->pos[0] + (RANDF - 0.5) * 0.5,
+                                 ent->pos[1] + (RANDF - 0.5) * 0.5,
+                                 ent->pos[2] + (RANDF - 0.5) * 0.5 },
+                        .vel = { 0, 0, -0.005 },
+                        .ticks_left = 120,
+                        .frame_ticks = 0,
+                        .current_frame = 24 + rand() % 4,
+                    };
+                    ARR_PUSH(d->particles, new_part);
+                }
+                --ent->counter[2];
+                if(ent->counter[2] == 0) ent->flags &= ~BORK_ENTFLAG_ON_FIRE;
             }
         }
         bork_entity_update(ent, &d->map);
@@ -681,6 +733,28 @@ static void tick_particles(struct bork_play_data* d)
     }
 }
 
+static void tick_fires(struct bork_play_data* d)
+{
+    struct bork_fire* fire;
+    int i;
+    ARR_FOREACH_REV_PTR(d->map.fires, fire, i) {
+        if(fire->lifetime % 41 == 0) create_smoke(d, fire->pos, (vec3){}, 180);
+        else if(fire->lifetime % 31 == 0) {
+            struct bork_particle new_part = {
+                .flags = BORK_PARTICLE_SPRITE | BORK_PARTICLE_BOUYANT | BORK_PARTICLE_DECELERATE,
+                .pos = { fire->pos[0], fire->pos[1], fire->pos[2] },
+                .vel = { 0, 0, -0.005 },
+                .ticks_left = 120,
+                .frame_ticks = 0,
+                .current_frame = 24 + rand() % 4,
+            };
+            ARR_PUSH(d->particles, new_part);
+        }
+        --fire->lifetime;
+        if(fire->lifetime == 0) ARR_SWAPSPLICE(d->map.fires, i, 1);
+    }
+}
+
 /*  Drawing */
 static void draw_hud_overlay(struct bork_play_data* d);
 static void draw_datapad(struct bork_play_data* d);
@@ -693,6 +767,7 @@ static void draw_bullets(struct bork_play_data* d, float lerp);
 static void draw_map_lights(struct bork_play_data* d);
 static void draw_lights(struct bork_play_data* d);
 static void draw_particles(struct bork_play_data* d);
+static void draw_fires(struct bork_play_data* d);
 static void draw_menu_inv(struct bork_play_data* d, float t);
 static void draw_doorpad(struct bork_play_data* d, float t);
 static void draw_quickfetch_text(struct bork_play_data* d, int draw_label,
@@ -727,6 +802,7 @@ static void bork_play_draw(struct pg_game_state* state)
     draw_enemies(d, t);
     draw_items(d, t);
     draw_bullets(d, t);
+    draw_fires(d);
     draw_particles(d);
     pg_shader_3d_texture(&d->core->shader_3d, &d->core->env_atlas);
     bork_map_draw(&d->map, d->core);
@@ -866,6 +942,8 @@ static void draw_hud_overlay(struct bork_play_data* d)
         pg_shader_2d_color_mod(&d->core->shader_2d, (vec4){ 0.5, 0, 0, hurt_alpha });
         pg_model_draw(&d->core->quad_2d, NULL);
     }
+    if(d->held_item != -1) {
+    }
 }
 
 static void draw_datapad(struct bork_play_data* d)
@@ -924,17 +1002,28 @@ static void draw_weapon(struct bork_play_data* d, float hud_anim_lerp,
     mat4_rotate_Z(tx, tx, M_PI + dir_lerp[0]);
     mat4_rotate_Y(tx, tx, -dir_lerp[1]);
     pg_shader_3d_add_tex_tx(shader, prof->sprite_tx, prof->sprite_tx + 2);
+    vec3 hud_pos = {};
+    float hud_angle = 0;
     mat4 offset;
     mat4_translate(offset, -0.6, 0.3, -0.2);
-    /*  Calculate the animated position and add it to the offset    */
-    vec3 hud_pos = {};
-    float hud_angle;
-    int anim_idx = floor(hud_anim_lerp * 4.0f);
-    float anim_between = fmodf(hud_anim_lerp, 0.25) * 4.0f;
-    vec3_lerp(hud_pos, d->hud_anim[anim_idx], d->hud_anim[(anim_idx + 1) % 4], anim_between);
-    hud_angle = lerp(d->hud_angle[anim_idx], d->hud_angle[(anim_idx + 1) % 4], anim_between);
-    /*  Apply the animated transform    */
-    mat4_translate(offset, -0.6 + hud_pos[0], 0.3 + hud_pos[1], -0.2 + hud_pos[2]);
+    if(d->reload_ticks) {
+        int down_time = d->reload_length - d->reload_ticks;
+        float t = 1;
+        if(down_time < 31) {
+            t = (float)down_time / 30;
+        } else if(d->reload_ticks < 31) {
+            t = (float)d->reload_ticks / 30;
+        }
+        mat4_translate_in_place(offset, 0, 0, -t);
+    } else {
+        /*  Calculate the animated position and add it to the offset    */
+        int anim_idx = floor(hud_anim_lerp * 4.0f);
+        float anim_between = fmodf(hud_anim_lerp, 0.25) * 4.0f;
+        vec3_lerp(hud_pos, d->hud_anim[anim_idx], d->hud_anim[(anim_idx + 1) % 4], anim_between);
+        hud_angle = lerp(d->hud_angle[anim_idx], d->hud_angle[(anim_idx + 1) % 4], anim_between);
+        /*  Apply the animated transform    */
+        mat4_translate_in_place(offset, hud_pos[0], hud_pos[1], hud_pos[2]);
+    }
     mat4_mul(tx, tx, offset);
     mat4_scale_aniso(tx, tx, prof->sprite_tx[0], prof->sprite_tx[1], prof->sprite_tx[1]);
     mat4_rotate_Y(tx, tx, hud_angle);
@@ -963,16 +1052,20 @@ static void draw_enemies(struct bork_play_data* d, float lerp)
         if(!ent || (ent->flags & BORK_ENTFLAG_DEAD)) continue;
         prof = &BORK_ENT_PROFILES[ent->type];
         /*  Figure out which directional frame to draw  */
-        if((ent->flags & BORK_ENTFLAG_DYING) && ent->dead_ticks <= 60) {
-            struct pg_light new_light = {};
-            pg_light_pointlight(&new_light, ent->pos,
-                ((float)ent->dead_ticks / 60.0f) * 5.0f, (vec3){ 1.5, 0.25, 0.25 });
-            ARR_PUSH(d->lights_buf, new_light);
-            continue;
-        }
         vec3 pos_lerp;
         vec3_scale(pos_lerp, ent->vel, lerp);
         vec3_add(pos_lerp, pos_lerp, ent->pos);
+        if((ent->flags & BORK_ENTFLAG_DYING) && ent->dead_ticks <= 60) {
+            struct pg_light new_light = {};
+            pg_light_pointlight(&new_light, pos_lerp,
+                ((float)ent->dead_ticks / 60.0f) * 5.0f, (vec3){ 1.5, 0.25, 0.25 });
+            ARR_PUSH(d->lights_buf, new_light);
+            continue;
+        } else if(ent->flags & BORK_ENTFLAG_ON_FIRE) {
+            struct pg_light new_light = {};
+            pg_light_pointlight(&new_light, pos_lerp, 2.5, (vec3){ 2.0, 1.5, 0 });
+            ARR_PUSH(d->lights_buf, new_light);
+        }
         vec2 ent_to_plr;
         vec2_sub(ent_to_plr, pos_lerp, plr_pos);
         float dir_adjust = 1.0f / (float)prof->dir_frames + 0.5f;
@@ -1090,6 +1183,18 @@ static void draw_map_lights(struct bork_play_data* d)
     }
 }
 
+static void draw_fires(struct bork_play_data* d)
+{
+    struct pg_light light;
+    pg_light_pointlight(&light, (vec3){}, 2.5, (vec3){ 2.0, 1.5, 0 });
+    struct bork_fire* fire;
+    int i;
+    ARR_FOREACH_PTR(d->map.fires, fire, i) {
+        vec3_dup(light.pos, fire->pos);
+        ARR_PUSH(d->lights_buf, light);
+    }
+}
+
 static void draw_particles(struct bork_play_data* d)
 {
     struct pg_shader* shader = &d->core->shader_sprite;
@@ -1108,49 +1213,6 @@ static void draw_particles(struct bork_play_data* d)
         mat4_translate(part_transform, part->pos[0], part->pos[1], part->pos[2]);
         pg_model_draw(model, part_transform);
     }
-}
-
-static void tick_control_inv_menu(struct bork_play_data* d)
-{
-    uint8_t* kmap = d->core->ctrl_map;
-    if(pg_check_input(SDL_SCANCODE_ESCAPE, PG_CONTROL_HIT)
-    || pg_check_gamepad(SDL_CONTROLLER_BUTTON_B, PG_CONTROL_HIT)
-    || pg_check_gamepad(SDL_CONTROLLER_BUTTON_LEFTSHOULDER, PG_CONTROL_HIT)) {
-        d->menu.state = BORK_MENU_CLOSED;
-        pg_mouse_mode(1);
-    }
-    if(d->inventory.len == 0) return;
-    int stick_ctrl = 0;
-    if(pg_check_gamepad(PG_LEFT_STICK, PG_CONTROL_HIT)) {
-        vec2 stick;
-        pg_gamepad_stick(0, stick);
-        if(fabsf(stick[1]) > 0.6) stick_ctrl = SGN(stick[1]);
-    }
-    if(pg_check_input(kmap[BORK_CTRL_DOWN], PG_CONTROL_HIT) || stick_ctrl == 1) {
-        d->menu.inv.selection_idx = MIN(d->menu.inv.selection_idx + 1, d->inventory.len - 1);
-        if(d->menu.inv.selection_idx >= d->menu.inv.scroll_idx + 10) ++d->menu.inv.scroll_idx;
-    }
-    if(pg_check_input(kmap[BORK_CTRL_UP], PG_CONTROL_HIT) || stick_ctrl == -1) {
-        d->menu.inv.selection_idx = MAX(d->menu.inv.selection_idx - 1, 0);
-        if(d->menu.inv.selection_idx < d->menu.inv.scroll_idx) --d->menu.inv.scroll_idx;
-    }
-    if(pg_check_input(kmap[BORK_CTRL_BIND1], PG_CONTROL_HIT)
-    || pg_check_gamepad(SDL_CONTROLLER_BUTTON_DPAD_UP, PG_CONTROL_HIT)) {
-        set_quick_item(d, 0, d->menu.inv.selection_idx);
-    }
-    if(pg_check_input(kmap[BORK_CTRL_BIND2], PG_CONTROL_HIT)
-    || pg_check_gamepad(SDL_CONTROLLER_BUTTON_DPAD_LEFT, PG_CONTROL_HIT)) {
-        set_quick_item(d, 1, d->menu.inv.selection_idx);
-    }
-    if(pg_check_input(kmap[BORK_CTRL_BIND3], PG_CONTROL_HIT)
-    || pg_check_gamepad(SDL_CONTROLLER_BUTTON_DPAD_RIGHT, PG_CONTROL_HIT)) {
-        set_quick_item(d, 2, d->menu.inv.selection_idx);
-    }
-    if(pg_check_input(kmap[BORK_CTRL_BIND4], PG_CONTROL_HIT)
-    || pg_check_gamepad(SDL_CONTROLLER_BUTTON_DPAD_DOWN, PG_CONTROL_HIT)) {
-        set_quick_item(d, 3, d->menu.inv.selection_idx);
-    }
-
 }
 
 static void draw_quickfetch_items(struct bork_play_data* d,
@@ -1191,8 +1253,10 @@ static void draw_quickfetch_items(struct bork_play_data* d,
         } else {
             pg_shader_2d_color_mod(shader, selected_mod);
         }
-        pg_shader_2d_transform(shader, draw_pos[i],
-            (vec2){ 0.05 * prof->sprite_tx[0], 0.05 * prof->sprite_tx[1] }, 0);
+        pg_shader_2d_transform(shader,
+            (vec2){ draw_pos[i][0], draw_pos[i][1] - 0.05 * prof->inv_height },
+            (vec2){ 0.05 * prof->sprite_tx[0], 0.05 * prof->sprite_tx[1] },
+            prof->inv_angle);
         pg_model_draw(&d->core->quad_2d_ctr, NULL);
     }
 }
@@ -1245,8 +1309,9 @@ static void draw_inventory_text(struct bork_play_data* d)
 {
     struct pg_shader* shader = &d->core->shader_text;
     if(!pg_shader_is_active(shader)) pg_shader_begin(shader, NULL);
-    float w = d->core->aspect_ratio;
-    pg_shader_2d_resolution(shader, (vec2){ w, 1 });
+    float ar = d->core->aspect_ratio;
+    pg_shader_text_resolution(shader, (vec2){ ar, 1 });
+    pg_shader_text_transform(shader, (vec2){ 1, 1 }, (vec2){});
     int inv_len = MIN(10, d->inventory.len);
     int inv_start = d->menu.inv.scroll_idx;
     struct pg_shader_text text = {
@@ -1268,25 +1333,180 @@ static void draw_inventory_text(struct bork_play_data* d)
         if(!item) continue;
         const struct bork_entity_profile* prof = &BORK_ENT_PROFILES[item->type];
         strncpy(text.block[ti], prof->name, 64);
-        vec4_set(text.block_style[ti], 0.1, 0.2 + 0.06 * i, 0.04, 1.2);
+        vec4_set(text.block_style[ti], 0.1, 0.2 + 0.06 * i, 0.03, 1.2);
         vec4_set(text.block_color[ti], 1, 1, 1, 0.5);
         if(i + inv_start == d->menu.inv.selection_idx) {
             text.block_style[ti][0] += 0.05;
             text.block_color[ti][3] = 0.75;
         }
     }
+    if(d->inventory.len > 0) {
+        struct bork_entity* item = bork_entity_get(d->inventory.data[d->menu.inv.selection_idx]);
+        const struct bork_entity_profile* prof = &BORK_ENT_PROFILES[item->type];
+        if(item->flags & BORK_ENTFLAG_IS_GUN) {
+            const struct bork_entity_profile* ammo_prof =
+                &BORK_ENT_PROFILES[prof->use_ammo[d->menu.inv.ammo_select]];
+            int len = snprintf(text.block[ti], 64, "%s", ammo_prof->name);
+            vec4_set(text.block_style[ti], ar * 0.75 - 0.25, 0.5, 0.025, 1.2);
+            vec4_set(text.block_color[ti], 1, 1, 1, 0.75);
+            len = snprintf(text.block[++ti], 64, "DAMAGE:     %d",
+                prof->damage + ammo_prof->damage);
+            vec4_set(text.block_style[ti], ar * 0.75 - 0.25, 0.54, 0.025, 1.2);
+            vec4_set(text.block_color[ti], 1, 1, 1, 0.75);
+            len = snprintf(text.block[++ti], 64,   "ARMOR PEN.: %d",
+                prof->armor_pierce + ammo_prof->armor_pierce);
+            vec4_set(text.block_style[ti], ar * 0.75 - 0.25, 0.58, 0.025, 1.2);
+            vec4_set(text.block_color[ti], 1, 1, 1, 0.75);
+            len = snprintf(text.block[++ti], 64,   "FIRE RATE:  %d", prof->speed);
+            vec4_set(text.block_style[ti], ar * 0.75 - 0.25, 0.62, 0.025, 1.2);
+            vec4_set(text.block_color[ti], 1, 1, 1, 0.75);
+            int j;
+            for(j = 0; j < prof->ammo_types; ++j) {
+                int held_ammo = d->ammo[prof->use_ammo[j] - BORK_ITEM_BULLETS];
+                len = snprintf(text.block[++ti], 64, "%d", held_ammo);
+                float x_off = len * 0.025 * 1.2 * 0.5;
+                vec4_set(text.block_style[ti], ar * 0.75 - 0.2 + 0.15 * j - x_off, 0.44, 0.025, 1.2);
+                vec4_set(text.block_color[ti], 1, 1, 1, 0.75);
+            }
+        }
+    }
+    text.use_blocks = ti + 1;
     pg_shader_text_write(&d->core->shader_text, &text);
 }
 
 static void draw_menu_inv(struct bork_play_data* d, float t)
 {
-    struct pg_shader* shader = &d->core->shader_text;
+    float ar = d->core->aspect_ratio;
+    struct pg_shader* shader = &d->core->shader_2d;
     if(!pg_shader_is_active(shader)) pg_shader_begin(shader, NULL);
-    pg_shader_text_resolution(shader, (vec2){d->core->aspect_ratio, 1});
-    pg_shader_text_transform(shader, (vec2){ 1, 1 }, (vec2){});
-    draw_quickfetch_text(d, 1, (vec4){ 1, 1, 1, 0.75 }, (vec4){ 1, 1, 1, 0.9 });
+    pg_shader_2d_resolution(shader, (vec2){ ar, 1 });
+    vec2 light_pos = { ar * 0.75 + (sin((float)d->ticks / 120.0f / M_PI) * 0.5f), 0 };
+    pg_shader_2d_set_light(shader, light_pos, (vec3){ 1.5, 1.5, 1.25 },
+                           (vec3){ 0.5, 0.5, 0.5 });
+    pg_shader_2d_color_mod(shader, (vec4){ 1, 1, 1, 1 });
+    pg_shader_2d_texture(shader, &d->core->item_tex);
+    pg_model_begin(&d->core->quad_2d_ctr, shader);
+    if(d->inventory.len > 0) {
+        struct bork_entity* item = bork_entity_get(d->inventory.data[d->menu.inv.selection_idx]);
+        const struct bork_entity_profile* prof = &BORK_ENT_PROFILES[item->type];
+        pg_shader_2d_tex_frame(shader, prof->front_frame);
+        pg_shader_2d_add_tex_tx(shader, prof->sprite_tx, prof->sprite_tx + 2);
+        pg_shader_2d_transform(shader,
+            (vec2){ ar * 0.75, 0.25 - (0.18 * prof->inv_height) },
+            (vec2){ 0.18 * prof->sprite_tx[0], 0.18 * prof->sprite_tx[1] },
+            prof->inv_angle);
+        pg_model_draw(&d->core->quad_2d_ctr, NULL);
+        if(item->flags & BORK_ENTFLAG_IS_GUN) {
+            int i;
+            for(i = 0; i < prof->ammo_types; ++i) {
+                const struct bork_entity_profile* ammo_prof =
+                    &BORK_ENT_PROFILES[prof->use_ammo[i]];
+                if(i != d->menu.inv.ammo_select) {
+                    pg_shader_2d_transform(shader,
+                        (vec2){ ar * 0.75 - 0.2 + 0.15 * i, 0.43 },
+                        (vec2){ 0.05, 0.05 }, 0);
+                    pg_shader_2d_color_mod(shader, (vec4){ 1, 1, 1, 0.5 });
+                } else {
+                    pg_shader_2d_transform(shader,
+                        (vec2){ ar * 0.75 - 0.2 + 0.15 * i, 0.43 },
+                        (vec2){ 0.075, 0.075 }, 0);
+                    pg_shader_2d_color_mod(shader, (vec4){ 1, 1, 1, 1 });
+                }
+                pg_shader_2d_tex_frame(shader, ammo_prof->front_frame);
+                pg_model_draw(&d->core->quad_2d_ctr, NULL);
+            }
+        }
+    }
     draw_inventory_text(d);
+    draw_quickfetch_text(d, 1, (vec4){ 1, 1, 1, 0.75 }, (vec4){ 1, 1, 1, 0.9 });
     draw_quickfetch_items(d, (vec4){ 1, 1, 1, 0.75 }, (vec4){ 1, 1, 1, 0.9 });
+}
+
+static void tick_control_inv_menu(struct bork_play_data* d)
+{
+    uint8_t* kmap = d->core->ctrl_map;
+    if(pg_check_input(SDL_SCANCODE_ESCAPE, PG_CONTROL_HIT)
+    || pg_check_input(SDL_SCANCODE_TAB, PG_CONTROL_HIT)
+    || pg_check_gamepad(SDL_CONTROLLER_BUTTON_B, PG_CONTROL_HIT)
+    || pg_check_gamepad(SDL_CONTROLLER_BUTTON_LEFTSHOULDER, PG_CONTROL_HIT)) {
+        d->menu.state = BORK_MENU_CLOSED;
+        pg_mouse_mode(1);
+    }
+    if(d->inventory.len == 0) return;
+    struct bork_entity* item = bork_entity_get(d->inventory.data[d->menu.inv.selection_idx]);
+    const struct bork_entity_profile* prof = &BORK_ENT_PROFILES[item->type];
+    int stick_ctrl_y = 0, stick_ctrl_x = 0;
+    if(pg_check_gamepad(PG_LEFT_STICK, PG_CONTROL_HIT)) {
+        vec2 stick;
+        pg_gamepad_stick(0, stick);
+        if(fabsf(stick[1]) > 0.6) stick_ctrl_y = SGN(stick[1]);
+        else if(fabsf(stick[0]) > 0.6) stick_ctrl_x = SGN(stick[0]);
+    }
+    int start_select = d->menu.inv.selection_idx;
+    if(pg_check_input(kmap[BORK_CTRL_DOWN], PG_CONTROL_HIT) || stick_ctrl_y == 1) {
+        d->menu.inv.selection_idx = MIN(d->menu.inv.selection_idx + 1, d->inventory.len - 1);
+        if(d->menu.inv.selection_idx >= d->menu.inv.scroll_idx + 10) ++d->menu.inv.scroll_idx;
+    } else if(pg_check_input(kmap[BORK_CTRL_UP], PG_CONTROL_HIT) || stick_ctrl_y == -1) {
+        d->menu.inv.selection_idx = MAX(d->menu.inv.selection_idx - 1, 0);
+        if(d->menu.inv.selection_idx < d->menu.inv.scroll_idx) --d->menu.inv.scroll_idx;
+    }
+    if(d->menu.inv.selection_idx != start_select) {
+        item = bork_entity_get(d->inventory.data[d->menu.inv.selection_idx]);
+        prof = &BORK_ENT_PROFILES[item->type];
+        if(item->flags & BORK_ENTFLAG_IS_GUN) {
+            d->menu.inv.ammo_select = item->ammo_type;
+        }
+    }
+    if(item->flags & BORK_ENTFLAG_IS_GUN) {
+        int ammo_iter = d->menu.inv.ammo_select;
+        if(pg_check_input(kmap[BORK_CTRL_LEFT], PG_CONTROL_HIT) || stick_ctrl_x == -1) {
+            ammo_iter = MOD(ammo_iter - 1, prof->ammo_types);
+            while(ammo_iter != d->menu.inv.ammo_select
+            && d->ammo[prof->use_ammo[ammo_iter] - BORK_ITEM_BULLETS] <= 0) {
+                ammo_iter = MOD(ammo_iter - 1, prof->ammo_types);
+            }
+        } else if(pg_check_input(kmap[BORK_CTRL_RIGHT], PG_CONTROL_HIT) || stick_ctrl_x == 1) {
+            ammo_iter = MOD(ammo_iter + 1, prof->ammo_types);
+            while(ammo_iter != d->menu.inv.ammo_select
+            && d->ammo[prof->use_ammo[ammo_iter] - BORK_ITEM_BULLETS] <= 0) {
+                ammo_iter = MOD(ammo_iter + 1, prof->ammo_types);
+            }
+        }
+        d->menu.inv.ammo_select = ammo_iter;
+        int ammo_type = prof->use_ammo[ammo_iter] - BORK_ITEM_BULLETS;
+        int used_ammo = prof->use_ammo[item->ammo_type] - BORK_ITEM_BULLETS;
+        if(pg_check_input(SDL_SCANCODE_E, PG_CONTROL_HIT)
+        || pg_check_gamepad(SDL_CONTROLLER_BUTTON_X, PG_CONTROL_HIT)) {
+            if(d->menu.inv.ammo_select == item->ammo_type) {
+                d->ammo[ammo_type] += item->ammo;
+                item->ammo = 0;
+            } else if(d->ammo[ammo_type] > 0) {
+                d->ammo[used_ammo] += item->ammo;
+                item->ammo = 0;
+                item->ammo_type = ammo_iter;
+                if(d->menu.inv.selection_idx == d->held_item) {
+                    d->reload_ticks = prof->reload_time;
+                    d->reload_length = prof->reload_time;
+                }
+            }
+        }
+    }
+    if(pg_check_input(kmap[BORK_CTRL_BIND1], PG_CONTROL_HIT)
+    || pg_check_gamepad(SDL_CONTROLLER_BUTTON_DPAD_UP, PG_CONTROL_HIT)) {
+        set_quick_item(d, 0, d->menu.inv.selection_idx);
+    }
+    if(pg_check_input(kmap[BORK_CTRL_BIND2], PG_CONTROL_HIT)
+    || pg_check_gamepad(SDL_CONTROLLER_BUTTON_DPAD_LEFT, PG_CONTROL_HIT)) {
+        set_quick_item(d, 1, d->menu.inv.selection_idx);
+    }
+    if(pg_check_input(kmap[BORK_CTRL_BIND3], PG_CONTROL_HIT)
+    || pg_check_gamepad(SDL_CONTROLLER_BUTTON_DPAD_RIGHT, PG_CONTROL_HIT)) {
+        set_quick_item(d, 2, d->menu.inv.selection_idx);
+    }
+    if(pg_check_input(kmap[BORK_CTRL_BIND4], PG_CONTROL_HIT)
+    || pg_check_gamepad(SDL_CONTROLLER_BUTTON_DPAD_DOWN, PG_CONTROL_HIT)) {
+        set_quick_item(d, 3, d->menu.inv.selection_idx);
+    }
 }
 
 static void tick_doorpad(struct bork_play_data* d)

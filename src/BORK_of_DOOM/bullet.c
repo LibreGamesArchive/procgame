@@ -50,7 +50,7 @@ void bork_bullet_move(struct bork_bullet* blt, struct bork_map* map)
                 }
             }
             if(closest_ent) {
-                closest_ent->HP -= 15;
+                closest_ent->HP -= blt->damage;
                 blt->flags |= BORK_BULLET_DEAD;
                 blt->dead_ticks = 10;
                 vec3 knockback;
@@ -59,6 +59,11 @@ void bork_bullet_move(struct bork_bullet* blt, struct bork_map* map)
                 vec3_sub(blt->pos, new_pos, blt->dir);
                 vec3_set(blt->dir, 0, 0, 0);
                 vec3_set(blt->light_color, 1, 1, 0.6);
+                if(blt->type == BORK_ITEM_BULLETS_INC - BORK_ITEM_BULLETS
+                || blt->type == BORK_ITEM_SHELLS_INC - BORK_ITEM_BULLETS) {
+                    closest_ent->flags |= BORK_ENTFLAG_ON_FIRE;
+                    closest_ent->counter[2] = 360;
+                }
                 return;
             }
         }
@@ -70,7 +75,7 @@ void bork_bullet_move(struct bork_bullet* blt, struct bork_map* map)
                 blt->flags |= BORK_BULLET_DEAD;
                 blt->dead_ticks = 10;
                 map->plr->pain_ticks = 120;
-                map->plr->HP -= 15;
+                map->plr->HP -= blt->damage;
                 vec3_sub(blt->pos, new_pos, blt->dir);
                 vec3_set(blt->dir, 0, 0, 0);
                 vec3_set(blt->light_color, 2, 0.8, 0.8);
@@ -83,6 +88,10 @@ void bork_bullet_move(struct bork_bullet* blt, struct bork_map* map)
             vec3_set(blt->dir, 0, 0, 0);
             vec3_sub(blt->pos, new_pos, max_move_dir);
             vec3_set(blt->light_color, 1, 1, 0.6);
+            if(blt->type == BORK_ITEM_BULLETS_INC - BORK_ITEM_BULLETS
+            || blt->type == BORK_ITEM_SHELLS_INC - BORK_ITEM_BULLETS) {
+                bork_map_create_fire(map, blt->pos, 360);
+            }
             return;
         }
     }

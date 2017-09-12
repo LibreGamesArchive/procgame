@@ -84,6 +84,11 @@ struct bork_map_light_fixture {
     int type;
 };
 
+struct bork_fire {
+    int lifetime;
+    vec3 pos;
+};
+
 struct bork_map {
     struct pg_model model;
     struct bork_tile data[32][32][32];
@@ -92,6 +97,7 @@ struct bork_map {
     ARR_T(struct bork_map_light_fixture) light_fixtures;
     ARR_T(bork_entity_t) enemies;
     ARR_T(bork_entity_t) items;
+    ARR_T(struct bork_fire) fires;
     ARR_T(struct pg_light) lights;
     ARR_T(struct pg_light) spotlights;
     struct pg_model door_model;
@@ -121,3 +127,6 @@ void bork_map_draw(struct bork_map* map, struct bork_game_core* core);
 int bork_map_check_ellipsoid(struct bork_map* map, vec3 const pos, vec3 const r);
 int bork_map_check_sphere(struct bork_map* map, vec3 const pos, float r);
 int bork_map_check_vis(struct bork_map* map, vec3 const start, vec3 const end);
+
+void bork_map_create_fire(struct bork_map* map, vec3 pos, int lifetime);
+
