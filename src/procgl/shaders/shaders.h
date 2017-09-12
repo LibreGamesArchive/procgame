@@ -3,9 +3,9 @@ struct pg_texture;
 
 /*  My shader implementations   */
 struct pg_shader_text {
-    char block[16][64];
-    vec4 block_style[16];
-    vec4 block_color[16];
+    char block[32][64];
+    vec4 block_style[32];
+    vec4 block_color[32];
     int use_blocks;
 };
 

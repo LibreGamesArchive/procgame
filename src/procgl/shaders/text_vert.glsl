@@ -10,9 +10,9 @@ uniform uint font_pitch;
 /*  Size in UV coords of each glyph */
 uniform vec2 glyph_size;
 /*  16x 64-char individually transformed blocks; packed to uints    */
-uniform uint chars[16 * 16];
-uniform vec4 style[16];
-uniform vec4 color[16];
+uniform uint chars[32 * 16];
+uniform vec4 style[32];
+uniform vec4 color[32];
 
 #define UINT_CHAR(c, i) \
     (((c) >> (i * 8)) & uint(0xFF))
