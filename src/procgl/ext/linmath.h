@@ -23,7 +23,8 @@
 #define SGN(a)  (a < 0 ? -1 : 1)
 #endif
 
-#define SATURATE(x) clamp(x, 0, 1)
+#define CLAMP(x, a, b) ( MIN(MAX(x, a), b) )
+#define SATURATE(x) CLAMP(x, 0, 1)
 static inline float clamp(float f, float a, float b)
 {
     return f < a ? a : (f > b ? b : f);
@@ -611,6 +612,7 @@ static inline void mat4_look_at(mat4 m, vec3 eye, vec3 center, vec3 up)
 typedef float quat[4];
 #define quat_set vec4_set
 #define quat_normalize vec4_normalize
+#define quat_lerp vec4_lerp
 static inline void quat_identity(quat q)
 {
     q[0] = q[1] = q[2] = 0.f;

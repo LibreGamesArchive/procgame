@@ -16,6 +16,15 @@ void bork_bullet_init(struct bork_bullet* blt, vec3 pos, vec3 dir)
 
 void bork_bullet_move(struct bork_bullet* blt, struct bork_map* map)
 {
+    static bork_entity_arr_t surr = {};
+    ARR_TRUNCATE(surr, 0);
+    vec3 surr_start, surr_end;
+    vec3 surr_center;
+    vec3_add(surr_center, blt->pos,
+        (vec3){ blt->dir[0] * 0.5, blt->dir[1] * 0.5, blt->dir[2] * 0.5 });
+    vec3_sub(surr_start, surr_center, (vec3){ 3, 3, 3 });
+    vec3_add(surr_end, surr_center, (vec3){ 3, 3, 3 });
+    bork_map_query_enemies(map, &surr, surr_start, surr_end);
     struct bork_collision coll = {};
     float curr_move = 0;
     float max_move = 0.1;
@@ -38,7 +47,7 @@ void bork_bullet_move(struct bork_bullet* blt, struct bork_map* map)
             int i;
             bork_entity_t ent_id;
             struct bork_entity* ent;
-            ARR_FOREACH(map->enemies, ent_id, i) {
+            ARR_FOREACH(surr, ent_id, i) {
                 ent = bork_entity_get(ent_id);
                 if(!ent) continue;
                 vec3 blt_to_ent;

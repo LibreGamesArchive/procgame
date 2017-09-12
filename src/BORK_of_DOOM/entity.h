@@ -22,6 +22,7 @@ struct bork_play_data;
 #define BORK_ENTFLAG_IS_AMMO            (1 << 18)
 
 struct bork_entity {
+    int last_tick;
     vec3 pos;
     vec3 vel;
     vec2 dir;
@@ -62,7 +63,6 @@ struct bork_entity {
         BORK_ENTITY_TYPES,
     } type;
 };
-
 #define BORK_AMMO_TYPES 9
 
 void bork_use_pistol(struct bork_entity* ent, struct bork_play_data* d);
@@ -300,6 +300,7 @@ static const struct bork_entity_profile {
 };
 
 typedef int bork_entity_t;
+typedef ARR_T(bork_entity_t) bork_entity_arr_t;
 bork_entity_t bork_entity_new(int n);
 struct bork_entity* bork_entity_get(bork_entity_t ent);
 void bork_entpool_clear(void);

@@ -13,7 +13,9 @@ struct bork_play_data {
     int quick_item[4];
     int reload_ticks, reload_length;
     int ammo[BORK_AMMO_TYPES];
-    ARR_T(bork_entity_t) inventory;
+    bork_entity_arr_t plr_enemy_query;
+    bork_entity_arr_t plr_item_query;
+    bork_entity_arr_t inventory;
     ARR_T(struct bork_bullet) bullets;
     ARR_T(struct bork_particle) particles;
     /*  The HUD-item animation  */

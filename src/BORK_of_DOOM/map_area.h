@@ -92,11 +92,11 @@ struct bork_fire {
 struct bork_map {
     struct pg_model model;
     struct bork_tile data[32][32][32];
+    bork_entity_arr_t enemies[4][4][4];
+    bork_entity_arr_t items[4][4][4];
     ARR_T(struct bork_map_object) doors;
     ARR_T(struct bork_map_object) doorpads;
     ARR_T(struct bork_map_light_fixture) light_fixtures;
-    ARR_T(bork_entity_t) enemies;
-    ARR_T(bork_entity_t) items;
     ARR_T(struct bork_fire) fires;
     ARR_T(struct pg_light) lights;
     ARR_T(struct pg_light) spotlights;
@@ -129,4 +129,11 @@ int bork_map_check_sphere(struct bork_map* map, vec3 const pos, float r);
 int bork_map_check_vis(struct bork_map* map, vec3 const start, vec3 const end);
 
 void bork_map_create_fire(struct bork_map* map, vec3 pos, int lifetime);
+void bork_map_add_enemy(struct bork_map* map, bork_entity_t ent_id);
+void bork_map_add_item(struct bork_map* map, bork_entity_t ent_id);
+void bork_map_query_enemies(struct bork_map* map, bork_entity_arr_t* arr,
+                            vec3 start, vec3 end);
+void bork_map_query_items(struct bork_map* map, bork_entity_arr_t* arr,
+                          vec3 start, vec3 end);
+
 

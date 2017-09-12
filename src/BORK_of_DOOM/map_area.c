@@ -254,8 +254,6 @@ void bork_map_deinit(struct bork_map* map)
     pg_model_deinit(&map->model);
     pg_model_deinit(&map->door_model);
     ARR_DEINIT(map->doors);
-    ARR_DEINIT(map->enemies);
-    ARR_DEINIT(map->items);
     ARR_DEINIT(map->light_fixtures);
     ARR_DEINIT(map->lights);
     ARR_DEINIT(map->spotlights);
@@ -421,7 +419,7 @@ int bork_map_check_vis(struct bork_map* map, vec3 const start, vec3 const end)
     vec3 full_vec, part_vec, curr_point;
     vec3_sub(full_vec, end, start);
     float full_dist = vec3_len(full_vec);
-    float part_dist = 0.5;
+    float part_dist = 0.25;
     float curr_dist = 0;
     vec3_set_len(part_vec, full_vec, part_dist);
     vec3_dup(curr_point, start);
@@ -774,5 +772,97 @@ void bork_map_create_fire(struct bork_map* map, vec3 pos, int lifetime)
         .lifetime = lifetime
     };
     ARR_PUSH(map->fires, new_fire);
+}
+
+void bork_map_add_enemy(struct bork_map* map, bork_entity_t ent_id)
+{
+    struct bork_entity* ent = bork_entity_get(ent_id);
+    if(!ent) return;
+    int x, y, z;
+    x = (int)ent->pos[0] / 16;
+    y = (int)ent->pos[1] / 16;
+    z = (int)ent->pos[2] / 16;
+    ARR_PUSH(map->enemies[x][y][z], ent_id);
+    printf("Adding %d %d %d\n", x, y, z);
+}
+
+void bork_map_add_item(struct bork_map* map, bork_entity_t ent_id)
+{
+    struct bork_entity* ent = bork_entity_get(ent_id);
+    if(!ent) return;
+    int x, y, z;
+    x = (int)ent->pos[0] / 16;
+    y = (int)ent->pos[1] / 16;
+    z = (int)ent->pos[2] / 16;
+    ARR_PUSH(map->items[x][y][z], ent_id);
+}
+
+void bork_map_query_enemies(struct bork_map* map, bork_entity_arr_t* arr,
+                            vec3 start, vec3 end)
+{
+    int start_i[3];
+    int end_i[3];
+    start_i[0] = CLAMP((int)start[0] / 16, 0, 3);
+    start_i[1] = CLAMP((int)start[1] / 16, 0, 3);
+    start_i[2] = CLAMP((int)start[2] / 16, 0, 3);
+    end_i[0] = CLAMP((int)end[0] / 16, 0, 3);
+    end_i[1] = CLAMP((int)end[1] / 16, 0, 3);
+    end_i[2] = CLAMP((int)end[2] / 16, 0, 3);
+    int x = start_i[0], y = start_i[1], z = start_i[2];
+    do {
+        do {
+            do {
+                int i;
+                bork_entity_t ent_id;
+                struct bork_entity* ent;
+                ARR_FOREACH(map->enemies[x][y][z], ent_id, i) {
+                    ent = bork_entity_get(ent_id);
+                    if(!ent) continue;
+                    //printf("%d\n", ent_id);
+                    if(ent->pos[0] >= start[0] && ent->pos[0] <= end[0]
+                    && ent->pos[1] >= start[1] && ent->pos[1] <= end[1]
+                    && ent->pos[2] >= start[2] && ent->pos[2] <= end[2]) {
+                        ARR_PUSH(*arr, ent_id);
+                    }
+                }
+            } while(x++ < end_i[0]);
+            x = start_i[0];
+        } while(y++ < end_i[1]);
+        y = start_i[1];
+    } while(z++ < end_i[2]);
+}
+
+void bork_map_query_items(struct bork_map* map, bork_entity_arr_t* arr,
+                          vec3 start, vec3 end)
+{
+    int start_i[3];
+    int end_i[3];
+    start_i[0] = CLAMP((int)start[0] / 16, 0, 3);
+    start_i[1] = CLAMP((int)start[1] / 16, 0, 3);
+    start_i[2] = CLAMP((int)start[2] / 16, 0, 3);
+    end_i[0] = CLAMP((int)end[0] / 16, 0, 3);
+    end_i[1] = CLAMP((int)end[1] / 16, 0, 3);
+    end_i[2] = CLAMP((int)end[2] / 16, 0, 3);
+    int x = start_i[0], y = start_i[1], z = start_i[2];
+    do {
+        do {
+            do {
+                int i;
+                bork_entity_t ent_id;
+                struct bork_entity* ent;
+                ARR_FOREACH(map->items[x][y][z], ent_id, i) {
+                    ent = bork_entity_get(ent_id);
+                    if(!ent) continue;
+                    if(ent->pos[0] >= start[0] && ent->pos[0] <= end[0]
+                    && ent->pos[1] >= start[1] && ent->pos[1] <= end[1]
+                    && ent->pos[2] >= start[2] && ent->pos[2] <= end[2]) {
+                        ARR_PUSH(*arr, ent_id);
+                    }
+                }
+            } while(x++ < end_i[0]);
+            x = start_i[0];
+        } while(y++ < end_i[1]);
+        y = start_i[1];
+    } while(z++ < end_i[2]);
 }
 
