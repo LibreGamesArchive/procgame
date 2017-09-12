@@ -124,8 +124,8 @@ void pg_shader_2d_transform(struct pg_shader* shader, vec2 const pos, vec2 const
 {
     mat4 tx;
     mat4_translate(tx, pos[0], pos[1], 0);
-    mat4_scale_aniso(tx, tx, size[0], size[1], 1);
     mat4_rotate_Z(tx, tx, rotation);
+    mat4_scale_aniso(tx, tx, size[0], size[1], 1);
     pg_shader_set_matrix(shader, PG_MODEL_MATRIX, tx);
     if(pg_shader_is_active(shader)) {
         pg_shader_rebuild_matrices(shader);
