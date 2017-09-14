@@ -18,13 +18,18 @@ const char* bork_map_area_str(enum bork_area area);
 #define BORK_FACE_NO_SELF_OPPOSITE  (1 << 4)
 #define BORK_FACE_HAS_BACKFACE      (1 << 5)
 #define BORK_FACE_NO_FRONTFACE      (1 << 6)
-#define BORK_FACE_HAS_ORIENTATION   (1 << 8)
-#define BORK_FACE_HALF_BOTTOM       (1 << 9)
-#define BORK_FACE_HALF_TOP          (1 << 10)
+#define BORK_FACE_HALF_BOTTOM       (1 << 7)
+#define BORK_FACE_HALF_TOP          (1 << 8)
+#define BORK_FACE_TRAVEL            (1 << 9)
+#define BORK_FACE_TRAVEL_SELF_ONLY  (1 << 10)
+#define BORK_FACE_TRAVEL_ORIENT     (1 << 11)
+#define BORK_FACE_TRAVEL_ORIENT_OPP (1 << 12)
 
 #define BORK_TILE_SPECIAL_MODEL     (1 << 0)
 #define BORK_TILE_HAS_ORIENTATION   (1 << 1)
 #define BORK_TILE_FACE_ORIENTED     (1 << 2)
+#define BORK_TILE_WALK_ABOVE        (1 << 3)
+#define BORK_TILE_TRAVEL_DROP       (1 << 4)
 
 enum bork_tile_type {
     BORK_TILE_VAC,
@@ -52,10 +57,10 @@ enum bork_tile_type {
 };
 
 struct bork_tile {
-    enum bork_tile_type type;
-    uint8_t flags;
+    uint8_t type;
+    uint8_t travel_flags;
     uint8_t orientation;
-    uint16_t num_tris;
+    uint8_t num_tris;
     uint32_t model_tri_idx;
 };
 
@@ -92,6 +97,7 @@ struct bork_fire {
 struct bork_map {
     struct pg_model model;
     struct bork_tile data[32][32][32];
+    uint8_t plr_dist[32][32][32];
     bork_entity_arr_t enemies[4][4][4];
     bork_entity_arr_t items[4][4][4];
     ARR_T(struct bork_map_object) doors;
@@ -127,6 +133,9 @@ void bork_map_draw(struct bork_map* map, struct bork_game_core* core);
 int bork_map_check_ellipsoid(struct bork_map* map, vec3 const pos, vec3 const r);
 int bork_map_check_sphere(struct bork_map* map, vec3 const pos, float r);
 int bork_map_check_vis(struct bork_map* map, vec3 const start, vec3 const end);
+int bork_map_tile_walkable(struct bork_map* map, int x, int y, int z);
+void bork_map_build_plr_dist(struct bork_map* map);
+void bork_map_calc_travel(struct bork_map* map);
 
 void bork_map_create_fire(struct bork_map* map, vec3 pos, int lifetime);
 void bork_map_add_enemy(struct bork_map* map, bork_entity_t ent_id);

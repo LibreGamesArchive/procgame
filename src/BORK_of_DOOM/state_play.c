@@ -380,6 +380,11 @@ static void bork_play_tick(struct pg_game_state* state)
         ARR_TRUNCATE(d->plr_item_query, 0);
         bork_map_query_enemies(&d->map, &d->plr_enemy_query, surr_start, surr_end);
         bork_map_query_items(&d->map, &d->plr_item_query, surr_start, surr_end);
+        int x, y, z;
+        x = floor(d->plr.pos[0] / 2);
+        y = floor(d->plr.pos[1] / 2);
+        z = floor(d->plr.pos[2] / 2);
+        printf("Player: %d\n", d->map.plr_dist[x][y][z]);
         tick_control_play(d);
         /*  Player update   */
         tick_held_item(d);
@@ -413,6 +418,9 @@ static void tick_control_play(struct bork_play_data* d)
         d->menu.inv.scroll_idx = 0;
         SDL_ShowCursor(SDL_ENABLE);
         pg_mouse_mode(0);
+    }
+    if(pg_check_input(SDL_SCANCODE_M, PG_CONTROL_HIT)) {
+        bork_map_build_plr_dist(&d->map);
     }
     if(pg_check_input(kmap[BORK_CTRL_SELECT], PG_CONTROL_HIT)
     || pg_check_gamepad(SDL_CONTROLLER_BUTTON_X, PG_CONTROL_HIT)) {
@@ -620,18 +628,42 @@ static void tick_enemy(struct bork_play_data* d, struct bork_entity* ent)
         vec3_add(ent_head, ent->pos, (vec3){ 0, 0, 0.5 });
         vec3_add(plr_head, d->plr.pos, (vec3){ 0, 0, 0.5 });
         int vis = bork_map_check_vis(&d->map, ent_head, plr_head);
-        if(vis && ent->counter[0] < d->ticks) {
-            vec3 ent_to_plr;
-            vec3_sub(ent_to_plr, plr_head, ent_head);
-            struct bork_bullet new_bullet = { .type = 6,
-                .flags = BORK_BULLET_HURTS_PLAYER,
-                .damage = 15 };
-            vec3_set_len(new_bullet.dir, ent_to_plr, 0.4);
-            vec3_add(new_bullet.pos, ent_head, new_bullet.dir);
-            ARR_PUSH(d->bullets, new_bullet);
-            float angle = atan2f(ent_to_plr[0], ent_to_plr[1]) + M_PI;
-            ent->dir[0] = (M_PI * 2 - angle) - M_PI * 0.5;
-            ent->counter[0] = d->ticks + 120;
+        if(1) {
+            if(1) {
+                int x = floor(ent->pos[0] / 2);
+                int y = floor(ent->pos[1] / 2);
+                int z = floor(ent->pos[2] / 2);
+                int plr_dist = d->map.plr_dist[x][y][z];
+                printf("Enemy dist: %d Diff ", plr_dist);
+                int i;
+                for(i = 0; i < 4; ++i) {
+                    int dx = x + PG_DIR_IDX[i][0];
+                    int dy = y + PG_DIR_IDX[i][1];
+                    int diff = d->map.plr_dist[dx][dy][z];
+                    printf("%d: %d, ", i, diff);
+                    if(diff == plr_dist + 1) {
+                        vec3 move;
+                        vec3_set_len(move, PG_DIR_VEC[i], 0.005);
+                        vec3_add(ent->vel, ent->vel, move);
+                        break;
+                    }
+                }
+                printf("\n");
+            } else {
+                vec3 ent_to_plr;
+                vec3_sub(ent_to_plr, plr_head, ent_head);
+                float angle = atan2f(ent_to_plr[0], ent_to_plr[1]) + M_PI;
+                ent->dir[0] = (M_PI * 2 - angle) - M_PI * 0.5;
+                if(ent->counter[0] < d->ticks) {
+                    struct bork_bullet new_bullet = { .type = 6,
+                        .flags = BORK_BULLET_HURTS_PLAYER,
+                        .damage = 0 };
+                    vec3_set_len(new_bullet.dir, ent_to_plr, 0.4);
+                    vec3_add(new_bullet.pos, ent_head, new_bullet.dir);
+                    //ARR_PUSH(d->bullets, new_bullet);
+                    ent->counter[0] = d->ticks + 180;
+                }
+            }
         }
         if(ent->flags & BORK_ENTFLAG_ON_FIRE) {
             if(ent->counter[2] % 41 == 0) {

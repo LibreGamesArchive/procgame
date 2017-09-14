@@ -34,9 +34,14 @@ static void bork_map_generate_model(struct bork_map* map,
 
 /*  Tile details */
 struct bork_tile_detail BORK_TILE_DETAILS[] = {
-    [BORK_TILE_VAC] = { .name = "VACUUM" },
-    [BORK_TILE_ATMO] = { .name = "ATMOSPHERE" },
+    [BORK_TILE_VAC] = { .name = "VACUUM",
+        .face_flags = { BORK_FACE_TRAVEL, BORK_FACE_TRAVEL, BORK_FACE_TRAVEL,
+                        BORK_FACE_TRAVEL, BORK_FACE_TRAVEL, BORK_FACE_TRAVEL } },
+    [BORK_TILE_ATMO] = { .name = "ATMOSPHERE",
+        .face_flags = { BORK_FACE_TRAVEL, BORK_FACE_TRAVEL, BORK_FACE_TRAVEL,
+                        BORK_FACE_TRAVEL, BORK_FACE_TRAVEL, BORK_FACE_TRAVEL } },
     [BORK_TILE_HULL] = { .name = "BASIC HULL",
+        .tile_flags = BORK_TILE_WALK_ABOVE,
         .face_flags = { 1, 1, 1, 1, 1, 1 },
         .tex_tile = {
             [PG_LEFT] = 19, [PG_RIGHT] = 19,
@@ -44,6 +49,7 @@ struct bork_tile_detail BORK_TILE_DETAILS[] = {
             [PG_TOP] = 3, [PG_DOWN] = 20 },
         .add_model = tile_model_basic },
     [BORK_TILE_HULL_EDGE] = { .name = "HULL EDGE",
+        .tile_flags = BORK_TILE_WALK_ABOVE,
         .face_flags = { 1, 1, 1, 1, 1, 1 },
         .tex_tile = {
             [PG_LEFT] = 35, [PG_RIGHT] = 35,
@@ -51,6 +57,7 @@ struct bork_tile_detail BORK_TILE_DETAILS[] = {
             [PG_TOP] = 3, [PG_DOWN] = 20 },
         .add_model = tile_model_basic },
     [BORK_TILE_CONTROL_PANEL] = { .name = "CONTROL PANEL",
+        .tile_flags = BORK_TILE_WALK_ABOVE,
         .face_flags = { 1, 1, 1, 1, 1, 1 },
         .tex_tile = {
             [PG_LEFT] = 4, [PG_RIGHT] = 4,
@@ -60,51 +67,68 @@ struct bork_tile_detail BORK_TILE_DETAILS[] = {
     [BORK_TILE_LADDER] = { .name = "LADDER",
         .tile_flags = BORK_TILE_HAS_ORIENTATION | BORK_TILE_FACE_ORIENTED,
         .face_flags = { BORK_FACE_HAS_SURFACE | BORK_FACE_FLUSH_SURFACE |
-                            BORK_FACE_HAS_BACKFACE | BORK_FACE_SEETHRU_SURFACE,
+                            BORK_FACE_HAS_BACKFACE | BORK_FACE_SEETHRU_SURFACE |
+                            BORK_FACE_TRAVEL_ORIENT_OPP,
                         BORK_FACE_HAS_SURFACE | BORK_FACE_FLUSH_SURFACE |
-                            BORK_FACE_HAS_BACKFACE | BORK_FACE_SEETHRU_SURFACE,
+                            BORK_FACE_HAS_BACKFACE | BORK_FACE_SEETHRU_SURFACE |
+                            BORK_FACE_TRAVEL_ORIENT_OPP,
                         BORK_FACE_HAS_SURFACE | BORK_FACE_FLUSH_SURFACE |
-                            BORK_FACE_HAS_BACKFACE | BORK_FACE_SEETHRU_SURFACE,
+                            BORK_FACE_HAS_BACKFACE | BORK_FACE_SEETHRU_SURFACE |
+                            BORK_FACE_TRAVEL_ORIENT_OPP,
                         BORK_FACE_HAS_SURFACE | BORK_FACE_FLUSH_SURFACE |
-                            BORK_FACE_HAS_BACKFACE | BORK_FACE_SEETHRU_SURFACE,
-                        0, 0 },
+                            BORK_FACE_HAS_BACKFACE | BORK_FACE_SEETHRU_SURFACE |
+                            BORK_FACE_TRAVEL_ORIENT_OPP, 0, 0 },
         .face_inset = { 0.1, 0.1, 0.1, 0.1 },
         .tex_tile = {
             [PG_LEFT] = 5, [PG_RIGHT] = 5,
             [PG_FRONT] = 5, [PG_BACK] = 5 },
         .add_model = tile_model_basic },
     [BORK_TILE_CATWALK] = { .name = "CATWALK",
-        .face_flags = { [PG_TOP] = BORK_FACE_HAS_SURFACE | BORK_FACE_HAS_BACKFACE },
+        .tile_flags = BORK_TILE_WALK_ABOVE,
+        .face_flags = { BORK_FACE_TRAVEL, BORK_FACE_TRAVEL, BORK_FACE_TRAVEL, BORK_FACE_TRAVEL,
+                        [PG_BOTTOM] = BORK_FACE_TRAVEL,
+                        [PG_TOP] = BORK_FACE_HAS_SURFACE | BORK_FACE_HAS_BACKFACE },
         .face_inset = { },
         .tex_tile = { [PG_TOP] = 6 },
         .add_model = tile_model_basic },
     [BORK_TILE_HANDRAIL] = { .name = "HANDRAIL",
         .tile_flags = BORK_TILE_HAS_ORIENTATION | BORK_TILE_FACE_ORIENTED,
         .face_flags = { BORK_FACE_HAS_SURFACE | BORK_FACE_HAS_BACKFACE |
-                            BORK_FACE_SEETHRU_SURFACE | BORK_FACE_HALF_BOTTOM,
+                            BORK_FACE_SEETHRU_SURFACE | BORK_FACE_HALF_BOTTOM |
+                            BORK_FACE_TRAVEL_ORIENT_OPP,
                         BORK_FACE_HAS_SURFACE | BORK_FACE_HAS_BACKFACE |
-                            BORK_FACE_SEETHRU_SURFACE | BORK_FACE_HALF_BOTTOM,
+                            BORK_FACE_SEETHRU_SURFACE | BORK_FACE_HALF_BOTTOM |
+                            BORK_FACE_TRAVEL_ORIENT_OPP,
                         BORK_FACE_HAS_SURFACE | BORK_FACE_HAS_BACKFACE |
-                            BORK_FACE_SEETHRU_SURFACE | BORK_FACE_HALF_BOTTOM,
+                            BORK_FACE_SEETHRU_SURFACE | BORK_FACE_HALF_BOTTOM |
+                            BORK_FACE_TRAVEL_ORIENT_OPP,
                         BORK_FACE_HAS_SURFACE | BORK_FACE_HAS_BACKFACE |
-                            BORK_FACE_SEETHRU_SURFACE | BORK_FACE_HALF_BOTTOM },
+                            BORK_FACE_SEETHRU_SURFACE | BORK_FACE_HALF_BOTTOM |
+                            BORK_FACE_TRAVEL_ORIENT_OPP,
+                        BORK_FACE_TRAVEL, BORK_FACE_TRAVEL },
         .face_inset = { -0.05, -0.05, -0.05, -0.05 },
         .tex_tile = { 7, 7, 7, 7 },
         .add_model = tile_model_basic },
     [BORK_TILE_HANDRAIL_TOP] = { .name = "HANDRAIL TOP",
         .tile_flags = BORK_TILE_HAS_ORIENTATION | BORK_TILE_FACE_ORIENTED,
         .face_flags = { BORK_FACE_HAS_SURFACE | BORK_FACE_HAS_BACKFACE |
-                            BORK_FACE_SEETHRU_SURFACE | BORK_FACE_HALF_TOP,
+                            BORK_FACE_SEETHRU_SURFACE | BORK_FACE_HALF_TOP |
+                            BORK_FACE_TRAVEL_ORIENT_OPP,
                         BORK_FACE_HAS_SURFACE | BORK_FACE_HAS_BACKFACE |
-                            BORK_FACE_SEETHRU_SURFACE | BORK_FACE_HALF_TOP,
+                            BORK_FACE_SEETHRU_SURFACE | BORK_FACE_HALF_TOP |
+                            BORK_FACE_TRAVEL_ORIENT_OPP,
                         BORK_FACE_HAS_SURFACE | BORK_FACE_HAS_BACKFACE |
-                            BORK_FACE_SEETHRU_SURFACE | BORK_FACE_HALF_TOP,
+                            BORK_FACE_SEETHRU_SURFACE | BORK_FACE_HALF_TOP |
+                            BORK_FACE_TRAVEL_ORIENT_OPP,
                         BORK_FACE_HAS_SURFACE | BORK_FACE_HAS_BACKFACE |
-                            BORK_FACE_SEETHRU_SURFACE | BORK_FACE_HALF_TOP },
+                            BORK_FACE_SEETHRU_SURFACE | BORK_FACE_HALF_TOP |
+                            BORK_FACE_TRAVEL_ORIENT_OPP,
+                        BORK_FACE_TRAVEL, BORK_FACE_TRAVEL },
         .face_inset = { -0.05, -0.05, -0.05, -0.05 },
         .tex_tile = { 7, 7, 7, 7 },
         .add_model = tile_model_basic },
     [BORK_TILE_POWERBLOCK] = { .name = "POWER BLOCK",
+        .tile_flags = BORK_TILE_WALK_ABOVE,
         .face_flags = { 1, 1, 1, 1, 1, 1 },
         .tex_tile = {
             [PG_LEFT] = 8, [PG_RIGHT] = 8,
@@ -142,32 +166,34 @@ struct bork_tile_detail BORK_TILE_DETAILS[] = {
         .tex_tile = { 12, 12, 12, 12, 13, 20 },
         .add_model = tile_model_basic },
     [BORK_TILE_CATWALK_HALF] = { .name = "CATWALK HALF",
-        .tile_flags = BORK_TILE_HAS_ORIENTATION | BORK_TILE_FACE_ORIENTED,
+        .tile_flags = BORK_TILE_TRAVEL_DROP |
+                        BORK_TILE_HAS_ORIENTATION | BORK_TILE_FACE_ORIENTED,
         .face_flags = {
             BORK_FACE_HAS_SURFACE | BORK_FACE_HAS_BACKFACE | BORK_FACE_NO_SELF_OPPOSITE |
-                BORK_FACE_SEETHRU_SURFACE | BORK_FACE_HALF_BOTTOM,
+                BORK_FACE_SEETHRU_SURFACE | BORK_FACE_HALF_BOTTOM | BORK_FACE_TRAVEL,
             BORK_FACE_HAS_SURFACE | BORK_FACE_HAS_BACKFACE | BORK_FACE_NO_SELF_OPPOSITE |
-                BORK_FACE_SEETHRU_SURFACE | BORK_FACE_HALF_BOTTOM,
+                BORK_FACE_SEETHRU_SURFACE | BORK_FACE_HALF_BOTTOM | BORK_FACE_TRAVEL,
             BORK_FACE_HAS_SURFACE | BORK_FACE_HAS_BACKFACE | BORK_FACE_NO_SELF_OPPOSITE |
-                BORK_FACE_SEETHRU_SURFACE | BORK_FACE_HALF_BOTTOM,
+                BORK_FACE_SEETHRU_SURFACE | BORK_FACE_HALF_BOTTOM | BORK_FACE_TRAVEL,
             BORK_FACE_HAS_SURFACE | BORK_FACE_HAS_BACKFACE | BORK_FACE_NO_SELF_OPPOSITE |
-                BORK_FACE_SEETHRU_SURFACE | BORK_FACE_HALF_BOTTOM,
+                BORK_FACE_SEETHRU_SURFACE | BORK_FACE_HALF_BOTTOM | BORK_FACE_TRAVEL,
             [PG_TOP] = BORK_FACE_HAS_SURFACE | BORK_FACE_SEETHRU_SURFACE | BORK_FACE_HAS_BACKFACE,
             [PG_BOTTOM] = 0, },
         .face_inset = { 0, 0, 0, 0, [PG_TOP] = 0.5 },
         .tex_tile = { 14, 14, 14, 14, [PG_TOP] = 6 },
         .add_model = tile_model_basic },
     [BORK_TILE_HULL_HALF] = { .name = "HULL HALF",
+        .tile_flags = BORK_TILE_TRAVEL_DROP,
         .face_flags = {
-            BORK_FACE_HAS_SURFACE | BORK_FACE_HAS_BACKFACE | BORK_FACE_NO_SELF_OPPOSITE |
-                BORK_FACE_SEETHRU_SURFACE | BORK_FACE_HALF_BOTTOM,
-            BORK_FACE_HAS_SURFACE | BORK_FACE_HAS_BACKFACE | BORK_FACE_NO_SELF_OPPOSITE |
-                BORK_FACE_SEETHRU_SURFACE | BORK_FACE_HALF_BOTTOM,
-            BORK_FACE_HAS_SURFACE | BORK_FACE_HAS_BACKFACE | BORK_FACE_NO_SELF_OPPOSITE |
-                BORK_FACE_SEETHRU_SURFACE | BORK_FACE_HALF_BOTTOM,
-            BORK_FACE_HAS_SURFACE | BORK_FACE_HAS_BACKFACE | BORK_FACE_NO_SELF_OPPOSITE |
-                BORK_FACE_SEETHRU_SURFACE | BORK_FACE_HALF_BOTTOM,
-            [PG_TOP] = BORK_FACE_HAS_SURFACE | BORK_FACE_SEETHRU_SURFACE,
+            BORK_FACE_HAS_SURFACE | BORK_FACE_NO_SELF_OPPOSITE |
+                BORK_FACE_SEETHRU_SURFACE | BORK_FACE_HALF_BOTTOM | BORK_FACE_TRAVEL,
+            BORK_FACE_HAS_SURFACE | BORK_FACE_NO_SELF_OPPOSITE |
+                BORK_FACE_SEETHRU_SURFACE | BORK_FACE_HALF_BOTTOM | BORK_FACE_TRAVEL,
+            BORK_FACE_HAS_SURFACE | BORK_FACE_NO_SELF_OPPOSITE |
+                BORK_FACE_SEETHRU_SURFACE | BORK_FACE_HALF_BOTTOM | BORK_FACE_TRAVEL,
+            BORK_FACE_HAS_SURFACE | BORK_FACE_NO_SELF_OPPOSITE |
+                BORK_FACE_SEETHRU_SURFACE | BORK_FACE_HALF_BOTTOM | BORK_FACE_TRAVEL,
+            [PG_TOP] = BORK_FACE_HAS_SURFACE | BORK_FACE_SEETHRU_SURFACE | BORK_FACE_TRAVEL,
             [PG_BOTTOM] = BORK_FACE_HAS_SURFACE, },
         .face_inset = { 0, 0, 0, 0, [PG_TOP] = 0.5 },
         .tex_tile = { 15, 15, 15, 15, [PG_TOP] = 3 },
@@ -177,6 +203,7 @@ struct bork_tile_detail BORK_TILE_DETAILS[] = {
         .face_flags = { 1, 1, 1, 1, [PG_TOP] = 0, [PG_BOTTOM] = 1 },
         .add_model = tile_model_duct },
     [BORK_TILE_CARGO_RED] = { .name = "CARGO (RED)",
+        .tile_flags = BORK_TILE_WALK_ABOVE,
         .face_flags = {
             BORK_FACE_NO_SELF_OPPOSITE | BORK_FACE_HAS_SURFACE | BORK_FACE_SEETHRU_SURFACE,
             BORK_FACE_NO_SELF_OPPOSITE | BORK_FACE_HAS_SURFACE | BORK_FACE_SEETHRU_SURFACE,
@@ -188,6 +215,7 @@ struct bork_tile_detail BORK_TILE_DETAILS[] = {
         .tex_tile = { 22, 22, 22, 22, [PG_TOP] = 23, [PG_BOTTOM] = 37 },
         .add_model = tile_model_basic },
     [BORK_TILE_CARGO_BLUE] = { .name = "CARGO (BLUE)",
+        .tile_flags = BORK_TILE_WALK_ABOVE,
         .face_flags = {
             BORK_FACE_NO_SELF_OPPOSITE | BORK_FACE_HAS_SURFACE | BORK_FACE_SEETHRU_SURFACE,
             BORK_FACE_NO_SELF_OPPOSITE | BORK_FACE_HAS_SURFACE | BORK_FACE_SEETHRU_SURFACE,
@@ -199,13 +227,15 @@ struct bork_tile_detail BORK_TILE_DETAILS[] = {
         .tex_tile = { 38, 38, 38, 38, [PG_TOP] = 39, [PG_BOTTOM] = 37 },
         .add_model = tile_model_basic },
     [BORK_TILE_RAMP_BOTTOM] = { .name = "RAMP BOTTOM",
-        .tile_flags = BORK_TILE_HAS_ORIENTATION,
+        .tile_flags = BORK_TILE_TRAVEL_DROP | BORK_TILE_HAS_ORIENTATION,
+        .face_flags = { BORK_FACE_TRAVEL, BORK_FACE_TRAVEL, BORK_FACE_TRAVEL, BORK_FACE_TRAVEL },
         .add_model = tile_model_ramp },
     [BORK_TILE_RAMP_TOP] = { .name = "RAMP TOP",
-        .tile_flags = BORK_TILE_HAS_ORIENTATION,
+        .tile_flags = BORK_TILE_WALK_ABOVE | BORK_TILE_HAS_ORIENTATION,
+        .face_flags = { BORK_FACE_TRAVEL, BORK_FACE_TRAVEL, BORK_FACE_TRAVEL, BORK_FACE_TRAVEL },
         .add_model = tile_model_ramp },
     [BORK_TILE_EDITOR_DOOR] = { .name = "DOOR",
-        .tile_flags = BORK_TILE_HAS_ORIENTATION, },
+        .tile_flags = BORK_TILE_HAS_ORIENTATION },
     [BORK_TILE_EDITOR_LIGHT1] = { .name = "CEIL LIGHT" },
     [BORK_TILE_EDITOR_LIGHT_WALLMOUNT] = { .name = "WALL LIGHT",
         .tile_flags = BORK_TILE_HAS_ORIENTATION },
@@ -430,6 +460,115 @@ int bork_map_check_vis(struct bork_map* map, vec3 const start, vec3 const end)
         curr_dist += part_dist;
     }
     return 1;
+}
+
+void bork_map_build_plr_dist(struct bork_map* map)
+{
+    memset(map->plr_dist, 0, sizeof(map->plr_dist));
+    int plr_x = floor(map->plr->pos[0] / 2);
+    int plr_y = floor(map->plr->pos[1] / 2);
+    int plr_z = floor(map->plr->pos[2] / 2);
+    /*  Start the queue with the player's current tile  */
+    struct bork_tile* opp = bork_map_tile_ptri(map, plr_x, plr_y, plr_z + 1);
+    struct bork_tile* tile = bork_map_tile_ptri(map, plr_x, plr_y, plr_z);
+    map->plr_dist[plr_x][plr_y][plr_z] = 16;
+    uint8_t queue[128][3] = { { plr_x, plr_y, plr_z } };
+    int queue_idx[2] = { 0, 1 };
+    while(queue_idx[0] != queue_idx[1]) {
+        int x, y, z;
+        x = queue[queue_idx[0]][0];
+        y = queue[queue_idx[0]][1];
+        z = queue[queue_idx[0]][2];
+        int d = map->plr_dist[x][y][z];
+        if(d > 1) {
+            tile = bork_map_tile_ptri(map, x, y, z);
+            printf("%s\n", bork_tile_detail(tile->type)->name);
+            int i;
+            for(i = 0; i < 4; ++i) {
+                if(!(tile->travel_flags & (1 << i))) continue;
+                int dx = x + PG_DIR_IDX[i][0];
+                int dy = y + PG_DIR_IDX[i][1];
+                int dz = z;
+                opp = bork_map_tile_ptri(map, dx, dy, dz);
+                if(!opp) continue;
+                if(!map->plr_dist[dx][dy][z]) {
+                    if(!(opp->travel_flags & (1 << 6))) continue;
+                    if(opp->travel_flags & (1 << 7)) {
+                        if(map->plr_dist[dx][dy][dz - 1]) continue;
+                        map->plr_dist[dx][dy][dz] = d - 1;
+                        --dz;
+                    } else if(opp->travel_flags & (1 << 5)) {
+                        map->plr_dist[dx][dy][dz + 1] = d - 1;
+                    } else if(opp->type == BORK_TILE_RAMP_TOP) {
+                        if(map->plr_dist[dx][dy][dz + 1]) {
+                            map->plr_dist[dx][dy][dz] = map->plr_dist[dx][dy][dz + 1];
+                            continue;
+                        } else {
+                            map->plr_dist[dx][dy][dz] = d - 1;
+                            ++dz;
+                        }
+                    }
+                    queue[queue_idx[1]][0] = dx;
+                    queue[queue_idx[1]][1] = dy;
+                    queue[queue_idx[1]][2] = dz;
+                    map->plr_dist[dx][dy][dz] = d - 1;
+                    queue_idx[1] = (queue_idx[1] + 1) % 128;
+                }
+            }
+        }
+        queue_idx[0] = (queue_idx[0] + 1) % 128;
+    }
+}
+
+void bork_map_calc_travel(struct bork_map* map)
+{
+    struct bork_tile* tile;
+    struct bork_tile* opp;
+    const struct bork_tile_detail* tile_d;
+    const struct bork_tile_detail* opp_d;
+    int x, y, z, i;
+    for(x = 0; x < 32; ++x)
+    for(y = 0; y < 32; ++y)
+    for(z = 0; z < 32; ++z) {
+        tile = bork_map_tile_ptri(map, x, y, z);
+        tile_d = bork_tile_detail(tile->type);
+        tile->travel_flags = 0;
+        if(tile_d->tile_flags & BORK_TILE_TRAVEL_DROP) {
+            tile->travel_flags |= (1 << 6) | (1 << 5);
+        } else if(tile->type == BORK_TILE_RAMP_TOP) tile->travel_flags |= (1 << 6);
+        if(z > 0) {
+            opp = bork_map_tile_ptri(map, x, y, z - 1);
+            opp_d = bork_tile_detail(opp->type);
+            if(opp_d->tile_flags & BORK_TILE_WALK_ABOVE) tile->travel_flags |= (1 << 6);
+            if(opp_d->tile_flags & BORK_TILE_TRAVEL_DROP) {
+                tile->travel_flags |= (1 << 7) | (1 << 6);
+            }
+        }
+        for(i = 0; i < 4; ++i) {
+            int opp_dir = PG_DIR_OPPOSITE[i];
+            int dx = x + PG_DIR_IDX[i][0];
+            int dy = y + PG_DIR_IDX[i][1];
+            int dz = z + PG_DIR_IDX[i][2];
+            opp = bork_map_tile_ptri(map, dx, dy, dz);
+            if(!opp) continue;
+            opp_d = bork_tile_detail(opp->type);
+            if((tile_d->face_flags[i] & BORK_FACE_TRAVEL_SELF_ONLY)
+            && (tile->type != opp->type)) continue;
+            int this_travel =
+                ((tile_d->face_flags[i] & BORK_FACE_TRAVEL)
+                || ((tile_d->face_flags[i] & BORK_FACE_TRAVEL_ORIENT)
+                    && (tile->orientation & (1 << i)))
+                || ((tile_d->face_flags[i] & BORK_FACE_TRAVEL_ORIENT_OPP)
+                    && !(tile->orientation & (1 << i))));
+            int opp_travel =
+                ((opp_d->face_flags[opp_dir] & BORK_FACE_TRAVEL)
+                || ((opp_d->face_flags[opp_dir] & BORK_FACE_TRAVEL_ORIENT)
+                    && (opp->orientation & (1 << opp_dir)))
+                || ((opp_d->face_flags[opp_dir] & BORK_FACE_TRAVEL_ORIENT_OPP)
+                    && !(opp->orientation & (1 << opp_dir))));
+            tile->travel_flags |= ((this_travel && opp_travel) << i);
+        }
+    }
 }
 
 /*  Model generation code   */

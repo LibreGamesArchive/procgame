@@ -602,6 +602,7 @@ void bork_editor_complete_map(struct bork_map* map, struct bork_editor_map* ed_m
             }
         }
     }
+    bork_map_calc_travel(map);
     bork_entity_t ent_arr = bork_entity_new(ed_map->ents.len);
     struct bork_editor_entity* ed_ent;
     ARR_FOREACH_PTR(ed_map->ents, ed_ent, i) {
