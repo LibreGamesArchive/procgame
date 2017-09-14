@@ -36,6 +36,13 @@ static const vec3 PG_DIR_BITAN[6] = {
     [PG_RIGHT] = { 0, 0, -1.0f },
     [PG_UP] = { 0, 1.0f, 0 },
     [PG_DOWN] = { 0, -1.0f, 0 } };
+static const int PG_DIR_IDX[6][3] = {
+    [PG_FRONT] = { 0, 1, 0 },
+    [PG_BACK] = { 0, -1, 0 },
+    [PG_LEFT] = { 1, 0, 0 },
+    [PG_RIGHT] = { -1, 0, 0 },
+    [PG_UP] = { 0, 0, 1 },
+    [PG_DOWN] = { 0, 0, -1 } };
 
 int pg_init(int w, int h, int fullscreen, const char* window_title);
 void pg_deinit(void);
