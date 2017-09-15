@@ -62,6 +62,11 @@ struct bork_play_data {
     bork_entity_t looked_enemy;
 };
 void bork_play_reset_hud_anim(struct bork_play_data* d);
+void create_explosion(struct bork_play_data* d, vec3 pos);
+void create_smoke(struct bork_play_data* d, vec3 pos, vec3 dir, int lifetime);
+void robot_explosion(struct bork_play_data* d, vec3 pos);
+void create_spark(struct bork_play_data* d, vec3 pos);
+void tin_canine_tick(struct bork_play_data* d, struct bork_entity* ent);
 
 struct bork_editor_tile {
     uint8_t type;

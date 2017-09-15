@@ -26,10 +26,12 @@ struct bork_entity {
     vec3 pos;
     vec3 vel;
     vec2 dir;
+    vec3 dst_pos;
     uint32_t flags;
     int dead_ticks;
     int still_ticks;
     int pain_ticks;
+    int aware_ticks;
     int HP;
     int ammo;
     int ammo_type;

@@ -19,6 +19,9 @@
 #ifndef MOD
 #define MOD(a, b) ((a) % (b) < 0 ? ((a) % (b)) + b : (a) % (b))
 #endif
+#ifndef FMOD
+#define FMOD(a, b) (fmod(a, b) < 0 ? (fmod(a, b) + b) : (fmod(a, b)))
+#endif
 #ifndef SGN
 #define SGN(a)  (a < 0 ? -1 : 1)
 #endif
@@ -88,6 +91,22 @@ static inline float vec##n##_mul_inner(vec##n const a, vec##n const b) \
 static inline float vec##n##_len(vec##n const v) \
 { \
     return sqrtf(vec##n##_mul_inner(v,v)); \
+} \
+static inline float vec##n##_dist(vec##n const a, vec##n const b) \
+{ \
+    vec##n diff; \
+    vec##n##_sub(diff, a, b); \
+    return vec##n##_len(diff); \
+} \
+static inline float vec##n##_len2(vec##n const v) \
+{ \
+    return vec##n##_mul_inner(v,v); \
+} \
+static inline float vec##n##_dist2(vec##n const a, vec##n const b) \
+{ \
+    vec##n diff; \
+    vec##n##_sub(diff, a, b); \
+    return vec##n##_len2(diff); \
 } \
 static inline void vec##n##_normalize(vec##n r, vec##n const v) \
 { \

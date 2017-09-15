@@ -227,7 +227,7 @@ struct bork_tile_detail BORK_TILE_DETAILS[] = {
         .tex_tile = { 38, 38, 38, 38, [PG_TOP] = 39, [PG_BOTTOM] = 37 },
         .add_model = tile_model_basic },
     [BORK_TILE_RAMP_BOTTOM] = { .name = "RAMP BOTTOM",
-        .tile_flags = BORK_TILE_TRAVEL_DROP | BORK_TILE_HAS_ORIENTATION,
+        .tile_flags = BORK_TILE_WALK_ABOVE | BORK_TILE_TRAVEL_DROP | BORK_TILE_HAS_ORIENTATION,
         .face_flags = { BORK_FACE_TRAVEL, BORK_FACE_TRAVEL, BORK_FACE_TRAVEL, BORK_FACE_TRAVEL },
         .add_model = tile_model_ramp },
     [BORK_TILE_RAMP_TOP] = { .name = "RAMP TOP",
@@ -520,6 +520,22 @@ void bork_map_build_plr_dist(struct bork_map* map)
     }
 }
 
+static int tile_travel(struct bork_tile* tile, int i)
+{
+    const struct bork_tile_detail* tile_d = bork_tile_detail(tile->type);
+    if(tile->type == BORK_TILE_RAMP_BOTTOM || tile->type == BORK_TILE_RAMP_TOP) {
+        if((tile->orientation & (1 << i))
+        || (tile->orientation & (1 << PG_DIR_OPPOSITE[i]))) return 1;
+        else return 0;
+    } else {
+        return ((tile_d->face_flags[i] & BORK_FACE_TRAVEL)
+            || ((tile_d->face_flags[i] & BORK_FACE_TRAVEL_ORIENT)
+                && (tile->orientation & (1 << i)))
+            || ((tile_d->face_flags[i] & BORK_FACE_TRAVEL_ORIENT_OPP)
+                && !(tile->orientation & (1 << i))));
+    }
+}
+
 void bork_map_calc_travel(struct bork_map* map)
 {
     struct bork_tile* tile;
@@ -529,7 +545,7 @@ void bork_map_calc_travel(struct bork_map* map)
     int x, y, z, i;
     for(x = 0; x < 32; ++x)
     for(y = 0; y < 32; ++y)
-    for(z = 0; z < 32; ++z) {
+    for(z = 1; z < 32; ++z) {
         tile = bork_map_tile_ptri(map, x, y, z);
         tile_d = bork_tile_detail(tile->type);
         tile->travel_flags = 0;
@@ -539,34 +555,26 @@ void bork_map_calc_travel(struct bork_map* map)
         if(z > 0) {
             opp = bork_map_tile_ptri(map, x, y, z - 1);
             opp_d = bork_tile_detail(opp->type);
-            if(opp_d->tile_flags & BORK_TILE_WALK_ABOVE) tile->travel_flags |= (1 << 6);
             if(opp_d->tile_flags & BORK_TILE_TRAVEL_DROP) {
                 tile->travel_flags |= (1 << 7) | (1 << 6);
             }
+            if(opp_d->tile_flags & BORK_TILE_WALK_ABOVE) tile->travel_flags |= (1 << 6);
         }
         for(i = 0; i < 4; ++i) {
-            int opp_dir = PG_DIR_OPPOSITE[i];
             int dx = x + PG_DIR_IDX[i][0];
             int dy = y + PG_DIR_IDX[i][1];
             int dz = z + PG_DIR_IDX[i][2];
             opp = bork_map_tile_ptri(map, dx, dy, dz);
             if(!opp) continue;
             opp_d = bork_tile_detail(opp->type);
-            if((tile_d->face_flags[i] & BORK_FACE_TRAVEL_SELF_ONLY)
-            && (tile->type != opp->type)) continue;
-            int this_travel =
-                ((tile_d->face_flags[i] & BORK_FACE_TRAVEL)
-                || ((tile_d->face_flags[i] & BORK_FACE_TRAVEL_ORIENT)
-                    && (tile->orientation & (1 << i)))
-                || ((tile_d->face_flags[i] & BORK_FACE_TRAVEL_ORIENT_OPP)
-                    && !(tile->orientation & (1 << i))));
-            int opp_travel =
-                ((opp_d->face_flags[opp_dir] & BORK_FACE_TRAVEL)
-                || ((opp_d->face_flags[opp_dir] & BORK_FACE_TRAVEL_ORIENT)
-                    && (opp->orientation & (1 << opp_dir)))
-                || ((opp_d->face_flags[opp_dir] & BORK_FACE_TRAVEL_ORIENT_OPP)
-                    && !(opp->orientation & (1 << opp_dir))));
-            tile->travel_flags |= ((this_travel && opp_travel) << i);
+            int opp_travel = tile_travel(opp, PG_DIR_OPPOSITE[i]);
+            if(opp->type != BORK_TILE_RAMP_TOP
+            && !(opp_d->tile_flags & BORK_TILE_TRAVEL_DROP)) {
+                opp = bork_map_tile_ptri(map, dx, dy, dz - 1);
+                opp_d = bork_tile_detail(opp->type);
+                if(!(opp_d->tile_flags & BORK_TILE_WALK_ABOVE)) continue;
+            }
+            tile->travel_flags |= ((tile_travel(tile, i) && opp_travel) << i);
         }
     }
 }

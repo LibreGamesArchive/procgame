@@ -11,6 +11,8 @@
 #include "game_states.h"
 #include "datapad_content.h"
 
+#define RANDF   ((float)rand() / RAND_MAX)
+
 /*  The Big Orbital Nonhuman Zone or "BONZ" consists of some main parts:
     Microgravity Utility Transit Tunnel (MUTT)
     Command Station
@@ -276,74 +278,6 @@ static struct bork_map_object* get_looked_map_object(struct bork_play_data* d)
     return looked_obj;
 }
 
-static void create_spark(struct bork_play_data* d, vec3 pos)
-{
-    struct bork_particle new_part = {
-        .pos = { pos[0], pos[1], pos[2] },
-        .vel = { 0, 0, 0 },
-        .ticks_left = 30,
-        .frame_ticks = 6,
-        .start_frame = 0, .end_frame = 5
-    };
-    ARR_PUSH(d->particles, new_part);
-}
-
-static void create_explosion(struct bork_play_data* d, vec3 pos)
-{
-    struct bork_particle new_part = {
-        .flags = BORK_PARTICLE_SPRITE | BORK_PARTICLE_LIGHT | BORK_PARTICLE_LIGHT_DECAY,
-        .pos = { pos[0], pos[1], pos[2] },
-        .light = { 1.5, 1.5, 1, 5 },
-        .vel = { 0, 0, 0 },
-        .ticks_left = 45,
-        .frame_ticks = 9,
-        .current_frame = 8,
-        .start_frame = 8, .end_frame = 12,
-    };
-    ARR_PUSH(d->particles, new_part);
-}
-
-static void create_smoke(struct bork_play_data* d, vec3 pos, vec3 dir, int lifetime)
-{
-    struct bork_particle new_part = {
-        .flags = BORK_PARTICLE_SPRITE | BORK_PARTICLE_BOUYANT | BORK_PARTICLE_DECELERATE,
-        .pos = { pos[0], pos[1], pos[2] },
-        .vel = { dir[0], dir[1], dir[2] },
-        .light = { 1.5, 1.5, 1, 5 },
-        .vel = { 0, 0, 0 },
-        .ticks_left = lifetime,
-        .frame_ticks = 0,
-        .current_frame = 16 + rand() % 4,
-    };
-    ARR_PUSH(d->particles, new_part);
-}
-
-#define RANDF   ((float)rand() / RAND_MAX)
-
-static void robot_explosion(struct bork_play_data* d, vec3 pos)
-{
-    vec3 pos_ = { pos[0], pos[1], pos[2] };
-    create_explosion(d, pos);
-    int num_scraps = 3 + rand() % 3;
-    int i;
-    for(i = 0; i < num_scraps; ++i) {
-        bork_entity_t new_id = bork_entity_new(1);
-        struct bork_entity* new_item = bork_entity_get(new_id);
-        if(!new_item) continue;
-        bork_entity_init(new_item, BORK_ITEM_SCRAPMETAL + (rand() % 3));
-        vec3_set(new_item->pos,
-            pos_[0] + (RANDF - 0.5),
-            pos_[1] + (RANDF - 0.5),
-            pos_[2] + (RANDF - 0.5));
-        vec3_set(new_item->vel,
-            (RANDF - 0.5) * 0.25,
-            (RANDF - 0.5) * 0.25,
-            (RANDF - 0.2) * 0.25);
-        new_item->counter[3] = 600;
-        new_item->flags |= BORK_ENTFLAG_SMOKING;
-        bork_map_add_item(&d->map, new_id);
-    }
-}
 
 static void tick_held_item(struct bork_play_data* d);
 static void tick_datapad(struct bork_play_data* d);
@@ -605,91 +539,7 @@ static void tick_datapad(struct bork_play_data* d)
 
 static void tick_enemy(struct bork_play_data* d, struct bork_entity* ent)
 {
-    if(ent->flags & BORK_ENTFLAG_DYING) {
-        --ent->dead_ticks;
-        if(ent->dead_ticks > 60 && ent->dead_ticks % 30 == 0) {
-            vec3 spark_pos = {
-                ent->pos[0] + (float)rand() / RAND_MAX - 0.5,
-                ent->pos[1] + (float)rand() / RAND_MAX - 0.5,
-                ent->pos[2] + (float)rand() / RAND_MAX - 0.5 };
-            create_spark(d, spark_pos);
-        } else if(ent->dead_ticks == 60) {
-            robot_explosion(d, ent->pos);
-            return;
-        } else if(ent->dead_ticks <= 0) {
-            ent->flags |= BORK_ENTFLAG_DEAD;
-        }
-    } else if(ent->HP <= 0) {
-        ent->flags |= BORK_ENTFLAG_DYING;
-        ent->dead_ticks = 180;
-        return;
-    } else {
-        vec3 ent_head, plr_head;
-        vec3_add(ent_head, ent->pos, (vec3){ 0, 0, 0.5 });
-        vec3_add(plr_head, d->plr.pos, (vec3){ 0, 0, 0.5 });
-        int vis = bork_map_check_vis(&d->map, ent_head, plr_head);
-        if(1) {
-            if(1) {
-                int x = floor(ent->pos[0] / 2);
-                int y = floor(ent->pos[1] / 2);
-                int z = floor(ent->pos[2] / 2);
-                int plr_dist = d->map.plr_dist[x][y][z];
-                printf("Enemy dist: %d Diff ", plr_dist);
-                int i;
-                for(i = 0; i < 4; ++i) {
-                    int dx = x + PG_DIR_IDX[i][0];
-                    int dy = y + PG_DIR_IDX[i][1];
-                    int diff = d->map.plr_dist[dx][dy][z];
-                    printf("%d: %d, ", i, diff);
-                    if(diff == plr_dist + 1) {
-                        vec3 move;
-                        vec3_set_len(move, PG_DIR_VEC[i], 0.005);
-                        vec3_add(ent->vel, ent->vel, move);
-                        break;
-                    }
-                }
-                printf("\n");
-            } else {
-                vec3 ent_to_plr;
-                vec3_sub(ent_to_plr, plr_head, ent_head);
-                float angle = atan2f(ent_to_plr[0], ent_to_plr[1]) + M_PI;
-                ent->dir[0] = (M_PI * 2 - angle) - M_PI * 0.5;
-                if(ent->counter[0] < d->ticks) {
-                    struct bork_bullet new_bullet = { .type = 6,
-                        .flags = BORK_BULLET_HURTS_PLAYER,
-                        .damage = 0 };
-                    vec3_set_len(new_bullet.dir, ent_to_plr, 0.4);
-                    vec3_add(new_bullet.pos, ent_head, new_bullet.dir);
-                    //ARR_PUSH(d->bullets, new_bullet);
-                    ent->counter[0] = d->ticks + 180;
-                }
-            }
-        }
-        if(ent->flags & BORK_ENTFLAG_ON_FIRE) {
-            if(ent->counter[2] % 41 == 0) {
-                create_smoke(d,
-                    (vec3){ ent->pos[0] + (RANDF - 0.5) * 0.5,
-                            ent->pos[1] + (RANDF - 0.5) * 0.5,
-                            ent->pos[2] + (RANDF - 0.5) * 0.5 },
-                    (vec3){}, 180);
-            } else if(ent->counter[2] % 31 == 0) {
-                struct bork_particle new_part = {
-                    .flags = BORK_PARTICLE_SPRITE | BORK_PARTICLE_BOUYANT | BORK_PARTICLE_DECELERATE,
-                    .pos = { ent->pos[0] + (RANDF - 0.5) * 0.5,
-                             ent->pos[1] + (RANDF - 0.5) * 0.5,
-                             ent->pos[2] + (RANDF - 0.5) * 0.5 },
-                    .vel = { 0, 0, -0.005 },
-                    .ticks_left = 120,
-                    .frame_ticks = 0,
-                    .current_frame = 24 + rand() % 4,
-                };
-                ARR_PUSH(d->particles, new_part);
-            }
-            --ent->counter[2];
-            if(ent->counter[2] == 0) ent->flags &= ~BORK_ENTFLAG_ON_FIRE;
-        }
-    }
-    bork_entity_update(ent, &d->map);
+    tin_canine_tick(d, ent);
 }
 
 static void tick_enemies(struct bork_play_data* d)
