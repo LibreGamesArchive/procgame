@@ -71,7 +71,7 @@ void bork_bullet_move(struct bork_bullet* blt, struct bork_map* map)
                 if(blt->type == BORK_ITEM_BULLETS_INC - BORK_ITEM_BULLETS
                 || blt->type == BORK_ITEM_SHELLS_INC - BORK_ITEM_BULLETS) {
                     closest_ent->flags |= BORK_ENTFLAG_ON_FIRE;
-                    closest_ent->counter[2] = 360;
+                    closest_ent->fire_ticks = 360;
                 }
                 return;
             }

@@ -78,16 +78,19 @@ void bork_load_assets(struct bork_game_core* core)
     pg_texture_bind(&core->env_atlas, 5, 6);
     pg_texture_init_from_file(&core->editor_atlas, "res/editor_atlas.png", NULL);
     pg_texture_set_atlas(&core->editor_atlas, 32, 32);
-    pg_texture_bind(&core->editor_atlas, 7, 8);
+    pg_texture_bind(&core->editor_atlas, 7, 0);
     pg_texture_init_from_file(&core->bullet_tex, "res/bullets.png", "res/bullets_lightmap.png");
     pg_texture_set_atlas(&core->bullet_tex, 16, 16);
-    pg_texture_bind(&core->bullet_tex, 9, 10);
+    pg_texture_bind(&core->bullet_tex, 8, 9);
     pg_texture_init_from_file(&core->item_tex, "res/items.png", "res/items_lightmap.png");
     pg_texture_set_atlas(&core->item_tex, 16, 16);
-    pg_texture_bind(&core->item_tex, 11, 12);
+    pg_texture_bind(&core->item_tex, 10, 11);
     pg_texture_init_from_file(&core->particle_tex, "res/particles.png", "res/particles_lightmap.png");
     pg_texture_set_atlas(&core->particle_tex, 16, 16);
-    pg_texture_bind(&core->particle_tex, 13, 14);
+    pg_texture_bind(&core->particle_tex, 12, 13);
+    pg_texture_init_from_file(&core->upgrades_tex, "res/upgrades.png", NULL);
+    pg_texture_set_atlas(&core->upgrades_tex, 32, 32);
+    pg_texture_bind(&core->upgrades_tex, 14, 0);
     /*  Generate the backdrop texture (cloudy reddish fog)  */
     pg_texture_init(&core->backdrop_tex, 256, 256);
     pg_texture_init(&core->menu_vignette, 256, 256);
@@ -230,7 +233,7 @@ void bork_draw_linear_vignette(struct bork_game_core* core, vec4 color_mod)
     pg_shader_2d_transform(shader, (vec2){}, (vec2){ core->aspect_ratio, 1 }, 0);
     pg_shader_2d_texture(shader, &core->menu_vignette);
     pg_shader_2d_color_mod(shader, color_mod);
-    pg_shader_2d_set_light(shader, (vec2){ 0, -1 }, (vec3){}, (vec3){ 1, 1, 1 });
+    pg_shader_2d_set_light(shader, (vec2){}, (vec3){}, (vec3){ 1, 1, 1 });
     if(!pg_shader_is_active(shader)) pg_shader_begin(shader, NULL);
     pg_model_begin(&core->quad_2d_ctr, shader);
     pg_model_draw(&core->quad_2d_ctr, NULL);

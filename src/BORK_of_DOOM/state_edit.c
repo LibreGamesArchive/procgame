@@ -5,6 +5,7 @@
 #include "bork.h"
 #include "entity.h"
 #include "map_area.h"
+#include "upgrades.h"
 #include "game_states.h"
 #include "datapad_content.h"
 
@@ -88,7 +89,11 @@ static void bork_editor_update_map(struct bork_editor_data* d)
             struct bork_editor_entity new_ent = {
                 .type = d->ent_type,
                 .pos = { click[0], click[1], d->cursor[2] + 0.5 } };
-            if(d->ent_type == BORK_ITEM_DATAPAD) new_ent.option = d->datapad_id;
+            if(d->ent_type == BORK_ITEM_DATAPAD) new_ent.option[0] = d->datapad_id;
+            else if(d->ent_type == BORK_ITEM_UPGRADE) {
+                new_ent.option[0] = d->upgrade_type[0];
+                new_ent.option[1] = d->upgrade_type[1];
+            }
             ARR_PUSH(d->map.ents, new_ent);
         }
     } else if(pg_check_input(PG_RIGHT_MOUSE, PG_CONTROL_HIT)) {
@@ -217,6 +222,14 @@ static void bork_editor_update_map(struct bork_editor_data* d)
             d->datapad_id = MOD(d->datapad_id + 1, NUM_DATAPADS);
         } else if(pg_check_input(SDL_SCANCODE_DOWN, PG_CONTROL_HIT)) {
             d->datapad_id = MOD(d->datapad_id - 1, NUM_DATAPADS);
+        }
+    } else if(d->ent_type == BORK_ITEM_UPGRADE) {
+        int t = 0;
+        if(pg_check_input(SDL_SCANCODE_LSHIFT, PG_CONTROL_HELD)) t = 1;
+        if(pg_check_input(SDL_SCANCODE_UP, PG_CONTROL_HIT)) {
+            d->upgrade_type[t] = MOD(d->upgrade_type[t] + 1, BORK_NUM_UPGRADES);
+        } else if(pg_check_input(SDL_SCANCODE_DOWN, PG_CONTROL_HIT)) {
+            d->upgrade_type[t] = MOD(d->upgrade_type[t] - 1, BORK_NUM_UPGRADES);
         }
     }
     if(d->select_mode == 1) {
@@ -381,6 +394,18 @@ static void bork_editor_draw(struct pg_game_state* state)
         vec4_set(text.block_style[b], 1, 0.35, 0.02, 1.2);
         vec4_set(text.block_color[b], 1, 1, 1, 1);
         text.use_blocks += 2;
+    } else if(d->ent_type == BORK_ITEM_UPGRADE) {
+        int b = text.use_blocks;
+        const struct bork_upgrade_detail* up_d = bork_upgrade_detail(d->upgrade_type[0]);
+        snprintf(text.block[b], 64, "UPGRADE 1: %s", up_d->name);
+        vec4_set(text.block_style[b], 1, 0.32, 0.02, 1.2);
+        vec4_set(text.block_color[b], 1, 1, 1, 1);
+        ++b;
+        up_d = bork_upgrade_detail(d->upgrade_type[1]);
+        snprintf(text.block[b], 64, "UPGRADE 2: %s", up_d->name);
+        vec4_set(text.block_style[b], 1, 0.35, 0.02, 1.2);
+        vec4_set(text.block_color[b], 1, 1, 1, 1);
+        text.use_blocks += 2;
     }
     if(tile->type == BORK_TILE_EDITOR_DOOR) {
         int b = text.use_blocks;
@@ -459,7 +484,11 @@ void bork_editor_complete_entity(struct bork_entity* ent,
         .item_quantity = 1,
         .type = ed->type,
     };
-    if(ed->type == BORK_ITEM_DATAPAD) ent->counter[0] = ed->option;
+    if(ed->type == BORK_ITEM_DATAPAD) ent->counter[0] = ed->option[0];
+    else if(ed->type == BORK_ITEM_UPGRADE) {
+        ent->counter[0] = ed->option[0];
+        ent->counter[1] = ed->option[1];
+    }
 }
 
 void bork_editor_complete_door(struct bork_map* map, struct bork_editor_map* ed_map,

@@ -1,73 +1,3 @@
-struct bork_play_data {
-    /*  Core data   */
-    int ticks;
-    struct bork_game_core* core;
-    ARR_T(struct pg_light) lights_buf;    /*  Updated per frame   */
-    ARR_T(struct pg_light) spotlights;
-    /*  Gameplay data   */
-    struct bork_map map;
-    struct bork_entity plr;
-    int flashlight_on;
-    float player_speed;
-    int held_item;
-    int quick_item[4];
-    int reload_ticks, reload_length;
-    int ammo[BORK_AMMO_TYPES];
-    bork_entity_arr_t plr_enemy_query;
-    bork_entity_arr_t plr_item_query;
-    bork_entity_arr_t inventory;
-    ARR_T(struct bork_bullet) bullets;
-    ARR_T(struct bork_particle) particles;
-    /*  The HUD-item animation  */
-    vec3 hud_anim[5];
-    float hud_angle[5];
-    float hud_anim_progress;
-    float hud_anim_speed;
-    int hud_anim_active;
-    int hud_anim_destroy_when_finished;
-    void (*hud_anim_callback)(struct bork_entity* item, struct bork_play_data* d);
-    int hud_callback_frame;
-    /*  HUD datapad info    */
-    int hud_datapad_id;
-    int hud_datapad_ticks;
-    int hud_datapad_line;
-    /*  Input states    */
-    vec2 mouse_motion;
-    int crouch_toggle;
-    int joystick_held[2];
-    int trigger_held[2];
-    struct {
-        enum {
-            BORK_MENU_CLOSED,
-            BORK_MENU_DOORPAD,
-            BORK_MENU_INVENTORY,
-            BORK_MENU_CHARACTER,
-            BORK_MENU_PLAYERDEAD,
-        } state;
-        union {
-            struct {
-                int selection_idx, scroll_idx;
-                int ammo_select;
-            } inv;
-            struct {
-                int selection[2];
-                int unlocked_ticks;
-                int door_idx;
-                int num_chars;
-                uint8_t chars[8];
-            } doorpad;
-        };
-    } menu;
-    bork_entity_t looked_item;
-    bork_entity_t looked_enemy;
-};
-void bork_play_reset_hud_anim(struct bork_play_data* d);
-void create_explosion(struct bork_play_data* d, vec3 pos);
-void create_smoke(struct bork_play_data* d, vec3 pos, vec3 dir, int lifetime);
-void robot_explosion(struct bork_play_data* d, vec3 pos);
-void create_spark(struct bork_play_data* d, vec3 pos);
-void tin_canine_tick(struct bork_play_data* d, struct bork_entity* ent);
-
 struct bork_editor_tile {
     uint8_t type;
     uint8_t dir;
@@ -88,12 +18,13 @@ struct bork_editor_data {
         ARR_T(struct bork_editor_entity {
             uint8_t type;
             vec3 pos;
-            int option;
+            int option[4];
         }) ents;
     } map;
     struct bork_editor_tile current_tile;
     int selected_ent;
     enum bork_entity_type ent_type;
+    int upgrade_type[2];
     int datapad_id;
     int select_mode;    /*  Whether the selection is being drawn    */
     int selection[4];

@@ -7,6 +7,7 @@
 #include "bullet.h"
 #include "map_area.h"
 #include "physics.h"
+#include "upgrades.h"
 #include "game_states.h"
 
 static ARR_T(struct bork_entity) ent_pool = {};
@@ -127,7 +128,6 @@ void bork_entity_move(struct bork_entity* ent, struct bork_map* map)
         else ent->vel[2] = -0.05;
         friction = 1;
     } else if(ent->flags & BORK_ENTFLAG_GROUND) {
-        if(vec3_len(ent->vel) > 0.1) vec3_set_len(ent->vel, ent->vel, 0.1);
         friction = 1;
     }
     if(friction) vec3_scale(ent->vel, ent->vel, 0.8);

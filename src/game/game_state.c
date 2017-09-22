@@ -44,9 +44,7 @@ void pg_game_state_update(struct pg_game_state* state, float new_time)
         if(ticks_done >= state->tick_max) break;
     }
     if((acc + tick_time) < time_elapsed && ticks_done) {
-        printf("%f : %f : %f\n", acc, time_elapsed, state->time);
         state->last_tick = new_time;
-        printf("Timestep falling behind!\n");
     } else {
         state->last_tick = state->last_tick + acc;
     }

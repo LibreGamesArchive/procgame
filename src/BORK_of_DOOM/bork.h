@@ -33,6 +33,7 @@ struct bork_game_core {
     struct pg_texture editor_atlas;
     struct pg_texture bullet_tex;
     struct pg_texture particle_tex;
+    struct pg_texture upgrades_tex;
     struct pg_texture item_tex;
     struct pg_texture font;
     /*  Generated assets    */
@@ -51,6 +52,9 @@ struct bork_game_core {
     int mouse_relative;
     SDL_GameController* gpad;
 };
+
+struct bork_map;
+struct bork_play_data;
 
 void bork_init(struct bork_game_core* core);
 void bork_deinit(struct bork_game_core* core);

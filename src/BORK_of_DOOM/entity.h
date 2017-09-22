@@ -1,6 +1,3 @@
-struct bork_map;
-struct bork_play_data;
-
 #define BORK_ENTFLAG_DEAD               (1 << 0)
 #define BORK_ENTFLAG_INACTIVE           (1 << 1)
 #define BORK_ENTFLAG_GROUND             (1 << 2)
@@ -20,6 +17,7 @@ struct bork_play_data;
 #define BORK_ENTFLAG_IS_GUN             (1 << 16)
 #define BORK_ENTFLAG_IS_MELEE           (1 << 17)
 #define BORK_ENTFLAG_IS_AMMO            (1 << 18)
+#define BORK_ENTFLAG_EMP                (1 << 19)
 
 struct bork_entity {
     int last_tick;
@@ -28,10 +26,13 @@ struct bork_entity {
     vec2 dir;
     vec3 dst_pos;
     uint32_t flags;
+    int path_ticks;
     int dead_ticks;
     int still_ticks;
     int pain_ticks;
     int aware_ticks;
+    int emp_ticks;
+    int fire_ticks;
     int HP;
     int ammo;
     int ammo_type;
@@ -62,6 +63,8 @@ struct bork_entity {
         BORK_ITEM_SCRAPMETAL,
         BORK_ITEM_WIRES,
         BORK_ITEM_STEELPLATE,
+        BORK_ITEM_UPGRADE,
+        BORK_ITEM_DECOY,
         BORK_ENTITY_TYPES,
     } type;
 };
@@ -299,6 +302,16 @@ static const struct bork_entity_profile {
         .size = { 0.4, 0.4, 0.4 },
         .sprite_tx = { 1, 1, 0, 0 },
         .front_frame = 4 },
+    [BORK_ITEM_UPGRADE] = { .name = "TECH UPGRADE",
+        .base_flags = BORK_ENTFLAG_ITEM,
+        .size = { 0.4, 0.4, 0.4 },
+        .sprite_tx = { 1, 1, 0, 0 },
+        .front_frame = 20 },
+    [BORK_ITEM_DECOY] = { .name = "DECOY",
+        .base_flags = BORK_ENTFLAG_ITEM | BORK_ENTFLAG_NOT_INTERACTIVE,
+        .size = { 0.4, 0.4, 0.4 },
+        .sprite_tx = { 1, 1, 0, 0 },
+        .front_frame = 42 }
 };
 
 typedef int bork_entity_t;
@@ -309,4 +322,5 @@ void bork_entpool_clear(void);
 void bork_entity_init(struct bork_entity* ent, enum bork_entity_type type);
 void bork_entity_push(struct bork_entity* ent, vec3 push);
 void bork_entity_update(struct bork_entity* ent, struct bork_map* map);
+void bork_entity_get_view(struct bork_entity* ent, mat4 view);
 void bork_entity_get_eye(struct bork_entity* ent, vec3 out_dir, vec3 out_pos);

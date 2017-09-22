@@ -5,6 +5,7 @@
 #include "bork.h"
 #include "entity.h"
 #include "map_area.h"
+#include "upgrades.h"
 #include "game_states.h"
 
 static const char* BORK_AREA_STRING[] = {
@@ -462,12 +463,27 @@ int bork_map_check_vis(struct bork_map* map, vec3 const start, vec3 const end)
     return 1;
 }
 
-void bork_map_build_plr_dist(struct bork_map* map)
+float bork_map_vis_dist(struct bork_map* map, vec3 const start, vec3 const dir)
+{
+    vec3 part_vec, curr_point;
+    float part_dist = 0.25;
+    float curr_dist = 0;
+    vec3_set_len(part_vec, dir, part_dist);
+    vec3_dup(curr_point, start);
+    while(bork_map_tile_ptr(map, curr_point)) {
+        if(bork_map_check_sphere(map, curr_point, 0.25)) return curr_dist;
+        vec3_add(curr_point, curr_point, part_vec);
+        curr_dist += part_dist;
+    }
+    return curr_dist;
+}
+
+void bork_map_build_plr_dist(struct bork_map* map, vec3 pos)
 {
     memset(map->plr_dist, 0, sizeof(map->plr_dist));
-    int plr_x = floor(map->plr->pos[0] / 2);
-    int plr_y = floor(map->plr->pos[1] / 2);
-    int plr_z = floor(map->plr->pos[2] / 2);
+    int plr_x = floor(pos[0] / 2);
+    int plr_y = floor(pos[1] / 2);
+    int plr_z = floor(pos[2] / 2);
     /*  Start the queue with the player's current tile  */
     struct bork_tile* opp = bork_map_tile_ptri(map, plr_x, plr_y, plr_z + 1);
     struct bork_tile* tile = bork_map_tile_ptri(map, plr_x, plr_y, plr_z);
@@ -482,7 +498,6 @@ void bork_map_build_plr_dist(struct bork_map* map)
         int d = map->plr_dist[x][y][z];
         if(d > 1) {
             tile = bork_map_tile_ptri(map, x, y, z);
-            printf("%s\n", bork_tile_detail(tile->type)->name);
             int i;
             for(i = 0; i < 4; ++i) {
                 if(!(tile->travel_flags & (1 << i))) continue;
@@ -930,7 +945,6 @@ void bork_map_add_enemy(struct bork_map* map, bork_entity_t ent_id)
     y = (int)ent->pos[1] / 16;
     z = (int)ent->pos[2] / 16;
     ARR_PUSH(map->enemies[x][y][z], ent_id);
-    printf("Adding %d %d %d\n", x, y, z);
 }
 
 void bork_map_add_item(struct bork_map* map, bork_entity_t ent_id)

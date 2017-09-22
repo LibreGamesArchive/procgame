@@ -8,6 +8,8 @@
 #include "map_area.h"
 #include "bullet.h"
 #include "physics.h"
+#include "upgrades.h"
+#include "state_play.h"
 #include "game_states.h"
 
 #define RANDF   ((float)rand() / RAND_MAX)
@@ -22,6 +24,19 @@ void create_spark(struct bork_play_data* d, vec3 pos)
         .start_frame = 0, .end_frame = 5
     };
     ARR_PUSH(d->particles, new_part);
+}
+
+void create_sparks(struct bork_play_data* d, vec3 pos, int sparks)
+{
+    int i;
+    for(i = 0; i < sparks; ++i) {
+        vec3 spark_pos;
+        vec3_set(spark_pos,
+            pos[0] + (float)rand() / RAND_MAX - 0.5,
+            pos[1] + (float)rand() / RAND_MAX - 0.5,
+            pos[2] + (float)rand() / RAND_MAX - 0.5);
+        create_spark(d, spark_pos);
+    }
 }
 
 void create_explosion(struct bork_play_data* d, vec3 pos)

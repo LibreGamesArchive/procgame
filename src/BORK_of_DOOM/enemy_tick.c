@@ -8,33 +8,32 @@
 #include "map_area.h"
 #include "physics.h"
 #include "particle.h"
+#include "upgrades.h"
+#include "state_play.h"
 #include "game_states.h"
 
 #define RANDF   ((float)rand() / RAND_MAX)
 
-static void entity_on_fire(struct bork_play_data* d, struct bork_entity* ent)
+static void entity_emp(struct bork_play_data* d, struct bork_entity* ent)
 {
-    if(ent->counter[2] % 41 == 0) {
+    if(ent->emp_ticks <= 0) {
+        ent->flags &= ~BORK_ENTFLAG_EMP;
+        return;
+    }
+    if(ent->emp_ticks % 41 == 0) {
         create_smoke(d,
             (vec3){ ent->pos[0] + (RANDF - 0.5) * 0.5,
                     ent->pos[1] + (RANDF - 0.5) * 0.5,
                     ent->pos[2] + (RANDF - 0.5) * 0.5 },
             (vec3){}, 180);
-    } else if(ent->counter[2] % 31 == 0) {
-        struct bork_particle new_part = {
-            .flags = BORK_PARTICLE_SPRITE | BORK_PARTICLE_BOUYANT | BORK_PARTICLE_DECELERATE,
-            .pos = { ent->pos[0] + (RANDF - 0.5) * 0.5,
-                     ent->pos[1] + (RANDF - 0.5) * 0.5,
-                     ent->pos[2] + (RANDF - 0.5) * 0.5 },
-            .vel = { 0, 0, -0.005 },
-            .ticks_left = 120,
-            .frame_ticks = 0,
-            .current_frame = 24 + rand() % 4,
-        };
-        ARR_PUSH(d->particles, new_part);
+    } else if(ent->emp_ticks % 17 == 0) {
+        vec3 spark_pos = {
+            ent->pos[0] + (float)rand() / RAND_MAX - 0.5,
+            ent->pos[1] + (float)rand() / RAND_MAX - 0.5,
+            ent->pos[2] + (float)rand() / RAND_MAX - 0.5 };
+        create_spark(d, spark_pos);
     }
-    --ent->counter[2];
-    if(ent->counter[2] == 0) ent->flags &= ~BORK_ENTFLAG_ON_FIRE;
+    --ent->emp_ticks;
 }
 
 static void robot_dying(struct bork_play_data* d, struct bork_entity* ent)
@@ -88,18 +87,29 @@ static int path_from_tile(struct bork_map* map, int x, int y, int z)
     if(closest > 0) return closest_i;
     else return -1;
 }
+
 void tin_canine_tick(struct bork_play_data* d, struct bork_entity* ent)
 {
+    static bork_entity_arr_t surr = {};
+    ARR_TRUNCATE(surr, 0);
+    vec3 start, end;
+    vec3_sub(start, ent->pos, (vec3){ 2, 2, 2 });
+    vec3_add(end, ent->pos, (vec3){ 2, 2, 2 });
+    bork_map_query_enemies(&d->map, &surr, start, end);
     if(ent->flags & BORK_ENTFLAG_ON_FIRE) entity_on_fire(d, ent);
+    if(ent->flags & BORK_ENTFLAG_EMP) {
+        entity_emp(d, ent);
+        return;
+    }
     if(ent->flags & BORK_ENTFLAG_DYING) robot_dying(d, ent);
     else if(ent->HP <= 0) {
         ent->flags |= BORK_ENTFLAG_DYING;
-        ent->dead_ticks = 180;
+        ent->dead_ticks = PLAY_SECONDS(3);
         return;
     } else {
         vec3 ent_head, plr_head;
+        get_plr_pos_for_ai(d, plr_head);
         vec3_add(ent_head, ent->pos, (vec3){ 0, 0, 0.5 });
-        vec3_add(plr_head, d->plr.pos, (vec3){ 0, 0, 0.5 });
         int vis = bork_map_check_vis(&d->map, ent_head, plr_head);
         if(vis) ent->aware_ticks = 1200;
         else if(ent->aware_ticks) --ent->aware_ticks;
@@ -116,14 +126,16 @@ void tin_canine_tick(struct bork_play_data* d, struct bork_entity* ent)
                 if(plr_dist) {
                     vec3 diff = {};
                     vec2_sub(diff, ent->dst_pos, ent->pos);
-                    if(vec2_len(diff) > 0.5 && vec2_len(diff) < 16) {
+                    if(ent->path_ticks && vec2_len(diff) > 0.5 && vec2_len(diff) < 16) {
                         /*  Just move to the last calculated destination    */
                         float angle = atan2f(diff[0], diff[1]) + M_PI;
                         ent->dir[0] = (M_PI * 2 - angle) - M_PI * 0.5;
                         ent->dir[0] = FMOD(ent->dir[0], M_PI * 2);
                         vec2_set_len(diff, diff, 0.005);
                         vec3_add(ent->vel, ent->vel, diff);
+                        --ent->path_ticks;
                     } else {
+                        ent->path_ticks = PLAY_SECONDS(2.5);
                         /*  Calculate the next tile on the path */
                         int path = path_from_tile(&d->map, x, y, z);
                         if(path >= 0) {
@@ -148,6 +160,21 @@ void tin_canine_tick(struct bork_play_data* d, struct bork_entity* ent)
                     ARR_PUSH(d->bullets, new_bullet);
                 }
             }
+        }
+    }
+    int i;
+    struct bork_entity* surr_ent;
+    bork_entity_t ent_id;
+    ARR_FOREACH(surr, ent_id, i) {
+        surr_ent = bork_entity_get(ent_id);
+        if(!surr_ent) continue;
+        vec3 push;
+        vec3_sub(push, ent->pos, surr_ent->pos);
+        float dist = vec3_len(push);
+        if(dist < 1.0f) {
+            vec3_set_len(push, push, 1.0f - dist);
+            vec3_add(ent->vel, ent->vel, push);
+            vec3_sub(surr_ent->vel, surr_ent->vel, push);
         }
     }
     bork_entity_update(ent, &d->map);
