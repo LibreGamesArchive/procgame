@@ -144,6 +144,18 @@ struct bork_map_object* get_looked_map_object(struct bork_play_data* d)
         closest_angle = angle;
         looked_obj = obj;
     }
+    ARR_FOREACH_PTR(d->map.recyclers, obj, i) {
+        vec3 ent_to_plr;
+        vec3_sub(ent_to_plr, obj->pos, look_pos);
+        float dist = vec3_len(ent_to_plr);
+        if(dist >= closest_dist) continue;
+        vec3_normalize(ent_to_plr, ent_to_plr);
+        float angle = acosf(vec3_mul_inner(ent_to_plr, look_dir));
+        if(angle >= closest_angle) continue;
+        closest_dist = dist;
+        closest_angle = angle;
+        looked_obj = obj;
+    }
     return looked_obj;
 }
 

@@ -50,6 +50,7 @@ enum bork_tile_type {
     BORK_TILE_DUCT,
     BORK_TILE_RAMP_BOTTOM, BORK_TILE_RAMP_TOP,
     BORK_TILE_EDITOR_DOOR,
+    BORK_TILE_EDITOR_RECYCLER,
     BORK_TILE_EDITOR_LIGHT1,
     BORK_TILE_EDITOR_LIGHT_WALLMOUNT,
     BORK_TILE_EDITOR_LIGHT_SMALLMOUNT,
@@ -68,6 +69,7 @@ struct bork_map_object {
     enum bork_map_object_type {
         BORK_MAP_DOOR,
         BORK_MAP_DOORPAD,
+        BORK_MAP_RECYCLER,
     } type;
     vec3 pos;
     quat dir;
@@ -102,11 +104,13 @@ struct bork_map {
     bork_entity_arr_t items[4][4][4];
     ARR_T(struct bork_map_object) doors;
     ARR_T(struct bork_map_object) doorpads;
+    ARR_T(struct bork_map_object) recyclers;
     ARR_T(struct bork_map_light_fixture) light_fixtures;
     ARR_T(struct bork_fire) fires;
     ARR_T(struct pg_light) lights;
     ARR_T(struct pg_light) spotlights;
     struct pg_model door_model;
+    struct pg_model recycler_model;
     struct bork_entity* plr;
 };
 

@@ -221,18 +221,22 @@ static void tick_control_play(struct bork_play_data* d)
                 add_inventory_item(d, d->looked_item);
             }
         } else if(d->looked_obj) {
-            struct bork_map_object* door = &d->map.doors.data[d->looked_obj->doorpad.door_idx];
-            if(door->door.locked) {
-                d->menu.doorpad.unlocked_ticks = 0;
-                d->menu.doorpad.selection[0] = -1;
-                d->menu.doorpad.selection[1] = 0;
-                d->menu.doorpad.num_chars = 0;
-                d->menu.doorpad.door_idx = d->looked_obj->doorpad.door_idx;
-                d->menu.state = BORK_MENU_DOORPAD;
-                SDL_ShowCursor(SDL_ENABLE);
-                pg_mouse_mode(0);
-            } else {
-                door->door.open = 1 - door->door.open;
+            if(d->looked_obj->type == BORK_MAP_DOORPAD) {
+                struct bork_map_object* door = &d->map.doors.data[d->looked_obj->doorpad.door_idx];
+                if(door->door.locked == 1) {
+                    d->menu.doorpad.unlocked_ticks = 0;
+                    d->menu.doorpad.selection[0] = -1;
+                    d->menu.doorpad.selection[1] = 0;
+                    d->menu.doorpad.num_chars = 0;
+                    d->menu.doorpad.door_idx = d->looked_obj->doorpad.door_idx;
+                    d->menu.state = BORK_MENU_DOORPAD;
+                    SDL_ShowCursor(SDL_ENABLE);
+                    pg_mouse_mode(0);
+                } else {
+                    door->door.open = 1 - door->door.open;
+                }
+            } else if(d->looked_obj->type == BORK_MAP_RECYCLER) {
+                printf("USING A RECYCLER EH?\n");
             }
         }
     }
@@ -756,7 +760,7 @@ static void draw_hud_overlay(struct bork_play_data* d)
     pg_shader_2d_resolution(&d->core->shader_2d, (vec2){ d->core->aspect_ratio, 1 });
     pg_shader_2d_set_light(&d->core->shader_2d, (vec2){}, (vec3){}, (vec3){ 1, 1, 1 });
     pg_shader_2d_color_mod(&d->core->shader_2d, (vec4){ 1, 1, 1, 1 });
-    pg_shader_2d_tex_frame(&d->core->shader_2d, 56);
+    pg_shader_2d_tex_frame(&d->core->shader_2d, 248);
     float hp_frac = (float)d->plr.HP / 100.0f;
     pg_shader_2d_add_tex_tx(&d->core->shader_2d, (vec2){ hp_frac * 4, 1 }, (vec2){ 0, 0 });
     pg_shader_2d_transform(&d->core->shader_2d, (vec2){ ar / 2 - 0.2, 0.86 }, (vec2){ 0.4 * hp_frac, 0.1 }, 0);
@@ -784,7 +788,7 @@ static void draw_datapad(struct bork_play_data* d)
     pg_shader_2d_tex_frame(shader, 4);
     pg_shader_2d_transform(shader, (vec2){ 0.3, 0.84 }, (vec2){ 0.1, 0.1 }, 0);
     pg_model_draw(&d->core->quad_2d_ctr, NULL);
-    pg_shader_2d_tex_frame(shader, 52);
+    pg_shader_2d_tex_frame(shader, 236);
     pg_shader_2d_add_tex_tx(shader, (vec2){ 4, 1.5 }, (vec2){});
     pg_shader_2d_transform(shader, (vec2){ 0.3, 0.75 }, (vec2){ 0.25, 0.1 }, 0);
     pg_model_draw(&d->core->quad_2d_ctr, NULL);
@@ -861,7 +865,7 @@ static void draw_decoy(struct bork_play_data* d)
     struct pg_shader* shader = &d->core->shader_sprite;
     pg_shader_sprite_mode(shader, PG_SPRITE_CYLINDRICAL);
     pg_shader_sprite_texture(shader, &d->core->item_tex);
-    pg_shader_sprite_tex_frame(shader, 35);
+    pg_shader_sprite_tex_frame(shader, 224);
     pg_shader_sprite_add_tex_tx(shader, (vec2){ 1.5, 1.5 }, (vec2){});
     pg_shader_sprite_transform(shader, (vec2){ 1, 1 }, (vec2){});
     pg_shader_sprite_color_mod(shader, (vec4){ 1.0f, 1.0f, 1.0f, 1.0f });

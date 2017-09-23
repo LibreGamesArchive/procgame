@@ -53,6 +53,7 @@ struct bork_play_data {
         enum {
             BORK_MENU_CLOSED,
             BORK_MENU_DOORPAD,
+            BORK_MENU_RECYCLER,
             BORK_MENU_INVENTORY,
             BORK_MENU_UPGRADES,
             BORK_MENU_PLAYERDEAD,
@@ -61,6 +62,9 @@ struct bork_play_data {
             int selection_idx, scroll_idx;
             int ammo_select;
         } inv;
+        struct {
+            int selection_idx;
+        } recycler;
         struct {
             int selection_idx, scroll_idx, side;
             int confirm;

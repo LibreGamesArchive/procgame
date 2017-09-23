@@ -30,6 +30,8 @@ static int tile_model_duct(struct bork_map*, struct pg_texture*,
                            struct bork_tile*, int, int, int);
 static int tile_model_ramp(struct bork_map*, struct pg_texture*,
                            struct bork_tile*, int, int, int);
+static int tile_model_recycler(struct bork_map*, struct pg_texture*,
+                               struct bork_tile*, int, int, int);
 static void bork_map_generate_model(struct bork_map* map,
                                     struct pg_texture* env_atlas);
 
@@ -237,6 +239,9 @@ struct bork_tile_detail BORK_TILE_DETAILS[] = {
         .add_model = tile_model_ramp },
     [BORK_TILE_EDITOR_DOOR] = { .name = "DOOR",
         .tile_flags = BORK_TILE_HAS_ORIENTATION },
+    [BORK_TILE_EDITOR_RECYCLER] = { .name = "RECYCLER",
+        .tile_flags = BORK_TILE_HAS_ORIENTATION,
+        .add_model = tile_model_recycler },
     [BORK_TILE_EDITOR_LIGHT1] = { .name = "CEIL LIGHT" },
     [BORK_TILE_EDITOR_LIGHT_WALLMOUNT] = { .name = "WALL LIGHT",
         .tile_flags = BORK_TILE_HAS_ORIENTATION },
@@ -258,10 +263,6 @@ void bork_map_init(struct bork_map* map)
 
 void bork_map_init_model(struct bork_map* map, struct bork_game_core* core)
 {
-    /*  Generate the map model  */
-    pg_model_init(&map->model);
-    bork_map_generate_model(map, &core->env_atlas);
-    pg_shader_buffer_model(&core->shader_3d, &map->model);
     /*  And the door model  */
     pg_model_init(&map->door_model);
     vec4 face_uv[6] = {};
@@ -278,6 +279,25 @@ void bork_map_init_model(struct bork_map* map, struct bork_game_core* core)
     pg_model_rect_prism(&map->door_model, (vec3){ 1, 0.125, 1 }, face_uv);
     pg_model_precalc_ntb(&map->door_model);
     pg_shader_buffer_model(&core->shader_3d, &map->door_model);
+    /*  And the recombobulator model  */
+    pg_model_init(&map->recycler_model);
+    pg_texture_get_frame(&core->env_atlas, 51, face_uv[PG_FRONT]);
+    pg_texture_frame_tx(face_uv[PG_FRONT], face_uv[PG_FRONT], (vec2){ 0.5, 1 }, (vec2){});
+    pg_texture_get_frame(&core->env_atlas, 51, face_uv[PG_BACK]);
+    pg_texture_frame_tx(face_uv[PG_BACK], face_uv[PG_BACK], (vec2){ 0.5, 1 }, (vec2){ 16.0f / 512.0f });
+    vec4_dup(face_uv[PG_LEFT], face_uv[PG_BACK]);
+    pg_texture_frame_flip(face_uv[PG_RIGHT], face_uv[PG_LEFT], 0, 1);
+    pg_texture_frame_flip(face_uv[PG_BACK], face_uv[PG_BACK], 0, 1);
+    pg_texture_get_frame(&core->env_atlas, 67, face_uv[PG_TOP]);
+    pg_texture_frame_tx(face_uv[PG_TOP], face_uv[PG_TOP], (vec2){ 0.5, 0.5 }, (vec2){});
+    vec4_dup(face_uv[PG_BOTTOM], face_uv[PG_TOP]);
+    pg_model_rect_prism(&map->recycler_model, (vec3){ 0.5, 0.5, 1 }, face_uv);
+    pg_model_precalc_ntb(&map->recycler_model);
+    pg_shader_buffer_model(&core->shader_3d, &map->recycler_model);
+    /*  Generate the map model  */
+    pg_model_init(&map->model);
+    bork_map_generate_model(map, &core->env_atlas);
+    pg_shader_buffer_model(&core->shader_3d, &map->model);
 }
 
 void bork_map_deinit(struct bork_map* map)
@@ -917,6 +937,37 @@ static int tile_model_ramp(struct bork_map* map, struct pg_texture* env_atlas,
     pg_model_add_triangle(model, vert_idx + 5, vert_idx + 6, vert_idx + 7);
     return 4;
 }
+
+static int tile_model_recycler(struct bork_map* map, struct pg_texture* env_atlas,
+                               struct bork_tile* tile, int x, int y, int z)
+{
+    vec3 pos = { x * 2 + 1, y * 2 + 1, z * 2 + 1 };
+    quat dir;
+    quat_identity(dir);
+    if(tile->orientation & (1 << PG_LEFT)) {
+        pos[0] -= 0.5;
+        quat_rotate(dir, M_PI * 1.5, (vec3){ 0, 0, 1 });
+    } else if(tile->orientation & (1 << PG_BACK)) {
+        pos[1] += 0.5;
+        quat_rotate(dir, M_PI, (vec3){ 0, 0, 1 });
+    } else if(tile->orientation & (1 << PG_RIGHT)) {
+        pos[0] += 0.5;
+        quat_rotate(dir, M_PI * 0.5, (vec3){ 0, 0, 1 });
+    } else {
+        pos[1] -= 0.5;
+    }
+    mat4 model_transform;
+    mat4_translate(model_transform, pos[0], pos[1], pos[2]);
+    mat4_mul_quat(model_transform, model_transform, dir);
+    pg_model_append(&map->model, &map->recycler_model, model_transform);
+    struct bork_map_object new_obj = {
+        .type = BORK_MAP_RECYCLER,
+        .pos = { x * 2 + 1, y * 2 + 1, z * 2 + 1.5 },
+    };
+    ARR_PUSH(map->recyclers, new_obj);
+    return 12;
+}
+
 
 int bork_map_load_editor_map(struct bork_map* map, char* filename)
 {
