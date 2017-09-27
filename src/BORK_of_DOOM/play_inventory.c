@@ -9,6 +9,7 @@
 #include "bullet.h"
 #include "physics.h"
 #include "upgrades.h"
+#include "recycler.h"
 #include "game_states.h"
 #include "state_play.h"
 #include "datapad_content.h"

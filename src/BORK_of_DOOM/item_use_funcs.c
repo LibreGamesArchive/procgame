@@ -8,6 +8,7 @@
 #include "map_area.h"
 #include "physics.h"
 #include "upgrades.h"
+#include "recycler.h"
 #include "state_play.h"
 #include "game_states.h"
 

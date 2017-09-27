@@ -9,6 +9,7 @@
 #include "physics.h"
 #include "particle.h"
 #include "upgrades.h"
+#include "recycler.h"
 #include "state_play.h"
 #include "game_states.h"
 

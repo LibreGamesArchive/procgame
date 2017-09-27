@@ -6,6 +6,7 @@
 #include "entity.h"
 #include "map_area.h"
 #include "upgrades.h"
+#include "recycler.h"
 #include "game_states.h"
 #include "datapad_content.h"
 
