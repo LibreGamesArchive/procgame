@@ -209,6 +209,7 @@ void pg_gbuffer_begin_pointlight(struct pg_gbuffer* gbuf, struct pg_viewer* view
     glBindFramebuffer(GL_FRAMEBUFFER, gbuf->frame);
     glDrawBuffers(1, drawbufs + 2);
     glEnable(GL_DEPTH_TEST);
+    glDepthFunc(GL_LESS);
     glDepthMask(0);
     glFrontFace(GL_CCW);
     /*  All the lights are just added on top of each other  */
@@ -236,6 +237,7 @@ void pg_gbuffer_begin_spotlight(struct pg_gbuffer* gbuf, struct pg_viewer* view)
     glBindFramebuffer(GL_FRAMEBUFFER, gbuf->frame);
     glDrawBuffers(1, drawbufs + 2);
     glEnable(GL_DEPTH_TEST);
+    glDepthFunc(GL_LESS);
     glDepthMask(0);
     glFrontFace(GL_CCW);
     /*  All the lights are just added on top of each other  */
@@ -278,10 +280,11 @@ void pg_gbuffer_draw_spotlight(struct pg_gbuffer* gbuf, struct pg_light* light)
 void pg_gbuffer_mode(struct pg_gbuffer* gbuf, int mode)
 {
     if(mode) {
-        glDisable(GL_DEPTH_TEST);
+        glDepthFunc(GL_GEQUAL);
+        glDepthMask(GL_FALSE);
         glFrontFace(GL_CW);
     } else {
-        glEnable(GL_DEPTH_TEST);
+        glDepthFunc(GL_LESS);
         glFrontFace(GL_CCW);
     }
 }
@@ -303,5 +306,6 @@ void pg_gbuffer_finish(struct pg_gbuffer* gbuf, vec3 ambient_light)
     /*  Unbind and reset everything back to normal  */
     glBindVertexArray(0);
     glEnable(GL_DEPTH_TEST);
-    glDepthMask(1);
+    glDepthFunc(GL_LESS);
+    glDepthMask(GL_TRUE);
 }
