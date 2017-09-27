@@ -21,3 +21,12 @@ void pg_viewer_set(struct pg_viewer* view, vec3 pos, vec2 dir)
     mat4_rotate_Z(view->view_matrix, view->view_matrix, (M_PI / 2) - dir[0]);
     mat4_translate_in_place(view->view_matrix, -pos[0], -pos[1], -pos[2]);
 }
+
+void pg_viewer_project(struct pg_viewer* view, vec2 out, vec3 const pos)
+{
+    vec4 pos_ = { pos[0], pos[1], pos[2], 1 };
+    vec4 out_;
+    mat4_mul_vec4(out_, view->proj_matrix, out_);
+    mat4_mul_vec4(out_, view->view_matrix, pos_);
+    vec2_dup(out, out_);
+}
