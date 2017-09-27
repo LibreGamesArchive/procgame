@@ -37,7 +37,7 @@ void pg_shader_2d_add_tex_tx(struct pg_shader* shader, vec2 const scale, vec2 co
 void pg_shader_2d_texture(struct pg_shader* shader, struct pg_texture* tex);
 void pg_shader_2d_tex_weight(struct pg_shader* shader, float weight);
 void pg_shader_2d_tex_frame(struct pg_shader* shader, int frame);
-void pg_shader_2d_color_mod(struct pg_shader* shader, vec4 const color);
+void pg_shader_2d_color_mod(struct pg_shader* shader, vec4 const color, vec4 const add);
 void pg_shader_2d_set_light(struct pg_shader* shader, vec2 const pos,
                             vec3 const color, vec3 const ambient);
 

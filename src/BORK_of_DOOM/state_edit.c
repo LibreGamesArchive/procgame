@@ -94,6 +94,8 @@ static void bork_editor_update_map(struct bork_editor_data* d)
             else if(d->ent_type == BORK_ITEM_UPGRADE) {
                 new_ent.option[0] = d->upgrade_type[0];
                 new_ent.option[1] = d->upgrade_type[1];
+            } else if(d->ent_type == BORK_ITEM_SCHEMATIC) {
+                new_ent.option[0] = d->schematic_type;
             }
             ARR_PUSH(d->map.ents, new_ent);
         }
@@ -232,6 +234,12 @@ static void bork_editor_update_map(struct bork_editor_data* d)
         } else if(pg_check_input(SDL_SCANCODE_DOWN, PG_CONTROL_HIT)) {
             d->upgrade_type[t] = MOD(d->upgrade_type[t] - 1, BORK_NUM_UPGRADES);
         }
+    } else if(d->ent_type == BORK_ITEM_SCHEMATIC) {
+        if(pg_check_input(SDL_SCANCODE_UP, PG_CONTROL_HIT)) {
+            d->schematic_type = MOD(d->schematic_type + 1, BORK_NUM_SCHEMATICS);
+        } else if(pg_check_input(SDL_SCANCODE_DOWN, PG_CONTROL_HIT)) {
+            d->schematic_type = MOD(d->schematic_type - 1, BORK_NUM_SCHEMATICS);
+        }
     }
     if(d->select_mode == 1) {
         d->selection[2] = d->cursor[0];
@@ -296,7 +304,7 @@ static void bork_editor_draw(struct pg_game_state* state)
     pg_shader_2d_texture(shader, &d->core->editor_atlas);
     pg_shader_2d_tex_weight(shader, 1.0f);
     pg_shader_2d_tex_frame(shader, 2);
-    pg_shader_2d_color_mod(shader, (vec4){ 1, 1, 1, 1 });
+    pg_shader_2d_color_mod(shader, (vec4){ 1, 1, 1, 1 }, (vec4){});
     int select_rect[4] = {
         MIN(d->selection[0], d->selection[2]), MIN(d->selection[1], d->selection[3]),
         MAX(d->selection[0], d->selection[2]), MAX(d->selection[1], d->selection[3]) };
@@ -309,9 +317,9 @@ static void bork_editor_draw(struct pg_game_state* state)
             if(d->select_mode >= 0
             && x >= select_rect[0] && x <= select_rect[2]
             && y >= select_rect[1] && y <= select_rect[3]) {
-                pg_shader_2d_color_mod(&d->core->shader_2d, (vec4){ 1, 1, 1, 0.5 });
+                pg_shader_2d_color_mod(&d->core->shader_2d, (vec4){ 1, 1, 1, 0.5 }, (vec4){});
             } else {
-                pg_shader_2d_color_mod(&d->core->shader_2d, (vec4){ 1, 1, 1, 1 });
+                pg_shader_2d_color_mod(&d->core->shader_2d, (vec4){ 1, 1, 1, 1 }, (vec4){});
             }
             pg_shader_2d_transform(&d->core->shader_2d,
                 (vec2){ 0.2 + 0.02 * x, 0.2 + 0.02 * y },
@@ -325,7 +333,7 @@ static void bork_editor_draw(struct pg_game_state* state)
     const struct bork_tile_detail* cursor_detail = bork_tile_detail(d->current_tile.type);
     /*  Draw the scaled-up view of the currently selected tile in the map   */
     pg_shader_2d_tex_frame(&d->core->shader_2d, d->current_tile.type);
-    pg_shader_2d_color_mod(&d->core->shader_2d, (vec4){ 1, 1, 1, 1 });
+    pg_shader_2d_color_mod(&d->core->shader_2d, (vec4){ 1, 1, 1, 1 }, (vec4){});
     pg_shader_2d_transform(&d->core->shader_2d,
         (vec2){ d->cursor[0] * 0.02 + 0.2, d->cursor[1] * 0.02 + 0.2 },
         (vec2){ 0.02, 0.02 }, 0);
@@ -407,6 +415,14 @@ static void bork_editor_draw(struct pg_game_state* state)
         vec4_set(text.block_style[b], 1, 0.35, 0.02, 1.2);
         vec4_set(text.block_color[b], 1, 1, 1, 1);
         text.use_blocks += 2;
+    } else if(d->ent_type == BORK_ITEM_SCHEMATIC) {
+        int b = text.use_blocks;
+        const struct bork_schematic_detail* sch_d = &BORK_SCHEMATIC_DETAIL[d->schematic_type];
+        const struct bork_entity_profile* prof = &BORK_ENT_PROFILES[sch_d->product];
+        snprintf(text.block[b], 64, "SCHEMATIC: %s\n", prof->name);
+        vec4_set(text.block_style[b], 1, 0.32, 0.02, 1.2);
+        vec4_set(text.block_color[b], 1, 1, 1, 1);
+        text.use_blocks += 1;
     }
     if(tile->type == BORK_TILE_EDITOR_DOOR) {
         int b = text.use_blocks;
@@ -489,6 +505,8 @@ void bork_editor_complete_entity(struct bork_entity* ent,
     else if(ed->type == BORK_ITEM_UPGRADE) {
         ent->counter[0] = ed->option[0];
         ent->counter[1] = ed->option[1];
+    } else if(ed->type == BORK_ITEM_SCHEMATIC) {
+        ent->counter[0] = ed->option[0];
     }
 }
 
@@ -545,7 +563,7 @@ void bork_editor_complete_map(struct bork_map* map, struct bork_editor_map* ed_m
                     struct pg_light new_light;
                     pg_light_spotlight(&new_light,
                         (vec3){ i * 2 + 1, j * 2 + 1, k * 2 + 1.75 }, 9,
-                        (vec3){ 1.5, 1.5, 1.2 }, (vec3){ 0, 0, -1 }, 1.7);
+                        (vec3){ 1.5, 1.5, 1.3 }, (vec3){ 0, 0, -1 }, 1.7);
                     int push = 0;
                     if(ed_tile->dir & (1 << 7)) {
                         push = 1;
@@ -585,7 +603,7 @@ void bork_editor_complete_map(struct bork_map* map, struct bork_editor_map* ed_m
                     vec3_normalize(dir_angle, dir_angle);
                     struct pg_light new_light;
                     pg_light_spotlight(&new_light,
-                        pos, 7, (vec3){ 1.5, 1.5, 1.2 }, dir_angle, 1.15);
+                        pos, 7, (vec3){ 1.5, 1.5, 1.3 }, dir_angle, 1.15);
                     ARR_PUSH(map->spotlights, new_light);
                     struct bork_map_light_fixture new_lfix = {
                         .pos = { new_light.pos[0], new_light.pos[1], new_light.pos[2] - 0.1 },
@@ -620,7 +638,7 @@ void bork_editor_complete_map(struct bork_map* map, struct bork_editor_map* ed_m
                     vec3_normalize(dir_angle, dir_angle);
                     struct pg_light new_light;
                     pg_light_spotlight(&new_light,
-                        pos, 3.5, (vec3){ 1.5, 1.5, 1.2 }, dir_angle, 0.9);
+                        pos, 3.5, (vec3){ 1.5, 1.5, 1.3 }, dir_angle, 0.9);
                     ARR_PUSH(map->spotlights, new_light);
                     struct bork_map_light_fixture new_lfix = {
                         .pos = { new_light.pos[0], new_light.pos[1], new_light.pos[2] - 0.1 },

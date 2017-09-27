@@ -242,7 +242,7 @@ void hud_passive(struct bork_play_data* d, int l, int idx, int passive_i)
     }
     pg_shader_2d_tex_frame(&d->core->shader_2d, d->upgrades[idx]);
     pg_model_draw(&d->core->quad_2d_ctr, NULL);
-    pg_shader_2d_color_mod(&d->core->shader_2d, (vec4){ 1, 1, 1, 1 });
+    pg_shader_2d_color_mod(&d->core->shader_2d, (vec4){ 1, 1, 1, 1 }, (vec4){});
 }
 
 void hud_jetpack(struct bork_play_data* d, int l, int idx, int passive_i)
@@ -250,14 +250,14 @@ void hud_jetpack(struct bork_play_data* d, int l, int idx, int passive_i)
     pg_shader_2d_transform(&d->core->shader_2d,
         (vec2){ 0.3 + passive_i * 0.075, 0.885 }, (vec2){ 0.03, 0.03 }, 0);
     pg_shader_2d_color_mod(&d->core->shader_2d,
-        (vec4){ 1, 1, 1, d->upgrade_counters[idx] / (float)PLAY_SECONDS(10) });
+        (vec4){ 1, 1, 1, d->upgrade_counters[idx] / (float)PLAY_SECONDS(10) }, (vec4){});
     if(l == 1) {
         pg_shader_2d_tex_frame(&d->core->shader_2d, 14);
         pg_model_draw(&d->core->quad_2d_ctr, NULL);
     }
     pg_shader_2d_tex_frame(&d->core->shader_2d, BORK_UPGRADE_JETPACK);
     pg_model_draw(&d->core->quad_2d_ctr, NULL);
-    pg_shader_2d_color_mod(&d->core->shader_2d, (vec4){ 1, 1, 1, 1 });
+    pg_shader_2d_color_mod(&d->core->shader_2d, (vec4){ 1, 1, 1, 1 }, (vec4){});
 }
 
 void hud_doorhack(struct bork_play_data* d, int l, int idx)
@@ -288,9 +288,9 @@ void hud_bothack(struct bork_play_data* d, int l, int idx)
     pg_shader_2d_transform(&d->core->shader_2d, (vec2){ 0.15, 0.85 },
                            (vec2){ 0.075 * scale, 0.075 * scale }, 0);
     if(d->looked_enemy == -1) {
-        pg_shader_2d_color_mod(&d->core->shader_2d, (vec4){ 1, 1, 1, 0.25 });
+        pg_shader_2d_color_mod(&d->core->shader_2d, (vec4){ 1, 1, 1, 0.25 }, (vec4){});
     } else {
-        pg_shader_2d_color_mod(&d->core->shader_2d, (vec4){ 1, 1, 1, 1 });
+        pg_shader_2d_color_mod(&d->core->shader_2d, (vec4){ 1, 1, 1, 1 }, (vec4){});
     }
     if(d->upgrade_use_level == 1) {
         pg_shader_2d_tex_frame(&d->core->shader_2d, 14);
@@ -298,7 +298,7 @@ void hud_bothack(struct bork_play_data* d, int l, int idx)
     }
     pg_shader_2d_tex_frame(&d->core->shader_2d, BORK_UPGRADE_BOTHACK);
     pg_model_draw(&d->core->quad_2d_ctr, NULL);
-    pg_shader_2d_color_mod(&d->core->shader_2d, (vec4){ 1, 1, 1, 1 });
+    pg_shader_2d_color_mod(&d->core->shader_2d, (vec4){ 1, 1, 1, 1 }, (vec4){});
 }
 
 void hud_decoy(struct bork_play_data* d, int l, int idx)
@@ -310,14 +310,14 @@ void hud_decoy(struct bork_play_data* d, int l, int idx)
         if(d->upgrade_counters[idx] > 0) {
             a = (1.0f - (d->upgrade_counters[idx] / (float)PLAY_SECONDS(15))) * 0.7 + 0.05;
         }
-        pg_shader_2d_color_mod(&d->core->shader_2d, (vec4){ 1, 1, 1, a });
+        pg_shader_2d_color_mod(&d->core->shader_2d, (vec4){ 1, 1, 1, a }, (vec4){});
         if(l == 1) {
             pg_shader_2d_tex_frame(&d->core->shader_2d, 14);
             pg_model_draw(&d->core->quad_2d_ctr, NULL);
         }
         pg_shader_2d_tex_frame(&d->core->shader_2d, BORK_UPGRADE_DECOY);
         pg_model_draw(&d->core->quad_2d_ctr, NULL);
-        pg_shader_2d_color_mod(&d->core->shader_2d, (vec4){ 1, 1, 1, 1 });
+        pg_shader_2d_color_mod(&d->core->shader_2d, (vec4){ 1, 1, 1, 1 }, (vec4){});
     }
 }
 
@@ -335,9 +335,9 @@ void hud_healing(struct bork_play_data* d, int l, int idx, int passive_i)
         if(d->upgrade_counters[idx] > 0) {
             a = (1.0f - (d->upgrade_counters[idx] / (float)PLAY_SECONDS(8))) * 0.7 + 0.05;
         }
-        pg_shader_2d_color_mod(&d->core->shader_2d, (vec4){ 1, 1, 1, a });
+        pg_shader_2d_color_mod(&d->core->shader_2d, (vec4){ 1, 1, 1, a }, (vec4){});
         pg_model_draw(&d->core->quad_2d_ctr, NULL);
-        pg_shader_2d_color_mod(&d->core->shader_2d, (vec4){ 1, 1, 1, 1 });
+        pg_shader_2d_color_mod(&d->core->shader_2d, (vec4){ 1, 1, 1, 1 }, (vec4){});
     }
 }
 
@@ -350,14 +350,14 @@ void hud_defense(struct bork_play_data* d, int l, int idx, int passive_i)
         if(d->upgrade_counters[idx] > 0) {
             a = (1.0f - (d->upgrade_counters[idx] / (float)PLAY_SECONDS(6))) * 0.7 + 0.05;
         }
-        pg_shader_2d_color_mod(&d->core->shader_2d, (vec4){ 1, 1, 1, a });
+        pg_shader_2d_color_mod(&d->core->shader_2d, (vec4){ 1, 1, 1, a }, (vec4){});
         if(l == 1) {
             pg_shader_2d_tex_frame(&d->core->shader_2d, 14);
             pg_model_draw(&d->core->quad_2d_ctr, NULL);
         }
         pg_shader_2d_tex_frame(&d->core->shader_2d, BORK_UPGRADE_DEFENSE);
         pg_model_draw(&d->core->quad_2d_ctr, NULL);
-        pg_shader_2d_color_mod(&d->core->shader_2d, (vec4){ 1, 1, 1, 1 });
+        pg_shader_2d_color_mod(&d->core->shader_2d, (vec4){ 1, 1, 1, 1 }, (vec4){});
     }
 }
 
@@ -367,7 +367,7 @@ void draw_upgrade_hud(struct bork_play_data* d)
     pg_shader_2d_set_light(&d->core->shader_2d, (vec2){}, (vec3){}, (vec3){ 1, 1, 1 });
     pg_model_begin(&d->core->quad_2d_ctr, &d->core->shader_2d);
     pg_shader_2d_texture(&d->core->shader_2d, &d->core->upgrades_tex);
-    pg_shader_2d_color_mod(&d->core->shader_2d, (vec4){ 1, 1, 1, 1 });
+    pg_shader_2d_color_mod(&d->core->shader_2d, (vec4){ 1, 1, 1, 1 }, (vec4){});
     int i;
     int passive_i = 0;
     for(i = 0; i < 3; ++i) {
@@ -484,6 +484,7 @@ void tick_control_upgrade_menu(struct bork_play_data* d)
                 || pg_check_gamepad(SDL_CONTROLLER_BUTTON_B, PG_CONTROL_HIT)
                 || pg_check_gamepad(SDL_CONTROLLER_BUTTON_LEFTSHOULDER, PG_CONTROL_HIT)) {
             d->menu.state = BORK_MENU_CLOSED;
+            SDL_ShowCursor(SDL_DISABLE);
             pg_mouse_mode(1);
             return;
         }
@@ -536,7 +537,7 @@ void draw_upgrade_menu(struct bork_play_data* d, float t)
     pg_shader_2d_resolution(shader, (vec2){ ar, 1 });
     pg_shader_2d_texture(shader, &d->core->upgrades_tex);
     pg_shader_2d_set_light(shader, (vec2){}, (vec3){}, (vec3){ 1, 1, 1 });
-    pg_shader_2d_color_mod(shader, (vec4){ 1, 1, 1, 1 });
+    pg_shader_2d_color_mod(shader, (vec4){ 1, 1, 1, 1 }, (vec4){});
     pg_model_begin(&d->core->quad_2d_ctr, shader);
     int inv_len = MIN(4, d->held_upgrades.len);
     int inv_start = d->menu.upgrades.scroll_idx;
@@ -577,12 +578,12 @@ void draw_upgrade_menu(struct bork_play_data* d, float t)
             selected_upgrade = up_d[0];
             pg_shader_2d_transform(shader,
                 (vec2){ 0.2, 0.25 + (i * 0.125) }, (vec2){ 0.065, 0.065 }, 0);
-            pg_shader_2d_color_mod(shader, (vec4){ 1, 1, 1, 1 });
+            pg_shader_2d_color_mod(shader, (vec4){ 1, 1, 1, 1 }, (vec4){});
         } else {
             if(i + inv_start == d->menu.upgrades.selection_idx)
-                pg_shader_2d_color_mod(shader, (vec4){ 1, 1, 1, 0.8 });
+                pg_shader_2d_color_mod(shader, (vec4){ 1, 1, 1, 0.8 }, (vec4){});
             else
-                pg_shader_2d_color_mod(shader, (vec4){ 1, 1, 1, 0.4 });
+                pg_shader_2d_color_mod(shader, (vec4){ 1, 1, 1, 0.4 }, (vec4){});
             pg_shader_2d_transform(shader,
                 (vec2){ 0.2, 0.25 + (i * 0.125) }, (vec2){ 0.05, 0.05 }, 0);
         }
@@ -593,12 +594,12 @@ void draw_upgrade_menu(struct bork_play_data* d, float t)
             selected_upgrade = up_d[1];
             pg_shader_2d_transform(shader,
                 (vec2){ 0.35, 0.25 + (i * 0.125) }, (vec2){ 0.065, 0.065 }, 0);
-            pg_shader_2d_color_mod(shader, (vec4){ 1, 1, 1, 1 });
+            pg_shader_2d_color_mod(shader, (vec4){ 1, 1, 1, 1 }, (vec4){});
         } else {
             if(i + inv_start == d->menu.upgrades.selection_idx)
-                pg_shader_2d_color_mod(shader, (vec4){ 1, 1, 1, 0.8 });
+                pg_shader_2d_color_mod(shader, (vec4){ 1, 1, 1, 0.8 }, (vec4){});
             else
-                pg_shader_2d_color_mod(shader, (vec4){ 1, 1, 1, 0.4 });
+                pg_shader_2d_color_mod(shader, (vec4){ 1, 1, 1, 0.4 }, (vec4){});
             pg_shader_2d_transform(shader,
                 (vec2){ 0.35, 0.25 + (i * 0.125) }, (vec2){ 0.05, 0.05 }, 0);
         }

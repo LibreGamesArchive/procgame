@@ -27,12 +27,20 @@ const char* bork_map_area_str(enum bork_area area) {
 
 static int tile_model_basic(struct bork_map*, struct pg_texture*,
                             struct bork_tile*, int, int, int);
+static int tile_model_spec_wall(struct bork_map*, struct pg_texture*,
+                                struct bork_tile*, int, int, int);
 static int tile_model_duct(struct bork_map*, struct pg_texture*,
                            struct bork_tile*, int, int, int);
 static int tile_model_ramp(struct bork_map*, struct pg_texture*,
                            struct bork_tile*, int, int, int);
 static int tile_model_recycler(struct bork_map*, struct pg_texture*,
                                struct bork_tile*, int, int, int);
+static int tile_model_oven(struct bork_map*, struct pg_texture*,
+                           struct bork_tile*, int, int, int);
+static int tile_model_bed(struct bork_map*, struct pg_texture*,
+                          struct bork_tile*, int, int, int);
+static int tile_model_small_table(struct bork_map*, struct pg_texture*,
+                                  struct bork_tile*, int, int, int);
 static void bork_map_generate_model(struct bork_map* map,
                                     struct pg_texture* env_atlas);
 
@@ -60,6 +68,28 @@ struct bork_tile_detail BORK_TILE_DETAILS[] = {
             [PG_FRONT] = 35, [PG_BACK] = 35,
             [PG_TOP] = 3, [PG_DOWN] = 20 },
         .add_model = tile_model_basic },
+    [BORK_TILE_HULL_WHITE_CAUTION] = { .name = "WHITE HULL (CAUTION)",
+        .tile_flags = BORK_TILE_HAS_ORIENTATION,
+        .face_flags = { 1, 1, 1, 1, 1, 1 },
+                  /* Regular side, Flagged side, Top, Bottom    */
+        .tex_tile = { 83, 99, 83, 84 },
+        .add_model = tile_model_spec_wall },
+    [BORK_TILE_HULL_WHITE_LIGHT] = { .name = "WHITE HULL (LIGHTS)",
+        .tile_flags = BORK_TILE_HAS_ORIENTATION,
+        .face_flags = { 1, 1, 1, 1, 1, 1 },
+        .tex_tile = { 83, 100, 83, 84 },
+        .add_model = tile_model_spec_wall },
+    [BORK_TILE_HULL_PANELS] = { .name = "HULL PANELS",
+        .tile_flags = BORK_TILE_HAS_ORIENTATION,
+        .face_flags = { 1, 1, 1, 1, 1, 1 },
+        .tex_tile = { 36, 53, 37, 37 },
+        .add_model = tile_model_spec_wall },
+    [BORK_TILE_OVEN] = { .name = "OVEN",
+        .tile_flags = BORK_TILE_HAS_ORIENTATION,
+        .add_model = tile_model_oven },
+    [BORK_TILE_BED] = { .name = "BED",
+        .tile_flags = BORK_TILE_HAS_ORIENTATION,
+        .add_model = tile_model_bed },
     [BORK_TILE_CONTROL_PANEL] = { .name = "CONTROL PANEL",
         .tile_flags = BORK_TILE_WALK_ABOVE,
         .face_flags = { 1, 1, 1, 1, 1, 1 },
@@ -154,6 +184,9 @@ struct bork_tile_detail BORK_TILE_DETAILS[] = {
         .face_inset = { [PG_TOP] = 0.5 },
         .tex_tile = { 11, 11, 11, 11, 10, 10 },
         .add_model = tile_model_basic },
+    [BORK_TILE_TABLE_SMALL] = { .name = "SMALL TABLE",
+        .tile_flags = BORK_TILE_HAS_ORIENTATION,
+        .add_model = tile_model_small_table },
     [BORK_TILE_GARDEN] = { .name = "GARDEN",
         .face_flags = {
             BORK_FACE_HAS_SURFACE | BORK_FACE_HAS_BACKFACE | BORK_FACE_NO_SELF_OPPOSITE |
@@ -295,6 +328,54 @@ void bork_map_init_model(struct bork_map* map, struct bork_game_core* core)
     pg_model_rect_prism(&map->recycler_model, (vec3){ 0.5, 0.5, 1 }, face_uv);
     pg_model_precalc_ntb(&map->recycler_model);
     pg_shader_buffer_model(&core->shader_3d, &map->recycler_model);
+    /*  The oven model  */
+    pg_model_init(&map->oven_model);
+    pg_texture_get_frame(&core->env_atlas, 52, face_uv[PG_TOP]);
+    pg_texture_frame_tx(face_uv[PG_TOP], face_uv[PG_TOP], (vec2){ 0.875, 0.875 },
+                        (vec2){ 2.0f / 512.0f, 2.0f / 512.0f });
+    pg_texture_get_frame(&core->env_atlas, 68, face_uv[PG_FRONT]);
+    pg_texture_frame_tx(face_uv[PG_FRONT], face_uv[PG_FRONT], (vec2){ 0.875, 0.5 },
+                        (vec2){ 2.0f / 512.0f, 0 });
+    pg_texture_frame_tx(face_uv[PG_BACK], face_uv[PG_FRONT], (vec2){ 1, 1 },
+                        (vec2){ 0, 16.0f / 512.0f });
+    vec4_dup(face_uv[PG_LEFT], face_uv[PG_BACK]);
+    pg_texture_frame_flip(face_uv[PG_RIGHT], face_uv[PG_LEFT], 0, 1);
+    pg_texture_frame_flip(face_uv[PG_BACK], face_uv[PG_BACK], 0, 1);
+    pg_model_rect_prism(&map->oven_model, (vec3){ 0.875, 0.875, 0.5 }, face_uv);
+    pg_model_precalc_ntb(&map->oven_model);
+    pg_shader_buffer_model(&core->shader_3d, &map->oven_model);
+    /*  The bed model  */
+    pg_model_init(&map->bed_model);
+    pg_texture_get_frame(&core->env_atlas, 24, face_uv[PG_TOP]);
+    pg_texture_frame_tx(face_uv[PG_TOP], face_uv[PG_TOP], (vec2){ 0.5, 1 }, (vec2){});
+    pg_texture_get_frame(&core->env_atlas, 40, face_uv[PG_LEFT]);
+    pg_texture_frame_tx(face_uv[PG_LEFT], face_uv[PG_LEFT], (vec2){ 1, 0.5 }, (vec2){});
+    pg_texture_frame_flip(face_uv[PG_LEFT], face_uv[PG_LEFT], 1, 0);
+    pg_texture_frame_flip(face_uv[PG_RIGHT], face_uv[PG_LEFT], 1, 1);
+    pg_texture_frame_tx(face_uv[PG_BACK], face_uv[PG_LEFT], (vec2){ 0.5, 1 },
+                        (vec2){ 0, 16.0f / 512.0f });
+    pg_texture_frame_flip(face_uv[PG_BACK], face_uv[PG_BACK], 0, 1);
+    pg_texture_frame_tx(face_uv[PG_FRONT], face_uv[PG_BACK], (vec2){ 1, 1 },
+                        (vec2){ -16.0f / 512.0f, 0 });
+    pg_texture_frame_flip(face_uv[PG_FRONT], face_uv[PG_FRONT], 0, 1);
+    pg_model_rect_prism(&map->bed_model, (vec3){ 0.5, 1, 0.5 }, face_uv);
+    pg_model_precalc_ntb(&map->bed_model);
+    pg_shader_buffer_model(&core->shader_3d, &map->bed_model);
+    /*  The small table model  */
+    pg_model_init(&map->small_table_model);
+    pg_texture_get_frame(&core->env_atlas, 27, face_uv[PG_TOP]);
+    pg_texture_frame_tx(face_uv[PG_TOP], face_uv[PG_TOP], (vec2){ 0.5, 0.5 },
+                        (vec2){ 0, 16.0f / 512.0f });
+    pg_texture_get_frame(&core->env_atlas, 27, face_uv[PG_FRONT]);
+    pg_texture_frame_tx(face_uv[PG_FRONT], face_uv[PG_FRONT], (vec2){ 0.5, 0.5 },
+                        (vec2){ 16.0f / 512.0f, 0 });
+    vec4_dup(face_uv[PG_BACK], face_uv[PG_FRONT]);
+    vec4_dup(face_uv[PG_LEFT], face_uv[PG_BACK]);
+    pg_texture_frame_flip(face_uv[PG_RIGHT], face_uv[PG_LEFT], 0, 1);
+    pg_texture_frame_flip(face_uv[PG_BACK], face_uv[PG_BACK], 0, 1);
+    pg_model_rect_prism(&map->small_table_model, (vec3){ 0.5, 0.5, 0.5 }, face_uv);
+    pg_model_precalc_ntb(&map->small_table_model);
+    pg_shader_buffer_model(&core->shader_3d, &map->small_table_model);
     /*  Generate the map model  */
     pg_model_init(&map->model);
     bork_map_generate_model(map, &core->env_atlas);
@@ -759,6 +840,110 @@ static int tile_model_basic(struct bork_map* map, struct pg_texture* env_atlas,
     return tri_count;
 }
 
+static int tile_face_spec_wall(struct bork_map* map, struct pg_texture* env_atlas,
+                           struct bork_tile* tile, int x, int y, int z,
+                           enum pg_direction dir)
+{
+    /*  Get the details for this face   */
+    struct bork_tile_detail* detail = &BORK_TILE_DETAILS[tile->type];
+    uint32_t tile_flags = detail->tile_flags;
+    uint32_t face_flags = detail->face_flags[dir];
+    if(!(face_flags & BORK_FACE_HAS_SURFACE)) return 0; /*  Tile has no face here   */
+    /*  Get details for the opposing face   */
+    int opp[3] = { x + PG_DIR_VEC[dir][0], y + PG_DIR_VEC[dir][1], z + PG_DIR_VEC[dir][2] };
+    struct bork_tile* opp_tile = bork_map_tile_ptri(map, opp[0], opp[1], opp[2]);
+    struct bork_tile_detail* opp_detail = opp_tile ?
+        &BORK_TILE_DETAILS[opp_tile->type] : &BORK_TILE_DETAILS[0];
+    uint32_t opp_flags = opp_detail->face_flags[PG_DIR_OPPOSITE[dir]];
+    /*  Decide if this face of the tile needs to be generated   */
+    if(opp_flags & BORK_FACE_HAS_SURFACE && !(opp_flags & BORK_FACE_SEETHRU_SURFACE)
+    && !(face_flags & BORK_FACE_FORCE_SURFACE) && !(face_flags & BORK_FACE_FLUSH_SURFACE)) {
+        return 0;
+    } else if(face_flags & BORK_FACE_NO_SELF_OPPOSITE && opp_tile->type == tile->type) {
+        return 0;
+    } else if((tile_flags & BORK_TILE_FACE_ORIENTED) && dir < 4 && !(tile->orientation & (1 << dir))) {
+        return 0;
+    }
+    struct pg_model* model = &map->model;
+    /*  Calculate the base info for this face   */
+    int num_tris = 0;
+    vec3 inset_dir;
+    vec3_scale(inset_dir, PG_DIR_VEC[dir], detail->face_inset[dir]);
+    vec4 tex_frame;
+    if(dir < PG_TOP) {
+        if(tile->orientation & (1 << dir)) {
+            pg_texture_get_frame(env_atlas, detail->tex_tile[1], tex_frame);
+        } else {
+            pg_texture_get_frame(env_atlas, detail->tex_tile[0], tex_frame);
+        }
+    } else if(dir == PG_TOP) {
+        pg_texture_get_frame(env_atlas, detail->tex_tile[2], tex_frame);
+    } else if(dir == PG_BOTTOM) {
+        pg_texture_get_frame(env_atlas, detail->tex_tile[3], tex_frame);
+    }
+    unsigned vert_idx = model->v_count;
+    /*  Generate the geometry   */
+    struct pg_vertex_full new_vert = { .components =
+        PG_MODEL_COMPONENT_POSITION | PG_MODEL_COMPONENT_UV };
+    int i;
+    if(!(face_flags & BORK_FACE_NO_FRONTFACE)) {
+        for(i = 0; i < 4; ++i) {
+            vec2_set(new_vert.uv, tex_frame[(1 - (i < 2)) * 2],
+                     tex_frame[(1 - (i % 2)) * 2 + 1]);
+            vec3_dup(new_vert.pos, vert_pos[dir][i]);
+            if(new_vert.pos[2] == 0.5 && (face_flags & BORK_FACE_HALF_BOTTOM)) {
+                new_vert.pos[2] = 0.0f;
+                new_vert.uv[1] += (16.0f / 512.0f);
+            } else if(new_vert.pos[2] == -0.5 && (face_flags & BORK_FACE_HALF_TOP)) {
+                new_vert.pos[2] = 0.0f;
+                new_vert.uv[1] -= (16.0f / 512.0f);
+            }
+            vec3_add(new_vert.pos, new_vert.pos, (vec3){ 0.5, 0.5, 0.5 });
+            vec3_add(new_vert.pos, new_vert.pos, (vec3){ x, y, z });
+            vec3_sub(new_vert.pos, new_vert.pos, inset_dir);
+            vec3_scale(new_vert.pos, new_vert.pos, 2);
+            pg_model_add_vertex(model, &new_vert);
+        }
+        pg_model_add_triangle(model, vert_idx + 1, vert_idx + 0, vert_idx + 2);
+        pg_model_add_triangle(model, vert_idx + 1, vert_idx + 2, vert_idx + 3);
+        num_tris += 2;
+    }
+    if(face_flags & BORK_FACE_HAS_BACKFACE) {
+        for(i = 0; i < 4; ++i) {
+            vec2_set(new_vert.uv, tex_frame[(1 - (i < 2)) * 2],
+                     tex_frame[(1 - (i % 2)) * 2 + 1]);
+            vec3_dup(new_vert.pos, vert_pos[dir][i]);
+            if(new_vert.pos[2] == 0.5 && (face_flags & BORK_FACE_HALF_BOTTOM)) {
+                new_vert.pos[2] = 0.0f;
+                new_vert.uv[1] += (16.0f / 512.0f);
+            } else if(new_vert.pos[2] == -0.5 && (face_flags & BORK_FACE_HALF_TOP)) {
+                new_vert.pos[2] = 0.0f;
+                new_vert.uv[1] -= (16.0f / 512.0f);
+            }
+            vec3_add(new_vert.pos, new_vert.pos, (vec3){ 0.5, 0.5, 0.5 });
+            vec3_add(new_vert.pos, new_vert.pos, (vec3){ x, y, z });
+            vec3_sub(new_vert.pos, new_vert.pos, inset_dir);
+            vec3_scale(new_vert.pos, new_vert.pos, 2);
+            pg_model_add_vertex(model, &new_vert);
+        }
+        pg_model_add_triangle(model, vert_idx + 4, vert_idx + 5, vert_idx + 6);
+        pg_model_add_triangle(model, vert_idx + 6, vert_idx + 5, vert_idx + 7);
+        num_tris += 2;
+    }
+    return num_tris;
+}
+
+static int tile_model_spec_wall(struct bork_map* map, struct pg_texture* env_atlas,
+                                struct bork_tile* tile, int x, int y, int z)
+{
+    int tri_count = 0;
+    int s;
+    for(s = 0; s < 6; ++s) {
+        tri_count += tile_face_spec_wall(map, env_atlas, tile, x, y, z, s);
+    }
+    return tri_count;
+}
+
 static int tile_face_duct(struct bork_map* map, struct pg_texture* env_atlas,
                           struct bork_tile* tile, int x, int y, int z,
                           enum pg_direction dir)
@@ -943,19 +1128,24 @@ static int tile_model_recycler(struct bork_map* map, struct pg_texture* env_atla
                                struct bork_tile* tile, int x, int y, int z)
 {
     vec3 pos = { x * 2 + 1, y * 2 + 1, z * 2 + 1 };
+    vec3 out_pos = { x * 2 + 1, y * 2 + 1, z * 2 + 0.5 };
     quat dir;
     quat_identity(dir);
     if(tile->orientation & (1 << PG_LEFT)) {
         pos[0] -= 0.5;
+        out_pos[0] += 0.5;
         quat_rotate(dir, M_PI * 1.5, (vec3){ 0, 0, 1 });
     } else if(tile->orientation & (1 << PG_BACK)) {
         pos[1] += 0.5;
+        out_pos[1] -= 0.5;
         quat_rotate(dir, M_PI, (vec3){ 0, 0, 1 });
     } else if(tile->orientation & (1 << PG_RIGHT)) {
         pos[0] += 0.5;
+        out_pos[0] -= 0.5;
         quat_rotate(dir, M_PI * 0.5, (vec3){ 0, 0, 1 });
     } else {
         pos[1] -= 0.5;
+        out_pos[1] += 0.5;
     }
     mat4 model_transform;
     mat4_translate(model_transform, pos[0], pos[1], pos[2]);
@@ -964,11 +1154,72 @@ static int tile_model_recycler(struct bork_map* map, struct pg_texture* env_atla
     struct bork_map_object new_obj = {
         .type = BORK_MAP_RECYCLER,
         .pos = { x * 2 + 1, y * 2 + 1, z * 2 + 1.5 },
+        .recycler = { .out_pos = { out_pos[0], out_pos[1], out_pos[2] } }
     };
     ARR_PUSH(map->recyclers, new_obj);
     return 12;
 }
 
+static int tile_model_oven(struct bork_map* map, struct pg_texture* env_atlas,
+                           struct bork_tile* tile, int x, int y, int z)
+{
+    vec3 pos = { x * 2 + 1, y * 2 + 1, z * 2 + 0.5 };
+    quat dir;
+    quat_identity(dir);
+    if(tile->orientation & (1 << PG_LEFT)) {
+        quat_rotate(dir, M_PI * 1.5, (vec3){ 0, 0, 1 });
+    } else if(tile->orientation & (1 << PG_BACK)) {
+        quat_rotate(dir, M_PI, (vec3){ 0, 0, 1 });
+    } else if(tile->orientation & (1 << PG_RIGHT)) {
+        quat_rotate(dir, M_PI * 0.5, (vec3){ 0, 0, 1 });
+    }
+    mat4 model_transform;
+    mat4_translate(model_transform, pos[0], pos[1], pos[2]);
+    mat4_mul_quat(model_transform, model_transform, dir);
+    pg_model_append(&map->model, &map->oven_model, model_transform);
+    return 12;
+}
+
+static int tile_model_bed(struct bork_map* map, struct pg_texture* env_atlas,
+                          struct bork_tile* tile, int x, int y, int z)
+{
+    vec3 pos = { x * 2 + 1, y * 2 + 1, z * 2 + 0.3 };
+    quat dir;
+    quat_identity(dir);
+    if(tile->orientation & (1 << PG_LEFT)) {
+        quat_rotate(dir, M_PI * 1.5, (vec3){ 0, 0, 1 });
+    } else if(tile->orientation & (1 << PG_BACK)) {
+        quat_rotate(dir, M_PI, (vec3){ 0, 0, 1 });
+    } else if(tile->orientation & (1 << PG_RIGHT)) {
+        quat_rotate(dir, M_PI * 0.5, (vec3){ 0, 0, 1 });
+    }
+    mat4 model_transform;
+    mat4_translate(model_transform, pos[0], pos[1], pos[2]);
+    mat4_mul_quat(model_transform, model_transform, dir);
+    pg_model_append(&map->model, &map->bed_model, model_transform);
+    return 12;
+}
+
+static int tile_model_small_table(struct bork_map* map, struct pg_texture* env_atlas,
+                                  struct bork_tile* tile, int x, int y, int z)
+{
+    vec3 pos = { x * 2 + 1, y * 2 + 1, z * 2 + 0.3 };
+    quat dir;
+    quat_identity(dir);
+    if(tile->orientation & (1 << PG_LEFT))
+        pos[0] += 0.5;
+    if(tile->orientation & (1 << PG_BACK))
+        pos[1] -= 0.5;
+    if(tile->orientation & (1 << PG_RIGHT))
+        pos[0] -= 0.5;
+    if(tile->orientation & (1 << PG_FRONT))
+        pos[1] += 0.5;
+    mat4 model_transform;
+    mat4_translate(model_transform, pos[0], pos[1], pos[2]);
+    mat4_mul_quat(model_transform, model_transform, dir);
+    pg_model_append(&map->model, &map->small_table_model, model_transform);
+    return 12;
+}
 
 int bork_map_load_editor_map(struct bork_map* map, char* filename)
 {

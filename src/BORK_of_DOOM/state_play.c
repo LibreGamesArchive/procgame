@@ -133,6 +133,7 @@ void bork_play_tick(struct pg_game_state* state)
     if(d->menu.state == BORK_MENU_INVENTORY) tick_control_inv_menu(d);
     else if(d->menu.state == BORK_MENU_UPGRADES) tick_control_upgrade_menu(d);
     else if(d->menu.state == BORK_MENU_DOORPAD) tick_doorpad(d);
+    else if(d->menu.state == BORK_MENU_RECYCLER) tick_recycler_menu(d);
     else if(d->menu.state == BORK_MENU_PLAYERDEAD) {
         if(pg_check_input(SDL_SCANCODE_RETURN, PG_CONTROL_HIT)) {
             struct bork_game_core* core = d->core;
@@ -217,6 +218,9 @@ static void tick_control_play(struct bork_play_data* d)
             } else if(item->type == BORK_ITEM_UPGRADE) {
                 item->flags |= BORK_ENTFLAG_IN_INVENTORY;
                 ARR_PUSH(d->held_upgrades, d->looked_item);
+            } else if(item->type == BORK_ITEM_SCHEMATIC) {
+                item->flags |= BORK_ENTFLAG_DEAD;
+                d->held_schematics |= (1 << item->counter[0]);
             } else {
                 item->flags |= BORK_ENTFLAG_IN_INVENTORY;
                 add_inventory_item(d, d->looked_item);
@@ -237,7 +241,10 @@ static void tick_control_play(struct bork_play_data* d)
                     door->door.open = 1 - door->door.open;
                 }
             } else if(d->looked_obj->type == BORK_MAP_RECYCLER) {
-                printf("USING A RECYCLER EH?\n");
+                d->menu.state = BORK_MENU_RECYCLER;
+                d->menu.recycler.selection_idx = 0;
+                SDL_ShowCursor(SDL_ENABLE);
+                pg_mouse_mode(0);
             }
         }
     }
@@ -644,7 +651,7 @@ static void bork_play_draw(struct pg_game_state* state)
         vec3_dup(flash_pos, draw_pos);
         if(d->plr.flags & BORK_ENTFLAG_CROUCH) flash_pos[2] -= 0.2;
         else flash_pos[2] -= 0.4;
-        pg_light_spotlight(&flashlight, flash_pos, 12, (vec3){ 1, 1, 0.75 },
+        pg_light_spotlight(&flashlight, flash_pos, 12, (vec3){ 1, 1, 1 },
                            look_dir, 0.35);
         ARR_PUSH(d->spotlights, flashlight);
     }
@@ -676,6 +683,9 @@ static void bork_play_draw(struct pg_game_state* state)
             break;
         case BORK_MENU_UPGRADES:
             draw_upgrade_menu(d, (float)state->ticks / (float)state->tick_rate);
+            break;
+        case BORK_MENU_RECYCLER:
+            draw_recycler_menu(d, (float)state->ticks / (float)state->tick_rate);
             break;
         case BORK_MENU_DOORPAD:
             draw_doorpad(d, (float)state->ticks / (float)state->tick_rate);
@@ -735,15 +745,46 @@ static void draw_hud_overlay(struct bork_play_data* d)
     pg_shader_begin(&d->core->shader_text, NULL);
     pg_shader_text_resolution(&d->core->shader_text, (vec2){ ar, 1 });
     pg_shader_text_transform(&d->core->shader_text, (vec2){ 1, 1 }, (vec2){});
+    vec2 screen_pos;
+    enum bork_resource looked_resource;
+    int looking_at_resource = 0;
+    float name_center = 0;
     struct bork_entity* looked_ent;
     if(d->looked_item != -1 && (looked_ent = bork_entity_get(d->looked_item))) {
+        if(looked_ent->flags & BORK_ENTFLAG_IS_FOOD) {
+            looking_at_resource = 1;
+            looked_resource = BORK_RESOURCE_FOODSTUFF;
+        } else if(looked_ent->flags & BORK_ENTFLAG_IS_CHEMICAL) {
+            looking_at_resource = 1;
+            looked_resource = BORK_RESOURCE_CHEMICAL;
+        } else if(looked_ent->flags & BORK_ENTFLAG_IS_ELECTRICAL) {
+            looking_at_resource = 1;
+            looked_resource = BORK_RESOURCE_ELECTRICAL;
+        } else if(looked_ent->flags & BORK_ENTFLAG_IS_RAW_MATERIAL) {
+            looking_at_resource = 1;
+            looked_resource = BORK_RESOURCE_SCRAP;
+        }
         const struct bork_entity_profile* prof = &BORK_ENT_PROFILES[looked_ent->type];
+        float dist = vec3_dist(d->plr.pos, looked_ent->pos);
+        pg_viewer_project(&d->core->view, screen_pos, looked_ent->pos);
+        vec2_set(screen_pos, screen_pos[0] * 0.5 + 0.5, screen_pos[1] * -0.5 + 0.5);
         struct pg_shader_text text = { .use_blocks = 1 };
-        snprintf(text.block[0], 64, "%s", prof->name);
-        vec4_set(text.block_style[0],
-            (ar * 0.5) - strnlen(text.block[0], 64) * 0.04 * 1.25 * 0.5,
-            0.3, 0.04, 1.25);
+        int len = snprintf(text.block[0], 64, "%s", prof->name);
+        name_center = (float)len * 0.04 * 1.25 * 0.5;
+        vec2_add(screen_pos, screen_pos, (vec2){ 0.4, -0.35 / dist });
+        vec4_set(text.block_style[0], screen_pos[0] - name_center, screen_pos[1], 0.04, 1.25);
         vec4_set(text.block_color[0], 1, 1, 1, 0.75);
+        if(looked_ent->type == BORK_ITEM_SCHEMATIC) {
+            const struct bork_schematic_detail* sch_d =
+                &BORK_SCHEMATIC_DETAIL[looked_ent->counter[0]];
+            const struct bork_entity_profile* sch_prof =
+                &BORK_ENT_PROFILES[sch_d->product];
+            len = snprintf(text.block[1], 64, "%s", sch_prof->name);
+            float sch_center = (float)len * 0.04 * 1.25 * 0.5;
+            vec4_set(text.block_style[1], screen_pos[0] - sch_center, screen_pos[1] - 0.05, 0.04, 1.25);
+            vec4_set(text.block_color[1], 1, 1, 1, 0.75);
+            text.use_blocks = 2;
+        }
         pg_shader_text_write(&d->core->shader_text, &text);
     }
     if(d->held_item >= 0) {
@@ -757,10 +798,20 @@ static void draw_hud_overlay(struct bork_play_data* d)
     draw_quickfetch_text(d, 0, (vec4){ 1, 1, 1, 0.15 }, (vec4){ 1, 1, 1, 0.75 });
     draw_quickfetch_items(d, (vec4){ 1, 1, 1, 0.15 }, (vec4){ 1, 1, 1, 0.75 });
     pg_shader_begin(&d->core->shader_2d, NULL);
-    pg_model_begin(&d->core->quad_2d, &d->core->shader_2d);
+    pg_model_begin(&d->core->quad_2d_ctr, &d->core->shader_2d);
     pg_shader_2d_resolution(&d->core->shader_2d, (vec2){ d->core->aspect_ratio, 1 });
     pg_shader_2d_set_light(&d->core->shader_2d, (vec2){}, (vec3){}, (vec3){ 1, 1, 1 });
-    pg_shader_2d_color_mod(&d->core->shader_2d, (vec4){ 1, 1, 1, 1 });
+    if(looking_at_resource) {
+        pg_shader_2d_color_mod(&d->core->shader_2d, (vec4){ 1, 1, 1, 0.75 }, (vec4){});
+        pg_shader_2d_tex_frame(&d->core->shader_2d, 200 + looked_resource * 2);
+        pg_shader_2d_add_tex_tx(&d->core->shader_2d, (vec2){ 2, 2 }, (vec2){});
+        pg_shader_2d_transform(&d->core->shader_2d,
+            (vec2){ screen_pos[0], screen_pos[1] - 0.075 },
+            (vec2){ 0.05, 0.05 }, 0);
+        pg_model_draw(&d->core->quad_2d_ctr, NULL);
+    }
+    pg_model_begin(&d->core->quad_2d, &d->core->shader_2d);
+    pg_shader_2d_color_mod(&d->core->shader_2d, (vec4){ 1, 1, 1, 1 }, (vec4){});
     pg_shader_2d_tex_frame(&d->core->shader_2d, 248);
     float hp_frac = (float)d->plr.HP / 100.0f;
     pg_shader_2d_add_tex_tx(&d->core->shader_2d, (vec2){ hp_frac * 4, 1 }, (vec2){ 0, 0 });
@@ -770,7 +821,7 @@ static void draw_hud_overlay(struct bork_play_data* d)
         pg_shader_2d_transform(&d->core->shader_2d, (vec2){}, (vec2){ ar, 1 }, 0);
         pg_shader_2d_texture(&d->core->shader_2d, &d->core->radial_vignette);
         float hurt_alpha = (float)d->plr.pain_ticks / 120 * 0.5;
-        pg_shader_2d_color_mod(&d->core->shader_2d, (vec4){ 0.5, 0, 0, hurt_alpha });
+        pg_shader_2d_color_mod(&d->core->shader_2d, (vec4){ 0.5, 0, 0, hurt_alpha }, (vec4){});
         pg_model_draw(&d->core->quad_2d, NULL);
     }
     draw_upgrade_hud(d);
@@ -783,7 +834,7 @@ static void draw_datapad(struct bork_play_data* d)
     struct pg_shader* shader = &d->core->shader_2d;
     pg_shader_2d_resolution(shader, (vec2){ d->core->aspect_ratio, 1 });
     pg_shader_2d_set_light(shader, (vec2){}, (vec3){}, (vec3){ 1, 1, 1 });
-    pg_shader_2d_color_mod(shader, (vec4){ 1, 1, 1, 1 });
+    pg_shader_2d_color_mod(shader, (vec4){ 1, 1, 1, 1 }, (vec4){});
     pg_shader_begin(shader, NULL);
     pg_model_begin(&d->core->quad_2d_ctr, shader);
     pg_shader_2d_tex_frame(shader, 4);
@@ -941,7 +992,7 @@ static void draw_items(struct bork_play_data* d, float lerp)
     struct pg_shader* shader = &d->core->shader_sprite;
     struct pg_model* model = &d->core->bullet_model;
     int current_frame = 0;
-    pg_shader_sprite_mode(shader, PG_SPRITE_SPHERICAL);
+    pg_shader_sprite_mode(shader, PG_SPRITE_CYLINDRICAL);
     pg_shader_sprite_texture(shader, &d->core->item_tex);
     pg_shader_sprite_tex_frame(shader, 0);
     pg_shader_sprite_add_tex_tx(shader, (vec2){ 1, 1 }, (vec2){});
@@ -964,7 +1015,8 @@ static void draw_items(struct bork_play_data* d, float lerp)
                 current_frame = prof->front_frame;
                 pg_shader_sprite_tex_frame(shader, prof->front_frame);
                 pg_shader_sprite_add_tex_tx(shader, prof->sprite_tx, prof->sprite_tx + 2);
-                pg_shader_sprite_transform(shader, prof->sprite_tx, prof->sprite_tx + 2);
+                pg_shader_sprite_transform(shader,
+                    (vec2){ prof->sprite_tx[0], prof->sprite_tx[1] * 2 }, prof->sprite_tx + 2);
             }
             vec3 pos_lerp;
             vec3_scale(pos_lerp, ent->vel, lerp);
@@ -972,6 +1024,11 @@ static void draw_items(struct bork_play_data* d, float lerp)
             mat4 transform;
             mat4_translate(transform, pos_lerp[0], pos_lerp[1], pos_lerp[2] + 0.05);
             mat4_scale(transform, transform, 0.5);
+            if(ent->type == BORK_ITEM_DESKLAMP) {
+                struct pg_light new_light = {};
+                pg_light_pointlight(&new_light, pos_lerp, 2, (vec3){ 0.9, 0.5, 0.5 });
+                ARR_PUSH(d->lights_buf, new_light);
+            }
             if(ent_id == d->looked_item) {
                 pg_shader_sprite_color_mod(shader, (vec4){ 1.5f, 1.8f, 1.5f, 1.0f });
                 pg_model_draw(model, transform);

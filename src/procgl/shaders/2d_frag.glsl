@@ -1,9 +1,11 @@
 #version 330
 
+uniform mat4 normal_matrix;
 uniform sampler2D tex;
 uniform sampler2D norm;
 uniform float tex_weight;
 uniform vec4 color_mod;
+uniform vec4 color_add;
 uniform vec3 light_color;
 uniform vec3 ambient_color;
 
@@ -18,12 +20,15 @@ out vec4 frag_color;
 void main()
 {
     vec4 tex_color = texture(tex, f_tex_coord);
-    tex_color = mix(f_color, tex_color, f_tex_weight * tex_weight) * color_mod;
+    tex_color = mix(f_color, tex_color, f_tex_weight * tex_weight) * color_mod + color_add;
     vec4 tex_norm = texture(norm, f_tex_coord);
-    vec3 norm = normalize(tex_norm.xyz * 2 - 1);
-    vec3 light_to_pos = vec3(f_light_pos - f_pos, 0);
+    vec3 norm = mat3(normal_matrix) * normalize(tex_norm.xyz * 2 - 1);
+    norm.y = -norm.y;
+    vec3 light_to_pos = vec3(f_pos - f_light_pos, -0.2);
     vec3 light_dir = normalize(light_to_pos);
     float light = max(0, dot(-light_dir, norm));
+    float spec = max(0, pow(dot(-light_dir, norm), 32)) * tex_norm.a;
+    light += spec;
     if(tex_norm.w == 1) frag_color = tex_color;
     else {
         frag_color = vec4(tex_color.rgb *

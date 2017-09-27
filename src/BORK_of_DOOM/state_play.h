@@ -24,6 +24,7 @@ struct bork_play_data {
     int upgrade_selected;
     int decoy_active;
     vec3 decoy_pos;
+    uint32_t held_schematics;
     bork_entity_t teleporter_item;
     bork_entity_arr_t plr_enemy_query;
     bork_entity_arr_t plr_item_query;
@@ -63,7 +64,9 @@ struct bork_play_data {
             int ammo_select;
         } inv;
         struct {
-            int selection_idx;
+            struct bork_map_obj* obj;
+            int selection_idx, scroll_idx;
+            int resources[4];
         } recycler;
         struct {
             int selection_idx, scroll_idx, side;
@@ -82,10 +85,13 @@ struct bork_play_data {
     bork_entity_t looked_enemy;
     struct bork_map_object* looked_obj;
 };
-/*  Miscellaneous game functions    play_misc.c */
+/*  Miscellaneous game functions        play_misc.c */
 void bork_play_reset_hud_anim(struct bork_play_data* d);
 void get_plr_pos_for_ai(struct bork_play_data* d, vec3 out);
 void entity_on_fire(struct bork_play_data* d, struct bork_entity* ent);
+bork_entity_t get_looked_item(struct bork_play_data* d);
+bork_entity_t get_looked_enemy(struct bork_play_data* d);
+struct bork_map_object* get_looked_map_object(struct bork_play_data* d);
 
 /*  Cosmetic/mainly visual type stuff   game_effects.c  */
 void create_explosion(struct bork_play_data* d, vec3 pos);
@@ -95,7 +101,11 @@ void create_spark(struct bork_play_data* d, vec3 pos);
 void create_sparks(struct bork_play_data* d, vec3 pos, int sparks);
 void tin_canine_tick(struct bork_play_data* d, struct bork_entity* ent);
 
-/*  Inventory functions    play_inventory.c     */
+/*  Recycler menu functions             play_recycler.c */
+void tick_recycler_menu(struct bork_play_data* d);
+void draw_recycler_menu(struct bork_play_data* d, float t);
+
+/*  Inventory functions                 play_inventory.c     */
 void tick_control_inv_menu(struct bork_play_data* d);
 void draw_menu_inv(struct bork_play_data* d, float t);
 bork_entity_t remove_inventory_item(struct bork_play_data* d, int inv_idx);
@@ -103,23 +113,19 @@ void add_inventory_item(struct bork_play_data* d, bork_entity_t ent_id);
 void switch_item(struct bork_play_data* d, int inv_idx);
 void set_quick_item(struct bork_play_data* d, int quick_idx, int inv_idx);
 
-/*  Upgrade menu functions      play_menu_upgrade.c     */
+/*  Upgrade menu functions              play_menu_upgrade.c     */
 void tick_upgrades(struct bork_play_data* d);
 void tick_control_upgrade_menu(struct bork_play_data* d);
 void draw_upgrade_hud(struct bork_play_data* d);
 void draw_upgrade_menu(struct bork_play_data* d, float t);
 void select_next_upgrade(struct bork_play_data* d);
 
-/*  Door keypad menu functions  play_menu_doorpad.c     */
+/*  Door keypad menu functions          play_menu_doorpad.c     */
 void tick_doorpad(struct bork_play_data* d);
 void draw_doorpad(struct bork_play_data* d, float t);
 
 /*  General UI code */
-void bork_play_reset_hud_anim(struct bork_play_data* d);
 void draw_quickfetch_text(struct bork_play_data* d, int draw_label,
                           vec4 color_mod, vec4 selected_mod);
 void draw_quickfetch_items(struct bork_play_data* d,
                            vec4 color_mod, vec4 selected_mod);
-bork_entity_t get_looked_item(struct bork_play_data* d);
-bork_entity_t get_looked_enemy(struct bork_play_data* d);
-struct bork_map_object* get_looked_map_object(struct bork_play_data* d);

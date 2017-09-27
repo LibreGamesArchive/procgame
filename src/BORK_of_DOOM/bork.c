@@ -219,7 +219,7 @@ void bork_draw_backdrop(struct bork_game_core* core, vec4 color_mod, float t)
     for(i = 0; i < 3; ++i) {
         vec4 c;
         vec4_mul(c, colors[i], color_mod);
-        pg_shader_2d_color_mod(shader, c);
+        pg_shader_2d_color_mod(shader, c, (vec4){});
         pg_shader_2d_tex_transform(shader, (vec2){ core->aspect_ratio, 1 },
            (vec2){ cos(t * f[i]) * off[i], sin(t * f[i]) * off[i] });
         pg_model_draw(&core->quad_2d_ctr, NULL);
@@ -232,7 +232,7 @@ void bork_draw_linear_vignette(struct bork_game_core* core, vec4 color_mod)
     pg_shader_2d_ndc(shader, (vec2){ core->aspect_ratio, 1 });
     pg_shader_2d_transform(shader, (vec2){}, (vec2){ core->aspect_ratio, 1 }, 0);
     pg_shader_2d_texture(shader, &core->menu_vignette);
-    pg_shader_2d_color_mod(shader, color_mod);
+    pg_shader_2d_color_mod(shader, color_mod, (vec4){});
     pg_shader_2d_set_light(shader, (vec2){}, (vec3){}, (vec3){ 1, 1, 1 });
     if(!pg_shader_is_active(shader)) pg_shader_begin(shader, NULL);
     pg_model_begin(&core->quad_2d_ctr, shader);

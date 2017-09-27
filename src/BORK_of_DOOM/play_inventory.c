@@ -22,6 +22,7 @@ void tick_control_inv_menu(struct bork_play_data* d)
     || pg_check_gamepad(SDL_CONTROLLER_BUTTON_B, PG_CONTROL_HIT)
     || pg_check_gamepad(SDL_CONTROLLER_BUTTON_LEFTSHOULDER, PG_CONTROL_HIT)) {
         d->menu.state = BORK_MENU_CLOSED;
+        SDL_ShowCursor(SDL_DISABLE);
         pg_mouse_mode(1);
         return;
     } else if(pg_check_input(SDL_SCANCODE_TAB, PG_CONTROL_HIT)) {
@@ -180,10 +181,19 @@ void draw_menu_inv(struct bork_play_data* d, float t)
     struct pg_shader* shader = &d->core->shader_2d;
     if(!pg_shader_is_active(shader)) pg_shader_begin(shader, NULL);
     pg_shader_2d_resolution(shader, (vec2){ ar, 1 });
-    vec2 light_pos = { ar * 0.75 + (sin((float)d->ticks / 120.0f / M_PI) * 0.5f), 0 };
-    pg_shader_2d_set_light(shader, light_pos, (vec3){ 1.5, 1.5, 1.25 },
+    vec2 mouse;
+    pg_mouse_pos(mouse);
+    vec2_scale(mouse, mouse, 1 / d->core->screen_size[1]);
+    /*
+    pg_shader_2d_set_light(shader, mouse, (vec3){ 0.5, 0.5, 0.5 },
                            (vec3){ 0.5, 0.5, 0.5 });
-    pg_shader_2d_color_mod(shader, (vec4){ 1, 1, 1, 1 });
+    */
+    vec2 light_pos = { sin((float)d->ticks / 180.0f / M_PI), cos((float)d->ticks / 180.0f / M_PI) };
+    vec2_scale(light_pos, light_pos, 0.5);
+    vec2_add(light_pos, light_pos, (vec2){ ar * 0.75, 0.25 });
+    pg_shader_2d_set_light(shader, light_pos, (vec3){ 0.7, 0.7, 0.7 },
+                           (vec3){ 0.2, 0.2, 0.2 });
+    pg_shader_2d_color_mod(shader, (vec4){ 1, 1, 1, 1 }, (vec4){});
     pg_shader_2d_texture(shader, &d->core->item_tex);
     pg_model_begin(&d->core->quad_2d_ctr, shader);
     if(d->inventory.len > 0) {
@@ -205,12 +215,12 @@ void draw_menu_inv(struct bork_play_data* d, float t)
                     pg_shader_2d_transform(shader,
                         (vec2){ ar * 0.75 - 0.2 + 0.15 * i, 0.43 },
                         (vec2){ 0.05, 0.05 }, 0);
-                    pg_shader_2d_color_mod(shader, (vec4){ 1, 1, 1, 0.5 });
+                    pg_shader_2d_color_mod(shader, (vec4){ 1, 1, 1, 0.5 }, (vec4){});
                 } else {
                     pg_shader_2d_transform(shader,
                         (vec2){ ar * 0.75 - 0.2 + 0.15 * i, 0.43 },
                         (vec2){ 0.075, 0.075 }, 0);
-                    pg_shader_2d_color_mod(shader, (vec4){ 1, 1, 1, 1 });
+                    pg_shader_2d_color_mod(shader, (vec4){ 1, 1, 1, 1 }, (vec4){});
                 }
                 pg_shader_2d_tex_frame(shader, ammo_prof->front_frame);
                 pg_model_draw(&d->core->quad_2d_ctr, NULL);
@@ -231,12 +241,12 @@ void draw_quickfetch_items(struct bork_play_data* d,
     pg_shader_2d_resolution(shader, (vec2){ w, 1 });
     pg_shader_2d_texture(shader, &d->core->item_tex);
     pg_shader_2d_tex_frame(shader, 0);
-    pg_shader_2d_color_mod(shader, (vec4){ 1, 1, 1, 1 });
-    vec2 light_pos = { sin((float)d->ticks / 60.0f / M_PI), cos((float)d->ticks / 60.0f / M_PI) };
+    pg_shader_2d_color_mod(shader, (vec4){ 1, 1, 1, 1 }, (vec4){});
+    vec2 light_pos = { sin((float)d->ticks / 180.0f / M_PI), cos((float)d->ticks / 180.0f / M_PI) };
     vec2_scale(light_pos, light_pos, 0.3);
     vec2_add(light_pos, light_pos, (vec2){ w - 0.2, 0.8 });
-    pg_shader_2d_set_light(shader, light_pos, (vec3){ 1.5, 1.5, 1.4 },
-                           (vec3){ 0.5, 0.5, 0.5 });
+    pg_shader_2d_set_light(shader, light_pos, (vec3){ 0.7, 0.7, 0.7 },
+                           (vec3){ 0.2, 0.2, 0.2 });
     pg_model_begin(&d->core->quad_2d_ctr, shader);
     struct bork_entity* item;
     const struct bork_entity_profile* prof;
@@ -256,9 +266,9 @@ void draw_quickfetch_items(struct bork_play_data* d,
             pg_shader_2d_add_tex_tx(shader, prof->sprite_tx, prof->sprite_tx + 2);
         }
         if(d->held_item != d->quick_item[i]) {
-            pg_shader_2d_color_mod(shader, color_mod);
+            pg_shader_2d_color_mod(shader, color_mod, (vec4){});
         } else {
-            pg_shader_2d_color_mod(shader, selected_mod);
+            pg_shader_2d_color_mod(shader, selected_mod, (vec4){});
         }
         pg_shader_2d_transform(shader,
             (vec2){ draw_pos[i][0], draw_pos[i][1] - 0.05 * prof->inv_height },
@@ -316,15 +326,24 @@ void draw_quickfetch_text(struct bork_play_data* d, int draw_label,
 bork_entity_t remove_inventory_item(struct bork_play_data* d, int inv_idx)
 {
     if(inv_idx >= d->inventory.len) return -1;
-    bork_entity_t item = d->inventory.data[inv_idx];
-    ARR_SWAPSPLICE(d->inventory, inv_idx, 1);
+    bork_entity_t item_id = d->inventory.data[inv_idx];
+    struct bork_entity* item = bork_entity_get(item_id);
+    if(!item) return -1;
+    if(item->item_quantity > 1) {
+        bork_entity_t rem_id = bork_entity_new(1);
+        struct bork_entity* rem_item = bork_entity_get(rem_id);
+        bork_entity_init(rem_item, item->type);
+        --item->item_quantity;
+        return rem_id;
+    }
+    ARR_SPLICE(d->inventory, inv_idx, 1);
     int i;
     for(i = 0; i < 4; ++i) {
         if(d->quick_item[i] == inv_idx) d->quick_item[i] = -1;
         else if(d->quick_item[i] > inv_idx) --d->quick_item[i];
     }
     if(d->held_item == inv_idx) d->held_item = -1;
-    return item;
+    return item_id;
 }
 
 void add_inventory_item(struct bork_play_data* d, bork_entity_t ent_id)

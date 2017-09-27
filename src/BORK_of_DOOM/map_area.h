@@ -37,6 +37,11 @@ enum bork_tile_type {
     BORK_TILE_HULL,
     BORK_TILE_HULL_HALF,
     BORK_TILE_HULL_EDGE,
+    BORK_TILE_HULL_WHITE_CAUTION,
+    BORK_TILE_HULL_WHITE_LIGHT,
+    BORK_TILE_HULL_PANELS,
+    BORK_TILE_OVEN,
+    BORK_TILE_BED,
     BORK_TILE_CONTROL_PANEL,
     BORK_TILE_LADDER,
     BORK_TILE_CATWALK,
@@ -45,6 +50,7 @@ enum bork_tile_type {
     BORK_TILE_HANDRAIL_TOP,
     BORK_TILE_POWERBLOCK,
     BORK_TILE_TABLE,
+    BORK_TILE_TABLE_SMALL,
     BORK_TILE_GARDEN,
     BORK_TILE_CARGO_RED, BORK_TILE_CARGO_BLUE,
     BORK_TILE_DUCT,
@@ -83,6 +89,9 @@ struct bork_map_object {
         struct {
             int door_idx;
         } doorpad;
+        struct {
+            vec3 out_pos;
+        } recycler;
     };
 };
 
@@ -111,6 +120,9 @@ struct bork_map {
     ARR_T(struct pg_light) spotlights;
     struct pg_model door_model;
     struct pg_model recycler_model;
+    struct pg_model oven_model;
+    struct pg_model bed_model;
+    struct pg_model small_table_model;
     struct bork_entity* plr;
 };
 

@@ -26,6 +26,7 @@ struct bork_editor_data {
     enum bork_entity_type ent_type;
     int upgrade_type[2];
     int datapad_id;
+    enum bork_schematic schematic_type;
     int select_mode;    /*  Whether the selection is being drawn    */
     int selection[4];
     int cursor[3];

@@ -9,6 +9,7 @@
 #include "bullet.h"
 #include "physics.h"
 #include "upgrades.h"
+#include "recycler.h"
 #include "game_states.h"
 #include "state_play.h"
 #include "datapad_content.h"
@@ -99,7 +100,7 @@ void draw_doorpad(struct bork_play_data* d, float t)
     struct pg_shader* shader = &d->core->shader_2d;
     if(!pg_shader_is_active(shader)) pg_shader_begin(shader, NULL);
     pg_shader_2d_resolution(shader, (vec2){ ar, 1.0f });
-    pg_shader_2d_color_mod(shader, (vec4){ 1, 1, 1, 1 });
+    pg_shader_2d_color_mod(shader, (vec4){ 1, 1, 1, 1 }, (vec4){});
     pg_shader_2d_texture(shader, &d->core->env_atlas);
     pg_shader_2d_tex_frame(shader, 2);
     vec2 light_pos = { ar * 0.5 + sin((float)d->ticks / 60.0f / M_PI) * 0.5f, 0 };

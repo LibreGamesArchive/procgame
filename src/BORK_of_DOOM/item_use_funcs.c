@@ -53,7 +53,7 @@ void bork_hud_pistol(struct bork_entity* ent, struct bork_play_data* d)
     int ammo_frame = ammo_prof->front_frame;
     struct pg_shader* shader = &d->core->shader_2d;
     pg_shader_begin(shader, NULL);
-    pg_shader_2d_color_mod(shader, (vec4){ 1, 1, 1, 0.5 });
+    pg_shader_2d_color_mod(shader, (vec4){ 1, 1, 1, 0.5 }, (vec4){});
     pg_shader_2d_texture(shader, &d->core->item_tex);
     pg_shader_2d_tex_frame(shader, ammo_frame);
     pg_shader_2d_transform(shader, (vec2){ ar - 0.18, 0.66 }, (vec2){ 0.05, 0.05 }, 0);
