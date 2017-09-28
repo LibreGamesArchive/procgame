@@ -1016,14 +1016,15 @@ static void draw_items(struct bork_play_data* d, float lerp)
                 pg_shader_sprite_tex_frame(shader, prof->front_frame);
                 pg_shader_sprite_add_tex_tx(shader, prof->sprite_tx, prof->sprite_tx + 2);
                 pg_shader_sprite_transform(shader,
-                    (vec2){ prof->sprite_tx[0], prof->sprite_tx[1] * 2 }, prof->sprite_tx + 2);
+                    (vec2){ prof->sprite_tx[0], prof->sprite_tx[1] * 1.5 },
+                    prof->sprite_tx + 2);
             }
             vec3 pos_lerp;
             vec3_scale(pos_lerp, ent->vel, lerp);
             vec3_add(pos_lerp, pos_lerp, ent->pos);
             mat4 transform;
             mat4_translate(transform, pos_lerp[0], pos_lerp[1], pos_lerp[2] + 0.05);
-            mat4_scale(transform, transform, 0.5);
+            mat4_scale(transform, transform, 0.75);
             if(ent->type == BORK_ITEM_DESKLAMP) {
                 struct pg_light new_light = {};
                 pg_light_pointlight(&new_light, pos_lerp, 2, (vec3){ 0.9, 0.5, 0.5 });

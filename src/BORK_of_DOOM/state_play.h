@@ -112,6 +112,10 @@ bork_entity_t remove_inventory_item(struct bork_play_data* d, int inv_idx);
 void add_inventory_item(struct bork_play_data* d, bork_entity_t ent_id);
 void switch_item(struct bork_play_data* d, int inv_idx);
 void set_quick_item(struct bork_play_data* d, int quick_idx, int inv_idx);
+void draw_quickfetch_text(struct bork_play_data* d, int draw_label,
+                          vec4 color_mod, vec4 selected_mod);
+void draw_quickfetch_items(struct bork_play_data* d,
+                           vec4 color_mod, vec4 selected_mod);
 
 /*  Upgrade menu functions              play_menu_upgrade.c     */
 void tick_upgrades(struct bork_play_data* d);
@@ -123,9 +127,3 @@ void select_next_upgrade(struct bork_play_data* d);
 /*  Door keypad menu functions          play_menu_doorpad.c     */
 void tick_doorpad(struct bork_play_data* d);
 void draw_doorpad(struct bork_play_data* d, float t);
-
-/*  General UI code */
-void draw_quickfetch_text(struct bork_play_data* d, int draw_label,
-                          vec4 color_mod, vec4 selected_mod);
-void draw_quickfetch_items(struct bork_play_data* d,
-                           vec4 color_mod, vec4 selected_mod);
