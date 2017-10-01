@@ -40,16 +40,16 @@ static void entity_emp(struct bork_play_data* d, struct bork_entity* ent)
 static void robot_dying(struct bork_play_data* d, struct bork_entity* ent)
 {
     --ent->dead_ticks;
-    if(ent->dead_ticks > 60 && ent->dead_ticks % 30 == 0) {
+    if(ent->dead_ticks % 30 == 0) {
         vec3 spark_pos = {
             ent->pos[0] + (float)rand() / RAND_MAX - 0.5,
             ent->pos[1] + (float)rand() / RAND_MAX - 0.5,
             ent->pos[2] + (float)rand() / RAND_MAX - 0.5 };
         create_spark(d, spark_pos);
-    } else if(ent->dead_ticks == 60) {
-        robot_explosion(d, ent->pos);
-        return;
     } else if(ent->dead_ticks <= 0) {
+        bork_entity_t ent_id = bork_entity_id(ent);
+        robot_explosion(d, ent->pos);
+        ent = bork_entity_get(ent_id);
         ent->flags |= BORK_ENTFLAG_DEAD;
     }
 }
@@ -97,16 +97,36 @@ void tin_canine_tick(struct bork_play_data* d, struct bork_entity* ent)
     vec3_sub(start, ent->pos, (vec3){ 2, 2, 2 });
     vec3_add(end, ent->pos, (vec3){ 2, 2, 2 });
     bork_map_query_enemies(&d->map, &surr, start, end);
+    /*  Do basic physics    */
+    bork_entity_move(ent, &d->map);
+    /*  Physics against other enemies   */
+    int i;
+    struct bork_entity* surr_ent;
+    bork_entity_t ent_id;
+    ARR_FOREACH(surr, ent_id, i) {
+        surr_ent = bork_entity_get(ent_id);
+        if(!surr_ent) continue;
+        vec3 push;
+        vec3_sub(push, ent->pos, surr_ent->pos);
+        float dist = vec3_len(push);
+        if(dist < 1.0f) {
+            vec3_set_len(push, push, 1.0f - dist);
+            vec3_add(ent->vel, ent->vel, push);
+            vec3_sub(surr_ent->vel, surr_ent->vel, push);
+        }
+    }
+    /*  Tick status effects */
     if(ent->flags & BORK_ENTFLAG_ON_FIRE) entity_on_fire(d, ent);
     if(ent->flags & BORK_ENTFLAG_EMP) {
         entity_emp(d, ent);
         return;
     }
-    if(ent->flags & BORK_ENTFLAG_DYING) robot_dying(d, ent);
-    else if(ent->HP <= 0) {
+    /*  Real enemy tick */
+    if(ent->flags & BORK_ENTFLAG_DYING) {
+        robot_dying(d, ent);
+    } else if(ent->HP <= 0) {
         ent->flags |= BORK_ENTFLAG_DYING;
-        ent->dead_ticks = PLAY_SECONDS(3);
-        return;
+        ent->dead_ticks = PLAY_SECONDS(2.5);
     } else {
         vec3 ent_head, plr_head;
         get_plr_pos_for_ai(d, plr_head);
@@ -163,20 +183,4 @@ void tin_canine_tick(struct bork_play_data* d, struct bork_entity* ent)
             }
         }
     }
-    int i;
-    struct bork_entity* surr_ent;
-    bork_entity_t ent_id;
-    ARR_FOREACH(surr, ent_id, i) {
-        surr_ent = bork_entity_get(ent_id);
-        if(!surr_ent) continue;
-        vec3 push;
-        vec3_sub(push, ent->pos, surr_ent->pos);
-        float dist = vec3_len(push);
-        if(dist < 1.0f) {
-            vec3_set_len(push, push, 1.0f - dist);
-            vec3_add(ent->vel, ent->vel, push);
-            vec3_sub(surr_ent->vel, surr_ent->vel, push);
-        }
-    }
-    bork_entity_update(ent, &d->map);
 }

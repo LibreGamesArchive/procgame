@@ -48,10 +48,16 @@ void bork_entity_init(struct bork_entity* ent, enum bork_entity_type type)
         .item_quantity = 1,
     };
 }
+
 struct bork_entity* bork_entity_get(bork_entity_t ent)
 {
     if(ent >= ent_pool.cap || (ent_pool.data[ent].flags & BORK_ENTFLAG_DEAD) || ent < 0) return NULL;
     return &ent_pool.data[ent];
+}
+
+bork_entity_t bork_entity_id(struct bork_entity* ent)
+{
+    return ent - ent_pool.data;
 }
 
 void bork_entity_push(struct bork_entity* ent, vec3 push)
@@ -59,7 +65,6 @@ void bork_entity_push(struct bork_entity* ent, vec3 push)
     vec3_add(ent->vel, ent->vel, push);
 }
 
-void bork_entity_move(struct bork_entity* ent, struct bork_map* map);
 void bork_entity_update(struct bork_entity* ent, struct bork_map* map)
 {
     if((ent->flags & BORK_ENTFLAG_DEAD) || (ent->flags & BORK_ENTFLAG_INACTIVE))
@@ -109,7 +114,17 @@ void bork_entity_move(struct bork_entity* ent, struct bork_map* map)
         while(bork_map_collide(map, &coll, new_pos, coll_size) && (steps++ < 4)) {
             float down_angle = vec3_angle_diff(coll.face_norm, PG_DIR_VEC[PG_UP]);
             float face_down_angle = vec3_angle_diff(coll.push, PG_DIR_VEC[PG_UP]);
-            if(down_angle <= 0.1) ent->flags |= BORK_ENTFLAG_GROUND;
+            if(ent->flags & BORK_ENTFLAG_BOUNCE) {
+                vec3 bounce_dir;
+                vec3 vel_norm;
+                vec3 push_norm;
+                vec3_normalize(push_norm, coll.push);
+                vec3_normalize(vel_norm, ent->vel);
+                vec3_reflect(bounce_dir, vel_norm, push_norm);
+                float vel_len = vec3_len(ent->vel);
+                vec3_set_len(ent->vel, bounce_dir, vel_len * 0.5);
+                return;
+            } else if(down_angle <= 0.1) ent->flags |= BORK_ENTFLAG_GROUND;
             else if(down_angle <= 0.5 && (fabsf(down_angle - face_down_angle) < 0.4)) {
                 ent->flags |= BORK_ENTFLAG_GROUND;
                 if(!(ent->flags & BORK_ENTFLAG_SLIDE)) {

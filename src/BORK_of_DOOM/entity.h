@@ -23,6 +23,7 @@
 #define BORK_ENTFLAG_IS_ELECTRICAL      (1 << 22)
 #define BORK_ENTFLAG_IS_CHEMICAL        (1 << 23)
 #define BORK_ENTFLAG_BOUNCE             (1 << 24)
+#define BORK_ENTFLAG_ACTIVE_FUNC        (1 << 25)
 
 struct bork_entity {
     int last_tick;
@@ -115,6 +116,10 @@ void bork_use_plazgun(struct bork_entity* ent, struct bork_play_data* d);
 void bork_hud_plazgun(struct bork_entity* ent, struct bork_play_data* d);
 void bork_use_firstaid(struct bork_entity* ent, struct bork_play_data* d);
 void bork_use_melee(struct bork_entity* ent, struct bork_play_data* d);
+void bork_tick_grenade_emp(struct bork_entity* ent, struct bork_play_data* d);
+void bork_tick_grenade_inc(struct bork_entity* ent, struct bork_play_data* d);
+void bork_tick_grenade(struct bork_entity* ent, struct bork_play_data* d);
+void bork_use_grenade(struct bork_entity* ent, struct bork_play_data* d);
 
 static const struct bork_entity_profile {
     char name[32];
@@ -134,6 +139,7 @@ static const struct bork_entity_profile {
     int ammo_types;
     uint8_t use_ctrl;
     float hud_angle;
+    void (*tick_func)(struct bork_entity*, struct bork_play_data*);
     void (*use_func)(struct bork_entity*, struct bork_play_data*);
     void (*hud_func)(struct bork_entity*, struct bork_play_data*);
 } BORK_ENT_PROFILES[] = {
@@ -333,7 +339,7 @@ static const struct bork_entity_profile {
         .front_frame = 80 },
     [BORK_ITEM_SCRAPMETAL] = { .name = "CHUNK OF METAL",
         .base_flags = BORK_ENTFLAG_ITEM | BORK_ENTFLAG_STACKS,
-        .size = { 0.5, 0.5, 0.5 },
+        .size = { 0.3, 0.3, 0.3 },
         .sprite_tx = { 1, 1, 0, 0 },
         .front_frame = 48 },
     [BORK_ITEM_WIRES] = { .name = "FRAYED WIRING",
@@ -352,32 +358,41 @@ static const struct bork_entity_profile {
         .sprite_tx = { 1, 1, 0, 0 },
         .front_frame = 40 },
     [BORK_ITEM_GRENADE_FRAG] = { .name = "GRENADE",
-        .base_flags = BORK_ENTFLAG_ITEM,
+        .base_flags = BORK_ENTFLAG_ITEM | BORK_ENTFLAG_STACKS,
         .size = { 0.3, 0.3, 0.3 },
         .sprite_tx = { 1, 1, 0, 0 },
-        .front_frame = 7 },
+        .front_frame = 7,
+        .use_ctrl = PG_CONTROL_HIT,
+        .use_func = bork_use_grenade,
+        .tick_func = bork_tick_grenade },
     [BORK_ITEM_GRENADE_EMP] = { .name = "GRENADE (EMP)",
-        .base_flags = BORK_ENTFLAG_ITEM,
+        .base_flags = BORK_ENTFLAG_ITEM | BORK_ENTFLAG_STACKS,
         .size = { 0.3, 0.3, 0.3 },
         .sprite_tx = { 1, 1, 0, 0 },
-        .front_frame = 23 },
+        .front_frame = 23,
+        .use_ctrl = PG_CONTROL_HIT,
+        .use_func = bork_use_grenade,
+        .tick_func = bork_tick_grenade_emp },
     [BORK_ITEM_GRENADE_INC] = { .name = "GRENADE (INC.)",
-        .base_flags = BORK_ENTFLAG_ITEM,
+        .base_flags = BORK_ENTFLAG_ITEM | BORK_ENTFLAG_STACKS,
         .size = { 0.3, 0.3, 0.3 },
         .sprite_tx = { 1, 1, 0, 0 },
-        .front_frame = 39 },
+        .front_frame = 39,
+        .use_ctrl = PG_CONTROL_HIT,
+        .use_func = bork_use_grenade,
+        .tick_func = bork_tick_grenade_inc },
     [BORK_ITEM_PROXY_FRAG] = { .name = "PROXY MINE",
-        .base_flags = BORK_ENTFLAG_ITEM,
+        .base_flags = BORK_ENTFLAG_ITEM | BORK_ENTFLAG_STACKS,
         .size = { 0.3, 0.3, 0.3 },
         .sprite_tx = { 1, 1, 0, 0 },
         .front_frame = 8 },
     [BORK_ITEM_PROXY_EMP] = { .name = "PROXY MINE (EMP)",
-        .base_flags = BORK_ENTFLAG_ITEM,
+        .base_flags = BORK_ENTFLAG_ITEM | BORK_ENTFLAG_STACKS,
         .size = { 0.3, 0.3, 0.3 },
         .sprite_tx = { 1, 1, 0, 0 },
         .front_frame = 24 },
     [BORK_ITEM_DOOR_OVERRIDE] = { .name = "DOOR OVERRIDE",
-        .base_flags = BORK_ENTFLAG_ITEM,
+        .base_flags = BORK_ENTFLAG_ITEM | BORK_ENTFLAG_STACKS,
         .size = { 0.3, 0.3, 0.3 },
         .sprite_tx = { 1, 1, 0, 0 },
         .inv_angle = 0.3,
@@ -507,9 +522,11 @@ typedef int bork_entity_t;
 typedef ARR_T(bork_entity_t) bork_entity_arr_t;
 bork_entity_t bork_entity_new(int n);
 struct bork_entity* bork_entity_get(bork_entity_t ent);
+bork_entity_t bork_entity_id(struct bork_entity* ent);
 void bork_entpool_clear(void);
 void bork_entity_init(struct bork_entity* ent, enum bork_entity_type type);
 void bork_entity_push(struct bork_entity* ent, vec3 push);
+void bork_entity_move(struct bork_entity* ent, struct bork_map* map);
 void bork_entity_update(struct bork_entity* ent, struct bork_map* map);
 void bork_entity_get_view(struct bork_entity* ent, mat4 view);
 void bork_entity_get_eye(struct bork_entity* ent, vec3 out_dir, vec3 out_pos);

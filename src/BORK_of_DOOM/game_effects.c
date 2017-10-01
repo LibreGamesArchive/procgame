@@ -27,16 +27,40 @@ void create_spark(struct bork_play_data* d, vec3 pos)
     ARR_PUSH(d->particles, new_part);
 }
 
-void create_sparks(struct bork_play_data* d, vec3 pos, int sparks)
+void create_sparks(struct bork_play_data* d, vec3 pos, float expand, int sparks)
 {
     int i;
     for(i = 0; i < sparks; ++i) {
-        vec3 spark_pos;
-        vec3_set(spark_pos,
-            pos[0] + (float)rand() / RAND_MAX - 0.5,
-            pos[1] + (float)rand() / RAND_MAX - 0.5,
-            pos[2] + (float)rand() / RAND_MAX - 0.5);
-        create_spark(d, spark_pos);
+        vec3 off = {
+            (float)rand() / RAND_MAX - 0.5,
+            (float)rand() / RAND_MAX - 0.5,
+            (float)rand() / RAND_MAX - 0.5 };
+        struct bork_particle new_part = {
+            .pos = { pos[0] + off[0], pos[1] + off[1], pos[2] + off[2] },
+            .vel = { off[0] * expand, off[1] * expand, off[2] * expand },
+            .ticks_left = 30,
+            .frame_ticks = 6,
+            .start_frame = 0, .end_frame = 5 };
+        ARR_PUSH(d->particles, new_part);
+    }
+}
+
+void create_elec_sparks(struct bork_play_data* d, vec3 pos, float expand, int sparks)
+{
+    int i;
+    for(i = 0; i < sparks; ++i) {
+        vec3 off = {
+            (float)rand() / RAND_MAX - 0.5,
+            (float)rand() / RAND_MAX - 0.5,
+            (float)rand() / RAND_MAX - 0.5 };
+        struct bork_particle new_part = {
+            .pos = { pos[0] + off[0], pos[1] + off[1], pos[2] + off[2] },
+            .vel = { off[0] * expand, off[1] * expand, off[2] * expand },
+            .ticks_left = 30,
+            .frame_ticks = 6,
+            .current_frame = 32,
+            .start_frame = 32, .end_frame = 36 };
+        ARR_PUSH(d->particles, new_part);
     }
 }
 
@@ -45,14 +69,33 @@ void create_explosion(struct bork_play_data* d, vec3 pos)
     struct bork_particle new_part = {
         .flags = BORK_PARTICLE_SPRITE | BORK_PARTICLE_LIGHT | BORK_PARTICLE_LIGHT_DECAY,
         .pos = { pos[0], pos[1], pos[2] },
-        .light = { 1.5, 1.5, 1, 5 },
+        .light = { 1.5, 1.5, 1, 8 },
         .vel = { 0, 0, 0 },
-        .ticks_left = 45,
-        .frame_ticks = 9,
+        .lifetime = 60,
+        .ticks_left = 60,
+        .frame_ticks = 12,
         .current_frame = 8,
         .start_frame = 8, .end_frame = 12,
     };
     ARR_PUSH(d->particles, new_part);
+    create_sparks(d, pos, 0.2, 5);
+}
+
+void create_elec_explosion(struct bork_play_data* d, vec3 pos)
+{
+    struct bork_particle new_part = {
+        .flags = BORK_PARTICLE_SPRITE | BORK_PARTICLE_LIGHT | BORK_PARTICLE_LIGHT_DECAY,
+        .pos = { pos[0], pos[1], pos[2] },
+        .light = { 1.0, 1.0, 1.5, 8 },
+        .vel = { 0, 0, 0 },
+        .lifetime = 60,
+        .ticks_left = 60,
+        .frame_ticks = 12,
+        .current_frame = 40,
+        .start_frame = 40, .end_frame = 44,
+    };
+    ARR_PUSH(d->particles, new_part);
+    create_elec_sparks(d, pos, 0.2, 5);
 }
 
 void create_smoke(struct bork_play_data* d, vec3 pos, vec3 dir, int lifetime)
@@ -61,7 +104,6 @@ void create_smoke(struct bork_play_data* d, vec3 pos, vec3 dir, int lifetime)
         .flags = BORK_PARTICLE_SPRITE | BORK_PARTICLE_BOUYANT | BORK_PARTICLE_DECELERATE,
         .pos = { pos[0], pos[1], pos[2] },
         .vel = { dir[0], dir[1], dir[2] },
-        .light = { 1.5, 1.5, 1, 5 },
         .vel = { 0, 0, 0 },
         .ticks_left = lifetime,
         .frame_ticks = 0,
@@ -95,4 +137,4 @@ void robot_explosion(struct bork_play_data* d, vec3 pos)
         new_item->flags |= BORK_ENTFLAG_SMOKING;
         bork_map_add_item(&d->map, new_id);
     }
-}
+}                                                                                               

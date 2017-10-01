@@ -186,7 +186,7 @@ static void tick_defense(struct bork_play_data* d, int l, int idx)
                 float dist = vec3_dist(d->plr.pos, ent->pos);
                 if(dist < 5) {
                     ent->HP -= 2;
-                    create_sparks(d, ent->pos, 3);
+                    create_sparks(d, ent->pos, 0.1, 3);
                 }
             }
         }
@@ -201,7 +201,7 @@ static void tick_defense(struct bork_play_data* d, int l, int idx)
                 float dist = vec3_dist(d->plr.pos, ent->pos);
                 if(dist < 5) {
                     ent->HP -= 15;
-                    create_sparks(d, ent->pos, 3);
+                    create_sparks(d, ent->pos, 0.1, 3);
                     vec3 push;
                     vec3_sub(push, ent->pos, d->plr.pos);
                     vec3_set_len(push, push, 0.25);

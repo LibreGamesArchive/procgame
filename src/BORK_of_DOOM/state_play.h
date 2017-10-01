@@ -95,10 +95,12 @@ struct bork_map_object* get_looked_map_object(struct bork_play_data* d);
 
 /*  Cosmetic/mainly visual type stuff   game_effects.c  */
 void create_explosion(struct bork_play_data* d, vec3 pos);
+void create_elec_explosion(struct bork_play_data* d, vec3 pos);
 void create_smoke(struct bork_play_data* d, vec3 pos, vec3 dir, int lifetime);
 void robot_explosion(struct bork_play_data* d, vec3 pos);
 void create_spark(struct bork_play_data* d, vec3 pos);
-void create_sparks(struct bork_play_data* d, vec3 pos, int sparks);
+void create_sparks(struct bork_play_data* d, vec3 pos, float expand, int sparks);
+void create_elec_sparks(struct bork_play_data* d, vec3 pos, float expand, int sparks);
 void tin_canine_tick(struct bork_play_data* d, struct bork_entity* ent);
 
 /*  Recycler menu functions             play_recycler.c */

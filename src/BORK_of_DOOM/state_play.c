@@ -447,6 +447,7 @@ static void tick_enemies(struct bork_play_data* d)
             ent = bork_entity_get(ent_id);
             if(!ent) {
                 ARR_SWAPSPLICE(d->map.enemies[x][y][z], i, 1);
+                --i;
                 continue;
             }
             if(ent->last_tick == d->ticks) continue;
@@ -455,6 +456,12 @@ static void tick_enemies(struct bork_play_data* d)
             && ent->pos[2] >= (z * 16.0f) && ent->pos[2] <= ((z + 1) * 16.0f)) {
                 ent->last_tick = d->ticks;
                 tick_enemy(d, ent);
+                ent = bork_entity_get(ent_id);
+                if(!ent) {
+                    ARR_SWAPSPLICE(d->map.enemies[x][y][z], i, 1);
+                    --i;
+                    continue;
+                }
             } else {
                 ARR_SWAPSPLICE(d->map.enemies[x][y][z], i, 1);
                 bork_map_add_enemy(&d->map, ent_id);
@@ -465,7 +472,7 @@ static void tick_enemies(struct bork_play_data* d)
                 ARR_FOREACH_PTR(d->map.fires, fire, j) {
                     if(vec2_dist(fire->pos, ent->pos) < 1
                     && fire->pos[2] < ent->pos[2] && ent->pos[2] - fire->pos[2] < 2) {
-                        create_sparks(d, ent->pos, 3);
+                        create_sparks(d, ent->pos, 0.1, 3);
                         ent->HP -= 5;
                         if(rand() % 4 == 0) {
                             ent->flags |= BORK_ENTFLAG_ON_FIRE;
@@ -515,6 +522,10 @@ static void tick_items(struct bork_play_data* d)
             && ent->pos[2] >= (z * 16.0f) && ent->pos[2] <= ((z + 1) * 16.0f)) {
                 ent->last_tick = d->ticks;
                 tick_item(d, ent);
+                if((ent->flags & BORK_ENTFLAG_ITEM) && (ent->flags & BORK_ENTFLAG_ACTIVE_FUNC)) {
+                    const struct bork_entity_profile* prof = &BORK_ENT_PROFILES[ent->type];
+                    prof->tick_func(ent, d);
+                }
             } else {
                 ARR_SWAPSPLICE(d->map.items[x][y][z], i, 1);
                 bork_map_add_item(&d->map, ent_id);
@@ -572,11 +583,26 @@ static void tick_fires(struct bork_play_data* d)
     struct bork_fire* fire;
     int i;
     ARR_FOREACH_REV_PTR(d->map.fires, fire, i) {
-        if(fire->lifetime % 41 == 0) create_smoke(d, fire->pos, (vec3){}, 180);
-        else if(fire->lifetime % 31 == 0) {
+        if(fire->flags & BORK_FIRE_MOVES) {
+            vec3_add(fire->pos, fire->pos, fire->vel);
+            fire->vel[2] -= 0.005;
+            struct bork_collision coll;
+            int hit = bork_map_collide(&d->map, &coll, fire->pos, (vec3){ 0.3, 0.3, 0.3 });
+            if(hit) vec3_set(fire->vel, 0, 0, 0);
+        }
+        if(fire->lifetime % 41 == 0) {
+            vec3 off = { ((float)rand() / RAND_MAX - 0.5) * 0.5,
+                         ((float)rand() / RAND_MAX - 0.5) * 0.5,
+                         ((float)rand() / RAND_MAX) * 0.5 };
+            vec3_add(off, off, fire->pos);
+            create_smoke(d, off, (vec3){}, 180);
+        } else if(fire->lifetime % 31 == 0) {
+            vec3 off = { ((float)rand() / RAND_MAX - 0.5) * 0.5,
+                         ((float)rand() / RAND_MAX - 0.5) * 0.5,
+                         ((float)rand() / RAND_MAX) * 0.5 };
             struct bork_particle new_part = {
                 .flags = BORK_PARTICLE_SPRITE | BORK_PARTICLE_BOUYANT | BORK_PARTICLE_DECELERATE,
-                .pos = { fire->pos[0], fire->pos[1], fire->pos[2] },
+                .pos = { fire->pos[0] + off[0], fire->pos[1] + off[1], fire->pos[2] + off[2] },
                 .vel = { 0, 0, -0.005 },
                 .ticks_left = 120,
                 .frame_ticks = 0,
@@ -957,13 +983,7 @@ static void draw_enemies(struct bork_play_data* d, float lerp)
             vec3 pos_lerp;
             vec3_scale(pos_lerp, ent->vel, lerp);
             vec3_add(pos_lerp, pos_lerp, ent->pos);
-            if((ent->flags & BORK_ENTFLAG_DYING) && ent->dead_ticks <= 60) {
-                struct pg_light new_light = {};
-                pg_light_pointlight(&new_light, pos_lerp,
-                    ((float)ent->dead_ticks / 60.0f) * 5.0f, (vec3){ 1.5, 0.25, 0.25 });
-                ARR_PUSH(d->lights_buf, new_light);
-                continue;
-            } else if(ent->flags & BORK_ENTFLAG_ON_FIRE) {
+            if(ent->flags & BORK_ENTFLAG_ON_FIRE) {
                 struct pg_light new_light = {};
                 pg_light_pointlight(&new_light, pos_lerp, 2.5, (vec3){ 2.0, 1.5, 0 });
                 ARR_PUSH(d->lights_buf, new_light);
@@ -1126,6 +1146,12 @@ static void draw_particles(struct bork_play_data* d)
         pg_shader_sprite_tex_frame(shader, part->current_frame);
         mat4_translate(part_transform, part->pos[0], part->pos[1], part->pos[2]);
         pg_model_draw(model, part_transform);
+        if(part->flags & BORK_PARTICLE_LIGHT) {
+            struct pg_light light;
+            pg_light_pointlight(&light, part->pos,
+                (float)part->ticks_left / (float)part->lifetime * part->light[3], part->light);
+            ARR_PUSH(d->lights_buf, light);
+        }
     }
 }
 

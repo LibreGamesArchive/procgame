@@ -100,9 +100,13 @@ struct bork_map_light_fixture {
     int type;
 };
 
+#define BORK_FIRE_MOVES     (1 << 0)
+
 struct bork_fire {
     int lifetime;
+    uint32_t flags;
     vec3 pos;
+    vec3 vel;
 };
 
 struct bork_map {

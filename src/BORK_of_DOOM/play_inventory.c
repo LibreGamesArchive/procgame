@@ -332,6 +332,7 @@ bork_entity_t remove_inventory_item(struct bork_play_data* d, int inv_idx)
     if(item->item_quantity > 1) {
         bork_entity_t rem_id = bork_entity_new(1);
         struct bork_entity* rem_item = bork_entity_get(rem_id);
+        rem_item->item_quantity = 1;
         bork_entity_init(rem_item, item->type);
         --item->item_quantity;
         return rem_id;
@@ -343,6 +344,7 @@ bork_entity_t remove_inventory_item(struct bork_play_data* d, int inv_idx)
         else if(d->quick_item[i] > inv_idx) --d->quick_item[i];
     }
     if(d->held_item == inv_idx) d->held_item = -1;
+    bork_entity_init(item, item->type);
     return item_id;
 }
 

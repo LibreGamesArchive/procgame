@@ -12,6 +12,8 @@
 #include "state_play.h"
 #include "game_states.h"
 
+#define RANDF   ((float)rand() / RAND_MAX)
+
 /*  Item use functions  */
 void bork_use_pistol(struct bork_entity* ent, struct bork_play_data* d)
 {
@@ -268,4 +270,136 @@ void bork_use_melee(struct bork_entity* ent, struct bork_play_data* d)
     d->hud_anim_active = 3;
     d->hud_anim_callback = melee_callback;
     d->hud_callback_frame = 2;
+}
+
+static void grenade_callback(struct bork_entity* item, struct bork_play_data* d)
+{
+    bork_entity_t ent_id = remove_inventory_item(d, d->held_item);
+    struct bork_entity* ent = bork_entity_get(ent_id);
+    if(!ent) return;
+    mat4 view;
+    bork_entity_get_view(&d->plr, view);
+    vec4 nade_pos = { 0, 0.2, -0.2, 1 };
+    vec3 nade_dir = { -0.4, 0, 0 };
+    mat3_mul_vec3(nade_dir, view, nade_dir);
+    mat4_mul_vec4(nade_pos, view, nade_pos);
+    vec3_dup(ent->pos, nade_pos);
+    vec3_dup(ent->vel, nade_dir);
+    ent->flags |= BORK_ENTFLAG_BOUNCE | BORK_ENTFLAG_ACTIVE_FUNC | BORK_ENTFLAG_NOT_INTERACTIVE;
+    ent->dead_ticks = PLAY_SECONDS(3);
+    bork_map_add_item(&d->map, ent_id);
+}
+
+void bork_use_grenade(struct bork_entity* ent, struct bork_play_data* d)
+{
+    if(d->hud_anim_active) return;
+    const struct bork_entity_profile* item_prof = &BORK_ENT_PROFILES[ent->type];
+    bork_play_reset_hud_anim(d);
+    vec3_set(d->hud_anim[1], 0.3, 0, 0);
+    vec3_set(d->hud_anim[2], -0.6, 0, 0.25);
+    d->hud_angle[1] = -2.0;
+    d->hud_angle[2] = 0.25;
+    d->hud_angle[3] = -0.45;
+    d->hud_anim_speed = 0.015;
+    d->hud_anim_active = 3;
+    d->hud_anim_callback = grenade_callback;
+    d->hud_callback_frame = 2;
+}
+
+void bork_tick_grenade(struct bork_entity* ent, struct bork_play_data* d)
+{
+    static bork_entity_arr_t surr = {};
+    if(ent->flags & BORK_ENTFLAG_DEAD) return;
+    --ent->dead_ticks;
+    if(ent->dead_ticks <= 0) {
+        ARR_TRUNCATE(surr, 0);
+        vec3 start, end;
+        vec3_sub(start, ent->pos, (vec3){ 5, 5, 5 });
+        vec3_add(end, ent->pos, (vec3){ 5, 5, 5 });
+        bork_map_query_enemies(&d->map, &surr, start, end);
+        int i;
+        bork_entity_t surr_ent_id;
+        struct bork_entity* surr_ent;
+        ARR_FOREACH(surr, surr_ent_id, i) {
+            surr_ent = bork_entity_get(surr_ent_id);
+            if(!surr_ent) continue;
+            float dist = vec3_dist(ent->pos, surr_ent->pos);
+            if(dist > 5.0f) continue;
+            dist = (1 - (dist / 5.0f)) * 0.5 + 0.5;
+            surr_ent->HP -= 50 * dist;
+            create_sparks(d, surr_ent->pos, 0.1, 3);
+            vec3 push;
+            vec3_sub(push, surr_ent->pos, ent->pos);
+            vec3_set_len(push, push, 0.25 * dist);
+            push[2] += 0.025;
+            vec3_add(surr_ent->vel, surr_ent->vel, push);
+        }
+        create_explosion(d, ent->pos);
+        ent->flags |= BORK_ENTFLAG_DEAD;
+    }
+}
+
+void bork_tick_grenade_emp(struct bork_entity* ent, struct bork_play_data* d)
+{
+    static bork_entity_arr_t surr = {};
+    if(ent->flags & BORK_ENTFLAG_DEAD) return;
+    --ent->dead_ticks;
+    if(ent->dead_ticks <= 0) {
+        ARR_TRUNCATE(surr, 0);
+        vec3 start, end;
+        vec3_sub(start, ent->pos, (vec3){ 5, 5, 5 });
+        vec3_add(end, ent->pos, (vec3){ 5, 5, 5 });
+        bork_map_query_enemies(&d->map, &surr, start, end);
+        int i;
+        bork_entity_t surr_ent_id;
+        struct bork_entity* surr_ent;
+        ARR_FOREACH(surr, surr_ent_id, i) {
+            surr_ent = bork_entity_get(surr_ent_id);
+            if(!surr_ent) continue;
+            float dist = vec3_dist(ent->pos, surr_ent->pos);
+            if(dist > 5.0f) continue;
+            surr_ent->flags |= BORK_ENTFLAG_EMP;
+            surr_ent->emp_ticks = PLAY_SECONDS(5);
+        }
+        create_elec_explosion(d, ent->pos);
+        ent->flags |= BORK_ENTFLAG_DEAD;
+    }
+}
+
+void bork_tick_grenade_inc(struct bork_entity* ent, struct bork_play_data* d)
+{
+    static bork_entity_arr_t surr = {};
+    if(ent->flags & BORK_ENTFLAG_DEAD) return;
+    --ent->dead_ticks;
+    if(ent->dead_ticks <= 0) {
+        ARR_TRUNCATE(surr, 0);
+        vec3 start, end;
+        vec3_sub(start, ent->pos, (vec3){ 5, 5, 5 });
+        vec3_add(end, ent->pos, (vec3){ 5, 5, 5 });
+        bork_map_query_enemies(&d->map, &surr, start, end);
+        int i;
+        bork_entity_t surr_ent_id;
+        struct bork_entity* surr_ent;
+        ARR_FOREACH(surr, surr_ent_id, i) {
+            surr_ent = bork_entity_get(surr_ent_id);
+            if(!surr_ent) continue;
+            float dist = vec3_dist(ent->pos, surr_ent->pos);
+            if(dist > 5.0f) continue;
+            surr_ent->flags |= BORK_ENTFLAG_ON_FIRE;
+            surr_ent->fire_ticks = PLAY_SECONDS(3);
+        }
+        create_explosion(d, ent->pos);
+        for(i = 0; i < 6; ++i) {
+            vec3 off = { ((float)rand() / RAND_MAX - 0.5) * 0.5,
+                         ((float)rand() / RAND_MAX - 0.5) * 0.5,
+                         ((float)rand() / RAND_MAX) * 0.5 };
+            struct bork_fire new_fire = {
+                .flags = BORK_FIRE_MOVES,
+                .pos = { ent->pos[0] + off[0], ent->pos[1] + off[1], ent->pos[2] + off[2] },
+                .vel = { off[0] * 0.25, off[1] * 0.25, off[2] * 0.25 },
+                .lifetime = PLAY_SECONDS(10) + PLAY_SECONDS(RANDF * 2) };
+            ARR_PUSH(d->map.fires, new_fire);
+        }
+        ent->flags |= BORK_ENTFLAG_DEAD;
+    }
 }
