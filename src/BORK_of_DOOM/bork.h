@@ -35,6 +35,7 @@ struct bork_game_core {
     struct pg_texture particle_tex;
     struct pg_texture upgrades_tex;
     struct pg_texture item_tex;
+    struct pg_texture enemies_tex;
     struct pg_texture font;
     /*  Generated assets    */
     struct pg_texture backdrop_tex;

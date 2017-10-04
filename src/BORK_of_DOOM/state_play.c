@@ -962,7 +962,7 @@ static void draw_enemies(struct bork_play_data* d, float lerp)
     struct pg_model* model = &d->core->enemy_model;
     int current_frame = 0;
     pg_shader_sprite_mode(shader, PG_SPRITE_CYLINDRICAL);
-    pg_shader_sprite_texture(shader, &d->core->env_atlas);
+    pg_shader_sprite_texture(shader, &d->core->enemies_tex);
     pg_shader_sprite_tex_frame(shader, 0);
     pg_shader_sprite_add_tex_tx(shader, (vec2){ 1, 1 }, (vec2){});
     pg_shader_sprite_transform(shader, (vec2){ 1, 1 }, (vec2){});

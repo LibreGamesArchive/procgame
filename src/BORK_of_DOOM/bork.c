@@ -32,7 +32,7 @@ void bork_init(struct bork_game_core* core)
     };
     /*  Set up the gbuffer for deferred shading */
     pg_gbuffer_init(&core->gbuf, sw, sh);
-    pg_gbuffer_bind(&core->gbuf, 20, 21, 22, 23);
+    pg_gbuffer_bind(&core->gbuf, 21, 22, 23, 24);
     pg_viewer_init(&core->view, (vec3){ 0, 0, 0 }, (vec2){ 0, 0 },
         core->screen_size, (vec2){ 0.01, 200 });
     /*  Set up the shaders  */
@@ -40,7 +40,7 @@ void bork_init(struct bork_game_core* core)
     pg_shader_2d(&core->shader_2d);
     pg_shader_sprite(&core->shader_sprite);
     pg_shader_text(&core->shader_text);
-    pg_ppbuffer_init(&core->ppbuf, sw, sh, 24, 25);
+    pg_ppbuffer_init(&core->ppbuf, sw, sh, 26, 27);
     pg_postproc_blur(&core->post_blur, PG_BLUR7);
     pg_postproc_screen(&core->post_screen);
     /*  Get the models, textures, sounds, etc.*    */
@@ -85,19 +85,22 @@ void bork_load_assets(struct bork_game_core* core)
     pg_texture_init_from_file(&core->item_tex, "res/items.png", "res/items_lightmap.png");
     pg_texture_set_atlas(&core->item_tex, 16, 16);
     pg_texture_bind(&core->item_tex, 10, 11);
+    pg_texture_init_from_file(&core->enemies_tex, "res/enemies.png", "res/enemies_lightmap.png");
+    pg_texture_set_atlas(&core->enemies_tex, 32, 32);
+    pg_texture_bind(&core->enemies_tex, 12, 13);
     pg_texture_init_from_file(&core->particle_tex, "res/particles.png", "res/particles_lightmap.png");
     pg_texture_set_atlas(&core->particle_tex, 16, 16);
-    pg_texture_bind(&core->particle_tex, 12, 13);
+    pg_texture_bind(&core->particle_tex, 14, 15);
     pg_texture_init_from_file(&core->upgrades_tex, "res/upgrades.png", NULL);
     pg_texture_set_atlas(&core->upgrades_tex, 32, 32);
-    pg_texture_bind(&core->upgrades_tex, 14, 0);
+    pg_texture_bind(&core->upgrades_tex, 16, 0);
     /*  Generate the backdrop texture (cloudy reddish fog)  */
     pg_texture_init(&core->backdrop_tex, 256, 256);
     pg_texture_init(&core->menu_vignette, 256, 256);
     pg_texture_init(&core->radial_vignette, 256, 256);
-    pg_texture_bind(&core->backdrop_tex, 16, -1);
-    pg_texture_bind(&core->menu_vignette, 17, -1);
-    pg_texture_bind(&core->radial_vignette, 18, -1);
+    pg_texture_bind(&core->backdrop_tex, 18, -1);
+    pg_texture_bind(&core->menu_vignette, 19, -1);
+    pg_texture_bind(&core->radial_vignette, 20, -1);
     float seed = (float)rand() / RAND_MAX * 1000;
     struct pg_wave backdrop_wave[8] = {
         PG_WAVE_MOD_SEAMLESS_2D(.scale = 0.5),
