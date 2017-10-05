@@ -92,9 +92,10 @@ void entity_on_fire(struct bork_play_data* d, struct bork_entity* ent);
 bork_entity_t get_looked_item(struct bork_play_data* d);
 bork_entity_t get_looked_enemy(struct bork_play_data* d);
 struct bork_map_object* get_looked_map_object(struct bork_play_data* d);
+void game_explosion(struct bork_play_data* d, vec3 pos, float intensity);
 
 /*  Cosmetic/mainly visual type stuff   game_effects.c  */
-void create_explosion(struct bork_play_data* d, vec3 pos);
+void create_explosion(struct bork_play_data* d, vec3 pos, float intensity);
 void create_elec_explosion(struct bork_play_data* d, vec3 pos);
 void create_smoke(struct bork_play_data* d, vec3 pos, vec3 dir, int lifetime);
 void robot_explosion(struct bork_play_data* d, vec3 pos);

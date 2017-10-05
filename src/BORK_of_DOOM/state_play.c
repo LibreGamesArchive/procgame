@@ -430,11 +430,6 @@ static void tick_datapad(struct bork_play_data* d)
     }
 }
 
-static void tick_enemy(struct bork_play_data* d, struct bork_entity* ent)
-{
-    tin_canine_tick(d, ent);
-}
-
 static void tick_enemies(struct bork_play_data* d)
 {
     int x, y, z, i;
@@ -451,11 +446,12 @@ static void tick_enemies(struct bork_play_data* d)
                 continue;
             }
             if(ent->last_tick == d->ticks) continue;
-            else if(ent->pos[0] >= (x * 16.0f) && ent->pos[0] <= ((x + 1) * 16.0f)
+            const struct bork_entity_profile* prof = &BORK_ENT_PROFILES[ent->type];
+            if(ent->pos[0] >= (x * 16.0f) && ent->pos[0] <= ((x + 1) * 16.0f)
             && ent->pos[1] >= (y * 16.0f) && ent->pos[1] <= ((y + 1) * 16.0f)
             && ent->pos[2] >= (z * 16.0f) && ent->pos[2] <= ((z + 1) * 16.0f)) {
                 ent->last_tick = d->ticks;
-                tick_enemy(d, ent);
+                if(prof->tick_func) prof->tick_func(ent, d);
                 ent = bork_entity_get(ent_id);
                 if(!ent) {
                     ARR_SWAPSPLICE(d->map.enemies[x][y][z], i, 1);
@@ -990,7 +986,7 @@ static void draw_enemies(struct bork_play_data* d, float lerp)
             }
             vec2 ent_to_plr;
             vec2_sub(ent_to_plr, pos_lerp, d->plr.pos);
-            float dir_adjust = 1.0f / (float)prof->dir_frames + 0.5f;
+            float dir_adjust = 1.0f / (float)prof->dir_frames * M_PI * 2;
             float angle = atan2(ent_to_plr[0], ent_to_plr[1]) - dir_adjust + M_PI + ent->dir[0];
             angle = fmodf(angle, M_PI * 2);
             float angle_f = angle / (M_PI * 2);
@@ -1003,6 +999,14 @@ static void draw_enemies(struct bork_play_data* d, float lerp)
             mat4 transform;
             mat4_translate(transform, pos_lerp[0], pos_lerp[1], pos_lerp[2]);
             pg_model_draw(model, transform);
+            if(ent->type == BORK_ENEMY_FANG_BANGER
+            && !(ent->flags & BORK_ENTFLAG_EMP)) {
+                struct pg_light new_light = {};
+                pg_light_pointlight(&new_light,
+                    (vec3){ pos_lerp[0], pos_lerp[1], pos_lerp[2] + 0.5 },
+                    2, (vec3){ 0.9, 0.5, 0.5 });
+                ARR_PUSH(d->lights_buf, new_light);
+            }
         }
     }
 }

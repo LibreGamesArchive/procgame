@@ -64,12 +64,12 @@ void create_elec_sparks(struct bork_play_data* d, vec3 pos, float expand, int sp
     }
 }
 
-void create_explosion(struct bork_play_data* d, vec3 pos)
+void create_explosion(struct bork_play_data* d, vec3 pos, float intensity)
 {
     struct bork_particle new_part = {
         .flags = BORK_PARTICLE_SPRITE | BORK_PARTICLE_LIGHT | BORK_PARTICLE_LIGHT_DECAY,
         .pos = { pos[0], pos[1], pos[2] },
-        .light = { 1.5, 1.5, 1, 8 },
+        .light = { 1.5, 1.5, 1, 8.0f * intensity},
         .vel = { 0, 0, 0 },
         .lifetime = 60,
         .ticks_left = 60,
@@ -117,7 +117,7 @@ void create_smoke(struct bork_play_data* d, vec3 pos, vec3 dir, int lifetime)
 void robot_explosion(struct bork_play_data* d, vec3 pos)
 {
     vec3 pos_ = { pos[0], pos[1], pos[2] };
-    create_explosion(d, pos);
+    create_explosion(d, pos, 1);
     int num_scraps = 3 + rand() % 3;
     int i;
     for(i = 0; i < num_scraps; ++i) {

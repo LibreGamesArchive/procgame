@@ -47,6 +47,7 @@ struct bork_entity {
     enum bork_entity_type {
         BORK_ENTITY_PLAYER,
         BORK_ENTITY_ENEMY,
+        BORK_ENEMY_FANG_BANGER,
         BORK_ITEM_PLANT1,
         BORK_ITEM_DATAPAD,
         BORK_ITEM_UPGRADE,
@@ -116,10 +117,12 @@ void bork_use_plazgun(struct bork_entity* ent, struct bork_play_data* d);
 void bork_hud_plazgun(struct bork_entity* ent, struct bork_play_data* d);
 void bork_use_firstaid(struct bork_entity* ent, struct bork_play_data* d);
 void bork_use_melee(struct bork_entity* ent, struct bork_play_data* d);
+void bork_use_grenade(struct bork_entity* ent, struct bork_play_data* d);
 void bork_tick_grenade_emp(struct bork_entity* ent, struct bork_play_data* d);
 void bork_tick_grenade_inc(struct bork_entity* ent, struct bork_play_data* d);
 void bork_tick_grenade(struct bork_entity* ent, struct bork_play_data* d);
-void bork_use_grenade(struct bork_entity* ent, struct bork_play_data* d);
+void bork_tick_tin_canine(struct bork_entity* ent, struct bork_play_data* d);
+void bork_tick_fang_banger(struct bork_entity* ent, struct bork_play_data* d);
 
 static const struct bork_entity_profile {
     char name[32];
@@ -149,11 +152,20 @@ static const struct bork_entity_profile {
         .sprite_tx = { 1, 1, 0, 0 } },
     [BORK_ENTITY_ENEMY] = { .name = "Enemy",
         .base_flags = BORK_ENTFLAG_ENEMY,
-        .base_hp = 30,
+        .base_hp = 100,
         .size = { 1, 1, 1 },
         .sprite_tx = { 1, 1, 0, 0 },
-        .front_frame = 192,
-        .dir_frames = 4 },
+        .front_frame = 0,
+        .dir_frames = 8,
+        .tick_func = bork_tick_tin_canine },
+    [BORK_ENEMY_FANG_BANGER] = { .name = "FANG BANGER",
+        .base_flags = BORK_ENTFLAG_ENEMY,
+        .base_hp = 25,
+        .size = { 0.5, 0.5, 0.5 },
+        .sprite_tx = { 1, 1, 0, 0 },
+        .front_frame = 32,
+        .dir_frames = 8,
+        .tick_func = bork_tick_fang_banger },
     [BORK_ITEM_DATAPAD] = { .name = "DATA PAD",
         .base_flags = BORK_ENTFLAG_ITEM,
         .size = { 0.3, 0.3, 0.3 },

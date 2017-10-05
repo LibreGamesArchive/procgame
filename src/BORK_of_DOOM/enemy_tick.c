@@ -89,7 +89,94 @@ static int path_from_tile(struct bork_map* map, int x, int y, int z)
     else return -1;
 }
 
-void tin_canine_tick(struct bork_play_data* d, struct bork_entity* ent)
+void bork_tick_fang_banger(struct bork_entity* ent, struct bork_play_data* d)
+{
+    const struct bork_entity_profile* prof = &BORK_ENT_PROFILES[ent->type];
+    static bork_entity_arr_t surr = {};
+    ARR_TRUNCATE(surr, 0);
+    vec3 start, end;
+    vec3_sub(start, ent->pos, (vec3){ 2, 2, 2 });
+    vec3_add(end, ent->pos, (vec3){ 2, 2, 2 });
+    bork_map_query_enemies(&d->map, &surr, start, end);
+    /*  Do basic physics    */
+    bork_entity_move(ent, &d->map);
+    /*  Physics against other enemies   */
+    int i;
+    struct bork_entity* surr_ent;
+    bork_entity_t ent_id;
+    ARR_FOREACH(surr, ent_id, i) {
+        surr_ent = bork_entity_get(ent_id);
+        if(!surr_ent) continue;
+        const struct bork_entity_profile* surr_prof = &BORK_ENT_PROFILES[surr_ent->type];
+        vec3 push;
+        vec3_sub(push, ent->pos, surr_ent->pos);
+        float full = prof->size[0] + surr_prof->size[0];
+        float dist = vec3_len(push);
+        if(dist < full) {
+            vec3_set_len(push, push, (full - dist) * 0.5);
+            vec3_add(ent->vel, ent->vel, push);
+            vec3_sub(surr_ent->vel, surr_ent->vel, push);
+        }
+    }
+    /*  Tick status effects */
+    if(ent->flags & BORK_ENTFLAG_ON_FIRE) entity_on_fire(d, ent);
+    if(ent->flags & BORK_ENTFLAG_EMP) {
+        entity_emp(d, ent);
+        return;
+    }
+    if(ent->flags & BORK_ENTFLAG_DYING) {
+        robot_dying(d, ent);
+    } else if(ent->HP <= 0) {
+        ent->flags |= BORK_ENTFLAG_DYING;
+        ent->dead_ticks = PLAY_SECONDS(2.5);
+    } else {
+        vec3 ent_head, plr_head;
+        get_plr_pos_for_ai(d, plr_head);
+        vec3_add(ent_head, ent->pos, (vec3){ 0, 0, 0.5 });
+        int vis = bork_map_check_vis(&d->map, ent_head, plr_head);
+        if(vis) ent->aware_ticks = 1200;
+        else if(ent->aware_ticks) --ent->aware_ticks;
+        if(ent->aware_ticks) {
+            /*  Movement/pathfinding    */
+            /*  Calculate the next destination  */
+            int x = floor(ent->pos[0] / 2);
+            int y = floor(ent->pos[1] / 2);
+            int z = floor(ent->pos[2] / 2);
+            int plr_dist = d->map.plr_dist[x][y][z];
+            if(plr_dist >= 15) {
+                ent->flags |= BORK_ENTFLAG_DEAD;
+                game_explosion(d, ent->pos, 0.5);
+            } else if(plr_dist) {
+                vec3 diff = {};
+                vec2_sub(diff, ent->dst_pos, ent->pos);
+                if(ent->path_ticks && vec2_len(diff) > 0.5 && vec2_len(diff) < 16) {
+                    /*  Just move to the last calculated destination    */
+                    float angle = atan2f(diff[0], diff[1]) + M_PI;
+                    ent->dir[0] = (M_PI * 2 - angle) - M_PI * 0.5;
+                    ent->dir[0] = FMOD(ent->dir[0], M_PI * 2);
+                    vec2_set_len(diff, diff, 0.0125);
+                    vec3_add(ent->vel, ent->vel, diff);
+                    --ent->path_ticks;
+                } else {
+                    ent->path_ticks = PLAY_SECONDS(2.5);
+                    /*  Calculate the next tile on the path */
+                    int path = path_from_tile(&d->map, x, y, z);
+                    if(path >= 0) {
+                        vec2 off = {
+                            ((float)rand() / RAND_MAX - 0.5) * 1.5,
+                            ((float)rand() / RAND_MAX - 0.5) * 1.5 };
+                        vec3_set(ent->dst_pos,
+                                 (x + path_dir[path][0]) * 2.0f + 1.0f + off[0],
+                                 (y + path_dir[path][1]) * 2.0f + 1.0f + off[1],
+                                 z * 2.0f + 1.0f);
+                    }
+                }
+            }
+        }
+    }
+}
+
+void bork_tick_tin_canine(struct bork_entity* ent, struct bork_play_data* d)
 {
     static bork_entity_arr_t surr = {};
     ARR_TRUNCATE(surr, 0);
@@ -134,7 +221,7 @@ void tin_canine_tick(struct bork_play_data* d, struct bork_entity* ent)
         int vis = bork_map_check_vis(&d->map, ent_head, plr_head);
         if(vis) ent->aware_ticks = 1200;
         else if(ent->aware_ticks) --ent->aware_ticks;
-        if(ent->aware_ticks) {
+        if(ent->aware_ticks && (ent->flags & BORK_ENTFLAG_GROUND)) {
             if(ent->counter[0] - d->ticks <= 0) {
                 ent->counter[0] = d->ticks + 180 + (RANDF * 90);
             } else if(!vis || ent->counter[0] - d->ticks > 60) {
@@ -169,7 +256,7 @@ void tin_canine_tick(struct bork_play_data* d, struct bork_entity* ent)
                 }
             } else if(vis) {
                 vec3 ent_to_plr;
-                vec3_sub(ent_to_plr, plr_head, ent_head);
+                vec3_sub(ent_to_plr, plr_head, ent->pos);
                 float angle = atan2f(ent_to_plr[0], ent_to_plr[1]) + M_PI;
                 ent->dir[0] = (M_PI * 2 - angle) - M_PI * 0.5;
                 if(ent->counter[0] - d->ticks == 30) {
@@ -177,10 +264,13 @@ void tin_canine_tick(struct bork_play_data* d, struct bork_entity* ent)
                         .flags = BORK_BULLET_HURTS_PLAYER,
                         .damage = 0 };
                     vec3_set_len(new_bullet.dir, ent_to_plr, 0.4);
-                    vec3_add(new_bullet.pos, ent_head, new_bullet.dir);
+                    vec3_add(new_bullet.pos, ent->pos, new_bullet.dir);
+                    new_bullet.pos[2] -= 0.1;
                     ARR_PUSH(d->bullets, new_bullet);
                 }
             }
         }
     }
 }
+
+

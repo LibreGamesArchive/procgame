@@ -169,3 +169,43 @@ void get_plr_pos_for_ai(struct bork_play_data* d, vec3 out)
         else out[2] += 0.8;
     }
 }
+
+void game_explosion(struct bork_play_data* d, vec3 pos, float intensity)
+{
+    /*  Apply explosion to other entities   */
+    static bork_entity_arr_t surr = {};
+    ARR_TRUNCATE(surr, 0);
+    vec3 start, end;
+    vec3_sub(start, pos, (vec3){ 5, 5, 5 });
+    vec3_add(end, pos, (vec3){ 5, 5, 5 });
+    bork_map_query_enemies(&d->map, &surr, start, end);
+    int i;
+    bork_entity_t surr_ent_id;
+    struct bork_entity* surr_ent;
+    ARR_FOREACH(surr, surr_ent_id, i) {
+        surr_ent = bork_entity_get(surr_ent_id);
+        if(!surr_ent) continue;
+        float dist = vec3_dist(pos, surr_ent->pos);
+        if(dist > 5.0f) continue;
+        dist = (1 - (dist / 5.0f)) * 0.5 + 0.5;
+        surr_ent->HP -= 50 * intensity * dist;
+        create_sparks(d, surr_ent->pos, 0.1, 3);
+        vec3 push;
+        vec3_sub(push, surr_ent->pos, pos);
+        vec3_set_len(push, push, 0.25 * intensity * dist);
+        push[2] += 0.025 * intensity;
+        vec3_add(surr_ent->vel, surr_ent->vel, push);
+    }
+    /*  Apply explosion to the player   */
+    float dist = vec3_dist(d->plr.pos, pos);
+    if(dist <= 5.0f) {
+        dist = (1 - (dist / 5.0f)) * 0.5 + 0.5;
+        d->plr.HP -= 50 * intensity * dist;
+        vec3 push;
+        vec3_sub(push, d->plr.pos, pos);
+        vec3_set_len(push, push, 0.2 * intensity * dist);
+        push[2] += 0.02 * intensity;
+        vec3_add(d->plr.vel, d->plr.vel, push);
+    }
+    create_explosion(d, pos, intensity);
+}

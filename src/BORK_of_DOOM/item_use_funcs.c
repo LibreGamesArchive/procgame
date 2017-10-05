@@ -334,7 +334,7 @@ void bork_tick_grenade(struct bork_entity* ent, struct bork_play_data* d)
             push[2] += 0.025;
             vec3_add(surr_ent->vel, surr_ent->vel, push);
         }
-        create_explosion(d, ent->pos);
+        game_explosion(d, ent->pos, 1);
         ent->flags |= BORK_ENTFLAG_DEAD;
     }
 }
@@ -388,7 +388,7 @@ void bork_tick_grenade_inc(struct bork_entity* ent, struct bork_play_data* d)
             surr_ent->flags |= BORK_ENTFLAG_ON_FIRE;
             surr_ent->fire_ticks = PLAY_SECONDS(3);
         }
-        create_explosion(d, ent->pos);
+        create_explosion(d, ent->pos, 1);
         for(i = 0; i < 6; ++i) {
             vec3 off = { ((float)rand() / RAND_MAX - 0.5) * 0.5,
                          ((float)rand() / RAND_MAX - 0.5) * 0.5,
