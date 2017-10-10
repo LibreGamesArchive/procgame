@@ -114,6 +114,7 @@ struct bork_map {
     struct bork_tile data[32][32][32];
     uint8_t plr_dist[32][32][32];
     bork_entity_arr_t enemies[4][4][4];
+    bork_entity_arr_t entities[4][4][4];
     bork_entity_arr_t items[4][4][4];
     ARR_T(struct bork_map_object) doors;
     ARR_T(struct bork_map_object) doorpads;
@@ -161,9 +162,12 @@ void bork_map_calc_travel(struct bork_map* map);
 void bork_map_create_fire(struct bork_map* map, vec3 pos, int lifetime);
 void bork_map_add_enemy(struct bork_map* map, bork_entity_t ent_id);
 void bork_map_add_item(struct bork_map* map, bork_entity_t ent_id);
+void bork_map_add_entity(struct bork_map* map, bork_entity_t ent_id);
 void bork_map_query_enemies(struct bork_map* map, bork_entity_arr_t* arr,
                             vec3 start, vec3 end);
 void bork_map_query_items(struct bork_map* map, bork_entity_arr_t* arr,
                           vec3 start, vec3 end);
+void bork_map_query_entities(struct bork_map* map, bork_entity_arr_t* arr,
+                             vec3 start, vec3 end);
 
 

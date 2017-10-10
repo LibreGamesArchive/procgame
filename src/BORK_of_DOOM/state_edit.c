@@ -664,6 +664,7 @@ void bork_editor_complete_map(struct bork_map* map, struct bork_editor_map* ed_m
         struct bork_entity* ent = bork_entity_get(ent_id);
         bork_editor_complete_entity(ent, ed_ent);
         if(ent->flags & BORK_ENTFLAG_ENEMY) bork_map_add_enemy(map, ent_id);
+        else if(ent->flags & BORK_ENTFLAG_ENTITY) bork_map_add_entity(map, ent_id);
         else bork_map_add_item(map, ent_id);
     }
 }

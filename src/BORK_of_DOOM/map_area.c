@@ -587,8 +587,13 @@ void bork_map_build_plr_dist(struct bork_map* map, vec3 pos)
     int plr_y = floor(pos[1] / 2);
     int plr_z = floor(pos[2] / 2);
     /*  Start the queue with the player's current tile  */
-    struct bork_tile* opp = bork_map_tile_ptri(map, plr_x, plr_y, plr_z + 1);
+    struct bork_tile* opp = NULL;
     struct bork_tile* tile = bork_map_tile_ptri(map, plr_x, plr_y, plr_z);
+    while(plr_z > 0 && !(tile->travel_flags & (1 << 6))) {
+        --plr_z;
+        tile = bork_map_tile_ptri(map, plr_x, plr_y, plr_z);
+    }
+    if(plr_z == 0) return;
     map->plr_dist[plr_x][plr_y][plr_z] = 16;
     uint8_t queue[128][3] = { { plr_x, plr_y, plr_z } };
     int queue_idx[2] = { 0, 1 };
@@ -1250,6 +1255,17 @@ void bork_map_add_enemy(struct bork_map* map, bork_entity_t ent_id)
     ARR_PUSH(map->enemies[x][y][z], ent_id);
 }
 
+void bork_map_add_entity(struct bork_map* map, bork_entity_t ent_id)
+{
+    struct bork_entity* ent = bork_entity_get(ent_id);
+    if(!ent) return;
+    int x, y, z;
+    x = (int)ent->pos[0] / 16;
+    y = (int)ent->pos[1] / 16;
+    z = (int)ent->pos[2] / 16;
+    ARR_PUSH(map->entities[x][y][z], ent_id);
+}
+
 void bork_map_add_item(struct bork_map* map, bork_entity_t ent_id)
 {
     struct bork_entity* ent = bork_entity_get(ent_id);
@@ -1280,6 +1296,41 @@ void bork_map_query_enemies(struct bork_map* map, bork_entity_arr_t* arr,
                 bork_entity_t ent_id;
                 struct bork_entity* ent;
                 ARR_FOREACH(map->enemies[x][y][z], ent_id, i) {
+                    ent = bork_entity_get(ent_id);
+                    if(!ent) continue;
+                    //printf("%d\n", ent_id);
+                    if(ent->pos[0] >= start[0] && ent->pos[0] <= end[0]
+                    && ent->pos[1] >= start[1] && ent->pos[1] <= end[1]
+                    && ent->pos[2] >= start[2] && ent->pos[2] <= end[2]) {
+                        ARR_PUSH(*arr, ent_id);
+                    }
+                }
+            } while(x++ < end_i[0]);
+            x = start_i[0];
+        } while(y++ < end_i[1]);
+        y = start_i[1];
+    } while(z++ < end_i[2]);
+}
+
+void bork_map_query_entities(struct bork_map* map, bork_entity_arr_t* arr,
+                             vec3 start, vec3 end)
+{
+    int start_i[3];
+    int end_i[3];
+    start_i[0] = CLAMP((int)start[0] / 16, 0, 3);
+    start_i[1] = CLAMP((int)start[1] / 16, 0, 3);
+    start_i[2] = CLAMP((int)start[2] / 16, 0, 3);
+    end_i[0] = CLAMP((int)end[0] / 16, 0, 3);
+    end_i[1] = CLAMP((int)end[1] / 16, 0, 3);
+    end_i[2] = CLAMP((int)end[2] / 16, 0, 3);
+    int x = start_i[0], y = start_i[1], z = start_i[2];
+    do {
+        do {
+            do {
+                int i;
+                bork_entity_t ent_id;
+                struct bork_entity* ent;
+                ARR_FOREACH(map->entities[x][y][z], ent_id, i) {
                     ent = bork_entity_get(ent_id);
                     if(!ent) continue;
                     //printf("%d\n", ent_id);

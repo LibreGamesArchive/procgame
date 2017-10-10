@@ -28,6 +28,7 @@ struct bork_play_data {
     bork_entity_t teleporter_item;
     bork_entity_arr_t plr_enemy_query;
     bork_entity_arr_t plr_item_query;
+    bork_entity_arr_t plr_entity_query;
     bork_entity_arr_t inventory;
     bork_entity_arr_t held_upgrades;
     ARR_T(struct bork_bullet) bullets;

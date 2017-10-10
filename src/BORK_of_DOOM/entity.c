@@ -91,7 +91,8 @@ void bork_entity_move(struct bork_entity* ent, struct bork_map* map)
         coll_size[2] *= 0.5;
     }
     ent->flags &= ~BORK_ENTFLAG_GROUND;
-    vec3_add(ent->vel, ent->vel, (vec3){ 0, 0, -0.005 });
+    if(!(ent->flags & BORK_ENTFLAG_FLIES))
+        vec3_add(ent->vel, ent->vel, (vec3){ 0, 0, -0.005 });
     struct bork_collision coll = {};
     float curr_move = 0;
     float max_move = vec3_vmin(coll_size);
@@ -171,5 +172,15 @@ void bork_entity_get_view(struct bork_entity* ent, mat4 view)
     mat4_translate(view, ent->pos[0], ent->pos[1], ent->pos[2] + eye_height);
     mat4_rotate_Z(view, view, M_PI + ent->dir[0]);
     mat4_rotate_Y(view, view, -ent->dir[1]);
+}
+
+void bork_entity_look_at(struct bork_entity* ent, vec3 look)
+{
+    ent->dir[0] = M_PI + atan2f(look[0] - ent->pos[0], -(look[1] - ent->pos[1]));
+}
+
+void bork_entity_look_dir(struct bork_entity* ent, vec3 look)
+{
+    ent->dir[0] = M_PI + atan2f(look[0], -look[1]);
 }
 

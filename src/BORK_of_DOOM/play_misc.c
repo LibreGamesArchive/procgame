@@ -179,6 +179,7 @@ void game_explosion(struct bork_play_data* d, vec3 pos, float intensity)
     vec3_sub(start, pos, (vec3){ 5, 5, 5 });
     vec3_add(end, pos, (vec3){ 5, 5, 5 });
     bork_map_query_enemies(&d->map, &surr, start, end);
+    bork_map_query_entities(&d->map, &surr, start, end);
     int i;
     bork_entity_t surr_ent_id;
     struct bork_entity* surr_ent;

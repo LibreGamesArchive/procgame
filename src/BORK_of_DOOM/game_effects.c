@@ -18,10 +18,11 @@
 void create_spark(struct bork_play_data* d, vec3 pos)
 {
     struct bork_particle new_part = {
+        .flags = BORK_PARTICLE_GRAVITY,
         .pos = { pos[0], pos[1], pos[2] },
         .vel = { 0, 0, 0 },
-        .ticks_left = 30,
-        .frame_ticks = 6,
+        .ticks_left = 50,
+        .frame_ticks = 10,
         .start_frame = 0, .end_frame = 5
     };
     ARR_PUSH(d->particles, new_part);
@@ -34,12 +35,13 @@ void create_sparks(struct bork_play_data* d, vec3 pos, float expand, int sparks)
         vec3 off = {
             (float)rand() / RAND_MAX - 0.5,
             (float)rand() / RAND_MAX - 0.5,
-            (float)rand() / RAND_MAX - 0.5 };
+            (float)rand() / RAND_MAX };
         struct bork_particle new_part = {
+            .flags = BORK_PARTICLE_GRAVITY,
             .pos = { pos[0] + off[0], pos[1] + off[1], pos[2] + off[2] },
             .vel = { off[0] * expand, off[1] * expand, off[2] * expand },
-            .ticks_left = 30,
-            .frame_ticks = 6,
+            .ticks_left = 50,
+            .frame_ticks = 10,
             .start_frame = 0, .end_frame = 5 };
         ARR_PUSH(d->particles, new_part);
     }
@@ -78,7 +80,7 @@ void create_explosion(struct bork_play_data* d, vec3 pos, float intensity)
         .start_frame = 8, .end_frame = 12,
     };
     ARR_PUSH(d->particles, new_part);
-    create_sparks(d, pos, 0.2, 5);
+    create_sparks(d, pos, 0.15, 5);
 }
 
 void create_elec_explosion(struct bork_play_data* d, vec3 pos)

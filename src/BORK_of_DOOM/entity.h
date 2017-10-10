@@ -24,6 +24,9 @@
 #define BORK_ENTFLAG_IS_CHEMICAL        (1 << 23)
 #define BORK_ENTFLAG_BOUNCE             (1 << 24)
 #define BORK_ENTFLAG_ACTIVE_FUNC        (1 << 25)
+#define BORK_ENTFLAG_FLIES              (1 << 26)
+#define BORK_ENTFLAG_STATIONARY         (1 << 27)
+#define BORK_ENTFLAG_ENTITY             (1 << 28)
 
 struct bork_entity {
     int last_tick;
@@ -46,8 +49,12 @@ struct bork_entity {
     int item_quantity;
     enum bork_entity_type {
         BORK_ENTITY_PLAYER,
-        BORK_ENTITY_ENEMY,
+        BORK_ENEMY_TEST,
+        BORK_ENEMY_TIN_CANINE,
+        BORK_ENEMY_BOTTWEILER,
         BORK_ENEMY_FANG_BANGER,
+        BORK_ENEMY_SNOUT_DRONE,
+        BORK_ENEMY_GREAT_BANE,
         BORK_ITEM_PLANT1,
         BORK_ITEM_DATAPAD,
         BORK_ITEM_UPGRADE,
@@ -101,7 +108,8 @@ struct bork_entity {
         BORK_ITEM_BROKEN_HELMET,
         BORK_ITEM_OXYGEN_TANK,
         BORK_ITEM_CHEMICAL_TANK,
-        BORK_ITEM_STOOL,
+        BORK_ENTITY_STOOL,
+        BORK_ENTITY_BARREL,
         BORK_ENTITY_TYPES,
     } type;
 };
@@ -121,8 +129,13 @@ void bork_use_grenade(struct bork_entity* ent, struct bork_play_data* d);
 void bork_tick_grenade_emp(struct bork_entity* ent, struct bork_play_data* d);
 void bork_tick_grenade_inc(struct bork_entity* ent, struct bork_play_data* d);
 void bork_tick_grenade(struct bork_entity* ent, struct bork_play_data* d);
+void bork_tick_test_enemy(struct bork_entity* ent, struct bork_play_data* d);
 void bork_tick_tin_canine(struct bork_entity* ent, struct bork_play_data* d);
+void bork_tick_bottweiler(struct bork_entity* ent, struct bork_play_data* d);
 void bork_tick_fang_banger(struct bork_entity* ent, struct bork_play_data* d);
+void bork_tick_snout_drone(struct bork_entity* ent, struct bork_play_data* d);
+void bork_tick_great_bane(struct bork_entity* ent, struct bork_play_data* d);
+void bork_barrel_explode(struct bork_entity* ent, struct bork_play_data* d);
 
 static const struct bork_entity_profile {
     char name[32];
@@ -143,6 +156,7 @@ static const struct bork_entity_profile {
     uint8_t use_ctrl;
     float hud_angle;
     void (*tick_func)(struct bork_entity*, struct bork_play_data*);
+    void (*death_func)(struct bork_entity*, struct bork_play_data*);
     void (*use_func)(struct bork_entity*, struct bork_play_data*);
     void (*hud_func)(struct bork_entity*, struct bork_play_data*);
 } BORK_ENT_PROFILES[] = {
@@ -150,7 +164,15 @@ static const struct bork_entity_profile {
         .base_flags = BORK_ENTFLAG_PLAYER,
         .size = { 0.5, 0.5, 0.9 },
         .sprite_tx = { 1, 1, 0, 0 } },
-    [BORK_ENTITY_ENEMY] = { .name = "Enemy",
+    [BORK_ENEMY_TEST] = { .name = "TEST ENEMY",
+        .base_flags = BORK_ENTFLAG_ENEMY,
+        .base_hp = 100,
+        .size = { 1, 1, 1 },
+        .sprite_tx = { 1, 1, 0, 0 },
+        .front_frame = 0,
+        .dir_frames = 8,
+        .tick_func = bork_tick_test_enemy },
+    [BORK_ENEMY_TIN_CANINE] = { .name = "TIN CANINE",
         .base_flags = BORK_ENTFLAG_ENEMY,
         .base_hp = 100,
         .size = { 1, 1, 1 },
@@ -158,6 +180,14 @@ static const struct bork_entity_profile {
         .front_frame = 0,
         .dir_frames = 8,
         .tick_func = bork_tick_tin_canine },
+    [BORK_ENEMY_BOTTWEILER] = { .name = "BOTTWEILER",
+        .base_flags = BORK_ENTFLAG_ENEMY,
+        .base_hp = 50,
+        .size = { 0.5, 0.5, 0.5 },
+        .sprite_tx = { 1, 1, 0, 0 },
+        .front_frame = 16,
+        .dir_frames = 8,
+        .tick_func = bork_tick_bottweiler },
     [BORK_ENEMY_FANG_BANGER] = { .name = "FANG BANGER",
         .base_flags = BORK_ENTFLAG_ENEMY,
         .base_hp = 25,
@@ -166,6 +196,35 @@ static const struct bork_entity_profile {
         .front_frame = 32,
         .dir_frames = 8,
         .tick_func = bork_tick_fang_banger },
+    [BORK_ENEMY_SNOUT_DRONE] = { .name = "SNOUT DRONE",
+        .base_flags = BORK_ENTFLAG_ENEMY | BORK_ENTFLAG_FLIES,
+        .base_hp = 75,
+        .size = { 1, 1, 1 },
+        .sprite_tx = { 1, 1, 0, 0 },
+        .front_frame = 48,
+        .dir_frames = 8,
+        .tick_func = bork_tick_snout_drone },
+    [BORK_ENEMY_GREAT_BANE] = { .name = "GREAT BANE",
+        .base_flags = BORK_ENTFLAG_ENEMY | BORK_ENTFLAG_STATIONARY,
+        .base_hp = 250,
+        .size = { 1.5, 1.5, 1.5 },
+        .sprite_tx = { 2, 2, 0, 0 },
+        .front_frame = 64,
+        .dir_frames = 8,
+        .tick_func = bork_tick_great_bane },
+    [BORK_ENTITY_STOOL] = { .name = "STOOL",
+        .base_flags = BORK_ENTFLAG_ENTITY,
+        .base_hp = 150,
+        .size = { 0.3, 0.3, 0.3 },
+        .front_frame = 178,
+        .sprite_tx = { 1, 1, 0, 0 } },
+    [BORK_ENTITY_BARREL] = { .name = "WASTE BARREL",
+        .base_flags = BORK_ENTFLAG_ENTITY,
+        .base_hp = 25,
+        .size = { 0.3, 0.3, 0.5 },
+        .front_frame = 195,
+        .sprite_tx = { 1, 1.5, 0, 0 },
+        .death_func = bork_barrel_explode },
     [BORK_ITEM_DATAPAD] = { .name = "DATA PAD",
         .base_flags = BORK_ENTFLAG_ITEM,
         .size = { 0.3, 0.3, 0.3 },
@@ -523,11 +582,6 @@ static const struct bork_entity_profile {
         .front_frame = 193,
         .inv_angle = -1,
         .sprite_tx = { 1, 1.5, 0, 0 } },
-    [BORK_ITEM_STOOL] = { .name = "STOOL",
-        .base_flags = BORK_ENTFLAG_ITEM | BORK_ENTFLAG_NOT_INTERACTIVE,
-        .size = { 0.3, 0.3, 0.3 },
-        .front_frame = 178,
-        .sprite_tx = { 1, 1, 0, 0 } },
 };
 
 typedef int bork_entity_t;
@@ -542,3 +596,5 @@ void bork_entity_move(struct bork_entity* ent, struct bork_map* map);
 void bork_entity_update(struct bork_entity* ent, struct bork_map* map);
 void bork_entity_get_view(struct bork_entity* ent, mat4 view);
 void bork_entity_get_eye(struct bork_entity* ent, vec3 out_dir, vec3 out_pos);
+void bork_entity_look_at(struct bork_entity* ent, vec3 look);
+void bork_entity_look_dir(struct bork_entity* ent, vec3 look);

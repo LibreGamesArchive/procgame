@@ -7,6 +7,7 @@
 #include "bullet.h"
 #include "map_area.h"
 #include "physics.h"
+#include "particle.h"
 #include "upgrades.h"
 #include "recycler.h"
 #include "state_play.h"
@@ -312,28 +313,6 @@ void bork_tick_grenade(struct bork_entity* ent, struct bork_play_data* d)
     if(ent->flags & BORK_ENTFLAG_DEAD) return;
     --ent->dead_ticks;
     if(ent->dead_ticks <= 0) {
-        ARR_TRUNCATE(surr, 0);
-        vec3 start, end;
-        vec3_sub(start, ent->pos, (vec3){ 5, 5, 5 });
-        vec3_add(end, ent->pos, (vec3){ 5, 5, 5 });
-        bork_map_query_enemies(&d->map, &surr, start, end);
-        int i;
-        bork_entity_t surr_ent_id;
-        struct bork_entity* surr_ent;
-        ARR_FOREACH(surr, surr_ent_id, i) {
-            surr_ent = bork_entity_get(surr_ent_id);
-            if(!surr_ent) continue;
-            float dist = vec3_dist(ent->pos, surr_ent->pos);
-            if(dist > 5.0f) continue;
-            dist = (1 - (dist / 5.0f)) * 0.5 + 0.5;
-            surr_ent->HP -= 50 * dist;
-            create_sparks(d, surr_ent->pos, 0.1, 3);
-            vec3 push;
-            vec3_sub(push, surr_ent->pos, ent->pos);
-            vec3_set_len(push, push, 0.25 * dist);
-            push[2] += 0.025;
-            vec3_add(surr_ent->vel, surr_ent->vel, push);
-        }
         game_explosion(d, ent->pos, 1);
         ent->flags |= BORK_ENTFLAG_DEAD;
     }
@@ -401,5 +380,34 @@ void bork_tick_grenade_inc(struct bork_entity* ent, struct bork_play_data* d)
             ARR_PUSH(d->map.fires, new_fire);
         }
         ent->flags |= BORK_ENTFLAG_DEAD;
+    }
+}
+
+void bork_barrel_explode(struct bork_entity* ent, struct bork_play_data* d)
+{
+    if(ent->counter[0] == 1) {
+        game_explosion(d, ent->pos, 1);
+        int i;
+        for(i = 0; i < 6; ++i) {
+            int f = rand() % 3;
+            vec3 off = {
+                (float)rand() / RAND_MAX - 0.5,
+                (float)rand() / RAND_MAX - 0.5,
+                (float)rand() / RAND_MAX };
+            struct bork_particle new_part = {
+                .flags = BORK_PARTICLE_GRAVITY,
+                .pos = { ent->pos[0] + off[0], ent->pos[1] + off[1], ent->pos[2] + off[2] },
+                .vel = { off[0] * 0.15, off[1] * 0.15, off[2] * 0.15, },
+                .ticks_left = 50,
+                .frame_ticks = 6,
+                .current_frame = 5,
+                .start_frame = 5 + f, .end_frame = 5 + f };
+            ARR_PUSH(d->particles, new_part);
+        }
+        ent->flags |= BORK_ENTFLAG_DEAD;
+    } else if(ent->counter[0] == 0) {
+        ent->counter[0] = PLAY_SECONDS(0.5);
+    } else {
+        --ent->counter[0];
     }
 }
