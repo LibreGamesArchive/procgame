@@ -26,7 +26,12 @@ void pg_viewer_project(struct pg_viewer* view, vec2 out, vec3 const pos)
 {
     vec4 pos_ = { pos[0], pos[1], pos[2], 1 };
     vec4 out_;
-    mat4_mul_vec4(out_, view->proj_matrix, out_);
     mat4_mul_vec4(out_, view->view_matrix, pos_);
+    mat4_mul_vec4(out_, view->proj_matrix, out_);
+    out_[0] /= out_[3];
+    out_[0] = out_[0] * 0.5 + 0.5;
+    out_[0] *= view->size[0] / view->size[1];
+    out_[1] /= out_[3];
+    out_[1] = -out_[1] * 0.5 + 0.5;
     vec2_dup(out, out_);
 }

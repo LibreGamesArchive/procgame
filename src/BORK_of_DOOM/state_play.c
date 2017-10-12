@@ -878,11 +878,10 @@ static void draw_hud_overlay(struct bork_play_data* d)
         const struct bork_entity_profile* prof = &BORK_ENT_PROFILES[looked_ent->type];
         float dist = vec3_dist(d->plr.pos, looked_ent->pos);
         pg_viewer_project(&d->core->view, screen_pos, looked_ent->pos);
-        vec2_set(screen_pos, screen_pos[0] * 0.5 + 0.5, screen_pos[1] * -0.5 + 0.5);
         struct pg_shader_text text = { .use_blocks = 1 };
         int len = snprintf(text.block[0], 64, "%s", prof->name);
-        name_center = (float)len * 0.04 * 1.25 * 0.5;
-        vec2_add(screen_pos, screen_pos, (vec2){ 0.4, -0.35 / dist });
+        name_center = ((float)len * 0.04 * 1.25 * 0.5) / ar;
+        vec2_add(screen_pos, screen_pos, (vec2){ -0.04 * ar, -0.35 / MAX(dist,1) });
         vec4_set(text.block_style[0], screen_pos[0] - name_center, screen_pos[1], 0.04, 1.25);
         vec4_set(text.block_color[0], 1, 1, 1, 0.75);
         if(looked_ent->type == BORK_ITEM_SCHEMATIC) {
