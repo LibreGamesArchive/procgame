@@ -9,13 +9,12 @@ uniform mat4 transform;
 uniform uint font_pitch;
 /*  Size in UV coords of each glyph */
 uniform vec2 glyph_size;
-/*  16x 64-char individually transformed blocks; packed to uints    */
+/*  32x 64-char individually transformed blocks; packed to uints    */
 uniform uint chars[32 * 16];
 uniform vec4 style[32];
 uniform vec4 color[32];
 
-#define UINT_CHAR(c, i) \
-    (((c) >> (i * 8)) & uint(0xFF))
+#define UINT_CHAR(c, i) (((c) >> (i * 8)) & uint(0xFF))
 
 out vec2 f_tex;
 out vec4 f_color;
@@ -36,7 +35,7 @@ void main()
                            frame / font_pitch * glyph_size.y);
     f_tex = vert * glyph_size + tex_offset;
     f_color = color[line_idx];
-    gl_Position = step(32, float(ch)) * transform *
+    gl_Position = transform *
         vec4(vert * tx.z + tx.xy + vec2(tx.z * tx.w * char_idx_in_line, 0), 0, 1);
 }
 

@@ -20,6 +20,7 @@
 struct data {
     GLuint dummy_vao;
     struct pg_texture* font;
+    GLint uni_normal, uni_3d;
     GLint uni_font, uni_pitch, uni_glyph;
     GLint uni_blocks, uni_style, uni_color;
 };
@@ -54,6 +55,8 @@ int pg_shader_text(struct pg_shader* shader)
     if(!load) return 0;
     struct data* d = malloc(sizeof(struct data));
     pg_shader_link_matrix(shader, PG_MODELVIEW_MATRIX, "transform");
+    d->uni_normal = glGetUniformLocation(shader->prog, "normal_3d");
+    d->uni_3d = glGetUniformLocation(shader->prog, "is_3d");
     d->uni_font = glGetUniformLocation(shader->prog, "font");
     d->uni_pitch = glGetUniformLocation(shader->prog, "font_pitch");
     d->uni_glyph = glGetUniformLocation(shader->prog, "glyph_size");
@@ -67,8 +70,25 @@ int pg_shader_text(struct pg_shader* shader)
     return 1;
 }
 
+void pg_shader_text_3d(struct pg_shader* shader, struct pg_viewer* view)
+{
+    struct data* d = shader->data;
+    glUniform1i(d->uni_3d, 1);
+    /*  Set the matrices    */
+    mat4 projview;
+    mat4_mul(projview, view->proj_matrix, view->view_matrix);
+    pg_shader_set_matrix(shader, PG_VIEW_MATRIX, projview);
+    /*  Enable depth testing    */
+    glEnable(GL_DEPTH_TEST);
+    glDisable(GL_BLEND);
+    glDepthMask(1);
+}
+
+
 void pg_shader_text_resolution(struct pg_shader* shader, vec2 const resolution)
 {
+    struct data* d = shader->data;
+    glUniform1i(d->uni_3d, 0);
     mat4 tx;
     mat4_ortho(tx, 0, resolution[0], resolution[1], 0, 0, 1);
     pg_shader_set_matrix(shader, PG_VIEW_MATRIX, tx);
@@ -76,9 +96,19 @@ void pg_shader_text_resolution(struct pg_shader* shader, vec2 const resolution)
 
 void pg_shader_text_ndc(struct pg_shader* shader, vec2 const scale)
 {
+    struct data* d = shader->data;
+    glUniform1i(d->uni_3d, 0);
     mat4 tx;
     mat4_ortho(tx, -scale[0], scale[0], scale[1], -scale[1], 0, 1);
     pg_shader_set_matrix(shader, PG_VIEW_MATRIX, tx);
+}
+
+void pg_shader_text_transform_3d(struct pg_shader* shader, mat4 tx)
+{
+    struct data* d = shader->data;
+    glUniform3f(d->uni_normal, tx[0][2], tx[1][2], tx[2][2]);
+    pg_shader_set_matrix(shader, PG_MODEL_MATRIX, tx);
+    pg_shader_rebuild_matrices(shader);
 }
 
 void pg_shader_text_transform(struct pg_shader* shader, vec2 const scale, vec2 const offset)

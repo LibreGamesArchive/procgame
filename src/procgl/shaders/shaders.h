@@ -10,9 +10,11 @@ struct pg_shader_text {
 };
 
 int pg_shader_text(struct pg_shader* shader);
+void pg_shader_text_3d(struct pg_shader* shader, struct pg_viewer* view);
 void pg_shader_text_resolution(struct pg_shader* shader, vec2 const resolution);
 void pg_shader_text_ndc(struct pg_shader* shader, vec2 const scale);
 void pg_shader_text_transform(struct pg_shader* shader, vec2 const scale, vec2 const offset);
+void pg_shader_text_transform_3d(struct pg_shader* shader, mat4 tx);
 void pg_shader_text_font(struct pg_shader* shader, struct pg_texture* tex);
 void pg_shader_text_write(struct pg_shader* shader, struct pg_shader_text* text);
 
