@@ -20,7 +20,7 @@ GAME := obj/game_state.o obj/bork.o obj/map_area.o obj/physics.o \
  obj/entity.o obj/item_use_funcs.o obj/enemy_tick.o obj/bullet.o \
  obj/upgrades.o obj/game_effects.o \
  obj/state_play.o obj/play_misc.o obj/play_inventory.o obj/play_menu_doorpad.o \
- obj/play_upgrades.o obj/play_recycler.o \
+ obj/play_upgrades.o obj/play_recycler.o obj/play_datapads.o obj/play_game_menu.o \
  obj/state_menu.o obj/state_edit.o
 PROCGL := obj/procgl_base.o \
  obj/viewer.o obj/postproc.o obj/shader.o obj/gbuffer.o \
@@ -84,6 +84,14 @@ obj/play_upgrades.o: src/BORK_of_DOOM/play_upgrades.c src/BORK_of_DOOM/bork.h \
  src/BORK_of_DOOM/game_states.h src/BORK_of_DOOM/map_area.h src/BORK_of_DOOM/entity.h \
  $(PROCGL) $(PROCGL_LIBS)
 	$(CC) $(CFLAGS) -o obj/play_upgrades.o -c src/BORK_of_DOOM/play_upgrades.c $(INCLUDES)
+obj/play_datapads.o: src/BORK_of_DOOM/play_datapads.c src/BORK_of_DOOM/bork.h \
+ src/BORK_of_DOOM/game_states.h \
+ $(PROCGL) $(PROCGL_LIBS)
+	$(CC) $(CFLAGS) -o obj/play_datapads.o -c src/BORK_of_DOOM/play_datapads.c $(INCLUDES)
+obj/play_game_menu.o: src/BORK_of_DOOM/play_game_menu.c src/BORK_of_DOOM/bork.h \
+ src/BORK_of_DOOM/game_states.h \
+ $(PROCGL) $(PROCGL_LIBS)
+	$(CC) $(CFLAGS) -o obj/play_game_menu.o -c src/BORK_of_DOOM/play_game_menu.c $(INCLUDES)
 obj/play_recycler.o: src/BORK_of_DOOM/play_recycler.c src/BORK_of_DOOM/bork.h \
  src/BORK_of_DOOM/game_states.h src/BORK_of_DOOM/map_area.h src/BORK_of_DOOM/entity.h \
  $(PROCGL) $(PROCGL_LIBS)
