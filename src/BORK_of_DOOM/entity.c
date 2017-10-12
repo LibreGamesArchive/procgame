@@ -34,8 +34,8 @@ bork_entity_t bork_entity_new(int n)
         if(run < n) i += run - 1;
         else break;
     }
-    alloc = i + run - 1;
-    if(i == ent_pool.cap) ARR_RESERVE(ent_pool, ent_pool.cap + n);
+    alloc = i;
+    if(alloc + n >= ent_pool.cap) ARR_RESERVE(ent_pool, alloc + n);
     for(i = 0; i < n; ++i) ent_pool.data[alloc + i].flags = 0;
     return alloc;
 }
