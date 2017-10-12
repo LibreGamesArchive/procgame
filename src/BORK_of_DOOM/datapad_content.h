@@ -1,4 +1,4 @@
-static const int NUM_DATAPADS = 2;
+#define NUM_DATAPADS    2
 
 static const struct bork_datapad {
     char title[64];

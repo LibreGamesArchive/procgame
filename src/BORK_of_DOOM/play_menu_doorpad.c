@@ -12,7 +12,6 @@
 #include "recycler.h"
 #include "game_states.h"
 #include "state_play.h"
-#include "datapad_content.h"
 
 void tick_doorpad(struct bork_play_data* d)
 {

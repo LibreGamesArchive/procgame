@@ -12,7 +12,6 @@
 #include "recycler.h"
 #include "game_states.h"
 #include "state_play.h"
-#include "datapad_content.h"
 
 #define RANDF   ((float)rand() / RAND_MAX)
 

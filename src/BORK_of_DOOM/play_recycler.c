@@ -12,7 +12,6 @@
 #include "recycler.h"
 #include "game_states.h"
 #include "state_play.h"
-#include "datapad_content.h"
 
 #define RANDF   ((float)rand() / RAND_MAX)
 
@@ -129,11 +128,20 @@ void draw_recycler_menu(struct bork_play_data* d, float t)
     enum bork_schematic sch;
     const struct bork_schematic_detail* sch_d;
     const struct bork_entity_profile* prof;
-    struct pg_shader_text text = {
-        .use_blocks = 1,
-        .block = { "RECOMBOBULATOR" },
-        .block_style = { { 0.1, 0.1, 0.05, 1.25 } },
-        .block_color = { { 1, 1, 1, 0.7 } } };
+    struct pg_shader_text text;
+    if(d->menu.recycler.obj) {
+        text = (struct pg_shader_text){
+            .use_blocks = 1,
+            .block = { "RECYCLER" },
+            .block_style = { { 0.1, 0.1, 0.05, 1.25 } },
+            .block_color = { { 1, 1, 1, 0.7 } } };
+    } else {
+        text = (struct pg_shader_text){
+            .use_blocks = 1,
+            .block = { "SCHEMATICS" },
+            .block_style = { { 0.1, 0.1, 0.05, 1.25 } },
+            .block_color = { { 1, 1, 1, 0.7 } } };
+    }
     int i;
     int ti = 1;
     for(i = 0; i < 10; ++i) {
@@ -183,7 +191,7 @@ void draw_recycler_menu(struct bork_play_data* d, float t)
     pg_shader_2d_set_light(shader, light_pos, (vec3){ 0.7, 0.7, 0.7 },
                            (vec3){ 0.2, 0.2, 0.2 });
     pg_shader_2d_transform(shader,
-        (vec2){ ar * 0.75 + 0.015, 0.3 - (0.18 * prof->inv_height) },
+        (vec2){ ar * 0.75 + 0.015, 0.4 - (0.18 * prof->inv_height) },
         (vec2){ 0.10 * prof->sprite_tx[0] * ar, 0.10 * prof->sprite_tx[1] * ar },
         prof->inv_angle);
     if(d->held_schematics & (1 << sch)) {
@@ -206,6 +214,17 @@ void draw_recycler_menu(struct bork_play_data* d, float t)
             pg_shader_2d_color_mod(shader, (vec4){ 0.2, 0.2, 0.2, 0.9 }, (vec4){});
         }
         pg_shader_2d_transform(shader, (vec2){ ar * 0.75 + 0.015 + 0.1 * ((i - 1.5) * ar), 0.7 }, (vec2){ 0.05, 0.05 }, 0);
+        pg_model_draw(&d->core->quad_2d_ctr, NULL);
+    }
+    pg_shader_2d_color_mod(shader, (vec4){ 1, 1, 1, 1 }, (vec4){});
+    if(d->menu.recycler.scroll_idx > 0) {
+        pg_shader_2d_tex_frame(shader, 198);
+        pg_shader_2d_transform(shader, (vec2){ 0.05, 0.2 }, (vec2){ 0.04, 0.04 }, 0);
+        pg_model_draw(&d->core->quad_2d_ctr, NULL);
+    }
+    if(d->menu.recycler.scroll_idx + 10 < BORK_NUM_SCHEMATICS) {
+        pg_shader_2d_tex_frame(shader, 199);
+        pg_shader_2d_transform(shader, (vec2){ 0.05, 0.775 }, (vec2){ 0.04, 0.04 }, 0);
         pg_model_draw(&d->core->quad_2d_ctr, NULL);
     }
 }

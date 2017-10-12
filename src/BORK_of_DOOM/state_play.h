@@ -1,3 +1,5 @@
+#include "datapad_content.h"
+
 #define PLAY_SECONDS(s)     ((int)(s * 120))
 struct bork_play_data {
     /*  Core data   */
@@ -24,6 +26,8 @@ struct bork_play_data {
     int upgrade_selected;
     int decoy_active;
     vec3 decoy_pos;
+    int held_datapads[NUM_DATAPADS];
+    int num_held_datapads;
     uint32_t held_schematics;
     bork_entity_t teleporter_item;
     bork_entity_arr_t plr_enemy_query;
@@ -54,10 +58,12 @@ struct bork_play_data {
     struct {
         enum {
             BORK_MENU_CLOSED,
-            BORK_MENU_DOORPAD,
-            BORK_MENU_RECYCLER,
             BORK_MENU_INVENTORY,
             BORK_MENU_UPGRADES,
+            BORK_MENU_RECYCLER,
+            BORK_MENU_DATAPADS,
+            BORK_MENU_GAME,
+            BORK_MENU_DOORPAD,
             BORK_MENU_PLAYERDEAD,
         } state;
         struct {
@@ -65,7 +71,7 @@ struct bork_play_data {
             int ammo_select;
         } inv;
         struct {
-            struct bork_map_obj* obj;
+            struct bork_map_object* obj;
             int selection_idx, scroll_idx;
             int resources[4];
         } recycler;
@@ -74,6 +80,13 @@ struct bork_play_data {
             int confirm;
             int replace_idx;
         } upgrades;
+        struct {
+            int selection_idx, scroll_idx, text_scroll;
+            int side;
+        } datapads;
+        struct {
+            int selection_idx;
+        } game;
         struct {
             int selection[2];
             int unlocked_ticks;
@@ -103,11 +116,10 @@ void robot_explosion(struct bork_play_data* d, vec3 pos);
 void create_spark(struct bork_play_data* d, vec3 pos);
 void create_sparks(struct bork_play_data* d, vec3 pos, float expand, int sparks);
 void create_elec_sparks(struct bork_play_data* d, vec3 pos, float expand, int sparks);
-void tin_canine_tick(struct bork_play_data* d, struct bork_entity* ent);
 
-/*  Recycler menu functions             play_recycler.c */
-void tick_recycler_menu(struct bork_play_data* d);
-void draw_recycler_menu(struct bork_play_data* d, float t);
+/*  General menu functions  */
+void bork_play_deinit(void* data);
+void draw_active_menu(struct bork_play_data* d);
 
 /*  Inventory functions                 play_inventory.c     */
 void tick_control_inv_menu(struct bork_play_data* d);
@@ -127,6 +139,18 @@ void tick_control_upgrade_menu(struct bork_play_data* d);
 void draw_upgrade_hud(struct bork_play_data* d);
 void draw_upgrade_menu(struct bork_play_data* d, float t);
 void select_next_upgrade(struct bork_play_data* d);
+
+/*  Recycler menu functions             play_recycler.c */
+void tick_recycler_menu(struct bork_play_data* d);
+void draw_recycler_menu(struct bork_play_data* d, float t);
+
+/*  Datapad menu functions              play_datapads.c */
+void tick_datapad_menu(struct bork_play_data* d);
+void draw_datapad_menu(struct bork_play_data* d, float t);
+
+/*  Game menu functions                 play_game_menu.c    */
+void tick_game_menu(struct bork_play_data* d, struct pg_game_state* state);
+void draw_game_menu(struct bork_play_data* d, float t);
 
 /*  Door keypad menu functions          play_menu_doorpad.c     */
 void tick_doorpad(struct bork_play_data* d);

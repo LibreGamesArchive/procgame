@@ -12,7 +12,6 @@
 #include "recycler.h"
 #include "game_states.h"
 #include "state_play.h"
-#include "datapad_content.h"
 
 /*  Gameplay tick functions for individual upgrades with active powers or
     constant effects. The HEATSHIELD and STRENGTH upgrades have to be checked
@@ -535,15 +534,26 @@ void draw_upgrade_menu(struct bork_play_data* d, float t)
     struct pg_shader* shader = &d->core->shader_2d;
     pg_shader_begin(shader, NULL);
     pg_shader_2d_resolution(shader, (vec2){ ar, 1 });
-    pg_shader_2d_texture(shader, &d->core->upgrades_tex);
+    pg_shader_2d_texture(shader, &d->core->item_tex);
     pg_shader_2d_set_light(shader, (vec2){}, (vec3){}, (vec3){ 1, 1, 1 });
     pg_shader_2d_color_mod(shader, (vec4){ 1, 1, 1, 1 }, (vec4){});
     pg_model_begin(&d->core->quad_2d_ctr, shader);
     int inv_len = MIN(4, d->held_upgrades.len);
     int inv_start = d->menu.upgrades.scroll_idx;
+    if(inv_start > 0) {
+        pg_shader_2d_tex_frame(shader, 198);
+        pg_shader_2d_transform(shader, (vec2){ 0.15, 0.2 }, (vec2){ 0.04, 0.04 }, 0);
+        pg_model_draw(&d->core->quad_2d_ctr, NULL);
+    }
+    if(inv_start + 4 < d->held_upgrades.len) {
+        pg_shader_2d_tex_frame(shader, 199);
+        pg_shader_2d_transform(shader, (vec2){ 0.15, 0.775 }, (vec2){ 0.04, 0.04 }, 0);
+        pg_model_draw(&d->core->quad_2d_ctr, NULL);
+    }
     if(inv_start + inv_len > d->held_upgrades.len) {
         inv_start = d->held_upgrades.len - inv_len;
     }
+    pg_shader_2d_texture(shader, &d->core->upgrades_tex);
     int i;
     for(i = 0; i < 3; ++i) {
         if(d->menu.upgrades.confirm != 0 && i == d->menu.upgrades.replace_idx) {
@@ -577,7 +587,7 @@ void draw_upgrade_menu(struct bork_play_data* d, float t)
         && d->menu.upgrades.side == 0) {
             selected_upgrade = up_d[0];
             pg_shader_2d_transform(shader,
-                (vec2){ 0.2, 0.25 + (i * 0.125) }, (vec2){ 0.065, 0.065 }, 0);
+                (vec2){ 0.2, 0.3 + (i * 0.125) }, (vec2){ 0.065, 0.065 }, 0);
             pg_shader_2d_color_mod(shader, (vec4){ 1, 1, 1, 1 }, (vec4){});
         } else {
             if(i + inv_start == d->menu.upgrades.selection_idx)
@@ -585,7 +595,7 @@ void draw_upgrade_menu(struct bork_play_data* d, float t)
             else
                 pg_shader_2d_color_mod(shader, (vec4){ 1, 1, 1, 0.4 }, (vec4){});
             pg_shader_2d_transform(shader,
-                (vec2){ 0.2, 0.25 + (i * 0.125) }, (vec2){ 0.05, 0.05 }, 0);
+                (vec2){ 0.2, 0.3 + (i * 0.125) }, (vec2){ 0.05, 0.05 }, 0);
         }
         pg_shader_2d_tex_frame(shader, item->counter[0]);
         pg_model_draw(&d->core->quad_2d_ctr, NULL);
@@ -593,7 +603,7 @@ void draw_upgrade_menu(struct bork_play_data* d, float t)
         && d->menu.upgrades.side == 1) {
             selected_upgrade = up_d[1];
             pg_shader_2d_transform(shader,
-                (vec2){ 0.35, 0.25 + (i * 0.125) }, (vec2){ 0.065, 0.065 }, 0);
+                (vec2){ 0.325, 0.325 + (i * 0.125) }, (vec2){ 0.065, 0.065 }, 0);
             pg_shader_2d_color_mod(shader, (vec4){ 1, 1, 1, 1 }, (vec4){});
         } else {
             if(i + inv_start == d->menu.upgrades.selection_idx)
@@ -601,7 +611,7 @@ void draw_upgrade_menu(struct bork_play_data* d, float t)
             else
                 pg_shader_2d_color_mod(shader, (vec4){ 1, 1, 1, 0.4 }, (vec4){});
             pg_shader_2d_transform(shader,
-                (vec2){ 0.35, 0.25 + (i * 0.125) }, (vec2){ 0.05, 0.05 }, 0);
+                (vec2){ 0.325, 0.325 + (i * 0.125) }, (vec2){ 0.05, 0.05 }, 0);
         }
         pg_shader_2d_tex_frame(shader, item->counter[1]);
         pg_model_draw(&d->core->quad_2d_ctr, NULL);

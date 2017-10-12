@@ -12,21 +12,16 @@
 #include "recycler.h"
 #include "game_states.h"
 #include "state_play.h"
-#include "datapad_content.h"
 
 /*  Menu/UI functions   */
 void tick_control_inv_menu(struct bork_play_data* d)
 {
     uint8_t* kmap = d->core->ctrl_map;
     if(pg_check_input(SDL_SCANCODE_ESCAPE, PG_CONTROL_HIT)
-    || pg_check_gamepad(SDL_CONTROLLER_BUTTON_B, PG_CONTROL_HIT)
-    || pg_check_gamepad(SDL_CONTROLLER_BUTTON_LEFTSHOULDER, PG_CONTROL_HIT)) {
+    || pg_check_gamepad(SDL_CONTROLLER_BUTTON_B, PG_CONTROL_HIT)) {
         d->menu.state = BORK_MENU_CLOSED;
         SDL_ShowCursor(SDL_DISABLE);
         pg_mouse_mode(1);
-        return;
-    } else if(pg_check_input(SDL_SCANCODE_TAB, PG_CONTROL_HIT)) {
-        d->menu.state = BORK_MENU_UPGRADES;
         return;
     }
     if(d->inventory.len == 0) return;
@@ -148,25 +143,16 @@ static void draw_inventory_text(struct bork_play_data* d)
             const struct bork_entity_profile* ammo_prof =
                 &BORK_ENT_PROFILES[prof->use_ammo[d->menu.inv.ammo_select]];
             int len = snprintf(text.block[ti], 64, "%s", ammo_prof->name);
-            vec4_set(text.block_style[ti], ar * 0.75 - 0.25, 0.5, 0.025, 1.2);
-            vec4_set(text.block_color[ti], 1, 1, 1, 0.75);
-            len = snprintf(text.block[++ti], 64, "DAMAGE:     %d",
-                prof->damage + ammo_prof->damage);
-            vec4_set(text.block_style[ti], ar * 0.75 - 0.25, 0.54, 0.025, 1.2);
-            vec4_set(text.block_color[ti], 1, 1, 1, 0.75);
-            len = snprintf(text.block[++ti], 64,   "ARMOR PEN.: %d",
-                prof->armor_pierce + ammo_prof->armor_pierce);
-            vec4_set(text.block_style[ti], ar * 0.75 - 0.25, 0.58, 0.025, 1.2);
-            vec4_set(text.block_color[ti], 1, 1, 1, 0.75);
-            len = snprintf(text.block[++ti], 64,   "FIRE RATE:  %d", prof->speed);
-            vec4_set(text.block_style[ti], ar * 0.75 - 0.25, 0.62, 0.025, 1.2);
+            float center = len * 0.025 * 1.2 * 0.5;
+            float x = ar * 0.75 - 0.2 + 0.15 * d->menu.inv.ammo_select;
+            vec4_set(text.block_style[ti], x - center, 0.7, 0.025, 1.2);
             vec4_set(text.block_color[ti], 1, 1, 1, 0.75);
             int j;
             for(j = 0; j < prof->ammo_types; ++j) {
                 int held_ammo = d->ammo[prof->use_ammo[j] - BORK_ITEM_BULLETS];
                 len = snprintf(text.block[++ti], 64, "%d", held_ammo);
                 float x_off = len * 0.025 * 1.2 * 0.5;
-                vec4_set(text.block_style[ti], ar * 0.75 - 0.2 + 0.15 * j - x_off, 0.44, 0.025, 1.2);
+                vec4_set(text.block_style[ti], ar * 0.75 - 0.2 + 0.15 * j - x_off, 0.6, 0.025, 1.2);
                 vec4_set(text.block_color[ti], 1, 1, 1, 0.75);
             }
         }
@@ -184,43 +170,48 @@ void draw_menu_inv(struct bork_play_data* d, float t)
     vec2 mouse;
     pg_mouse_pos(mouse);
     vec2_scale(mouse, mouse, 1 / d->core->screen_size[1]);
-    /*
-    pg_shader_2d_set_light(shader, mouse, (vec3){ 0.5, 0.5, 0.5 },
-                           (vec3){ 0.5, 0.5, 0.5 });
-    */
     vec2 light_pos = { sin((float)d->ticks / 180.0f / M_PI), cos((float)d->ticks / 180.0f / M_PI) };
     vec2_scale(light_pos, light_pos, 0.5);
     vec2_add(light_pos, light_pos, (vec2){ ar * 0.75, 0.25 });
-    pg_shader_2d_set_light(shader, light_pos, (vec3){ 0.7, 0.7, 0.7 },
-                           (vec3){ 0.2, 0.2, 0.2 });
     pg_shader_2d_color_mod(shader, (vec4){ 1, 1, 1, 1 }, (vec4){});
     pg_shader_2d_texture(shader, &d->core->item_tex);
     pg_model_begin(&d->core->quad_2d_ctr, shader);
     if(d->inventory.len > 0) {
         struct bork_entity* item = bork_entity_get(d->inventory.data[d->menu.inv.selection_idx]);
         const struct bork_entity_profile* prof = &BORK_ENT_PROFILES[item->type];
+        pg_shader_2d_set_light(shader, light_pos, (vec3){ 0.7, 0.7, 0.7 },
+                               (vec3){ 0.2, 0.2, 0.2 });
         pg_shader_2d_tex_frame(shader, prof->front_frame);
         pg_shader_2d_add_tex_tx(shader, prof->sprite_tx, prof->sprite_tx + 2);
         pg_shader_2d_transform(shader,
-            (vec2){ ar * 0.75, 0.25 - (0.18 * prof->inv_height) },
+            (vec2){ ar * 0.75, 0.35 - (0.18 * prof->inv_height) },
             (vec2){ 0.18 * prof->sprite_tx[0], 0.18 * prof->sprite_tx[1] },
             prof->inv_angle);
         pg_model_draw(&d->core->quad_2d_ctr, NULL);
         if(item->flags & BORK_ENTFLAG_IS_GUN) {
+            pg_shader_2d_tex_frame(shader, 214);
+            pg_shader_2d_add_tex_tx(shader, (vec2){ 2, 2 }, (vec2){});
+            pg_shader_2d_transform(shader,
+                (vec2){ ar * 0.75 - 0.2 + 0.15 * item->ammo_type, 0.6125 },
+                (vec2){ 0.1, 0.1 }, 0);
+            pg_shader_2d_set_light(&d->core->shader_2d, (vec2){}, (vec3){}, (vec3){ 1, 1, 1 });
+            pg_model_draw(&d->core->quad_2d_ctr, NULL);
+            pg_shader_2d_set_light(shader, light_pos, (vec3){ 0.7, 0.7, 0.7 },
+                                   (vec3){ 0.2, 0.2, 0.2 });
             int i;
             for(i = 0; i < prof->ammo_types; ++i) {
                 const struct bork_entity_profile* ammo_prof =
                     &BORK_ENT_PROFILES[prof->use_ammo[i]];
+                if(i == item->ammo_type) {
+                }
                 if(i != d->menu.inv.ammo_select) {
                     pg_shader_2d_transform(shader,
-                        (vec2){ ar * 0.75 - 0.2 + 0.15 * i, 0.43 },
+                        (vec2){ ar * 0.75 - 0.2 + 0.15 * i, 0.6 },
                         (vec2){ 0.05, 0.05 }, 0);
-                    pg_shader_2d_color_mod(shader, (vec4){ 1, 1, 1, 0.5 }, (vec4){});
                 } else {
                     pg_shader_2d_transform(shader,
-                        (vec2){ ar * 0.75 - 0.2 + 0.15 * i, 0.43 },
+                        (vec2){ ar * 0.75 - 0.2 + 0.15 * i, 0.6 },
                         (vec2){ 0.075, 0.075 }, 0);
-                    pg_shader_2d_color_mod(shader, (vec4){ 1, 1, 1, 1 }, (vec4){});
                 }
                 pg_shader_2d_tex_frame(shader, ammo_prof->front_frame);
                 pg_model_draw(&d->core->quad_2d_ctr, NULL);
@@ -230,6 +221,18 @@ void draw_menu_inv(struct bork_play_data* d, float t)
     draw_inventory_text(d);
     draw_quickfetch_text(d, 1, (vec4){ 1, 1, 1, 0.75 }, (vec4){ 1, 1, 1, 0.9 });
     draw_quickfetch_items(d, (vec4){ 1, 1, 1, 0.75 }, (vec4){ 1, 1, 1, 0.9 });
+    pg_shader_2d_set_light(&d->core->shader_2d, (vec2){}, (vec3){}, (vec3){ 1, 1, 1 });
+    pg_shader_2d_color_mod(shader, (vec4){ 1, 1, 1, 1 }, (vec4){});
+    if(d->menu.inv.scroll_idx > 0) {
+        pg_shader_2d_tex_frame(shader, 198);
+        pg_shader_2d_transform(shader, (vec2){ 0.05, 0.2 }, (vec2){ 0.04, 0.04 }, 0);
+        pg_model_draw(&d->core->quad_2d_ctr, NULL);
+    }
+    if(d->menu.inv.scroll_idx + 10 < d->inventory.len) {
+        pg_shader_2d_tex_frame(shader, 199);
+        pg_shader_2d_transform(shader, (vec2){ 0.05, 0.775 }, (vec2){ 0.04, 0.04 }, 0);
+        pg_model_draw(&d->core->quad_2d_ctr, NULL);
+    }
 }
 
 void draw_quickfetch_items(struct bork_play_data* d,

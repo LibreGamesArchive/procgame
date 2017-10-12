@@ -12,7 +12,6 @@
 #include "recycler.h"
 #include "game_states.h"
 #include "state_play.h"
-#include "datapad_content.h"
 
 #define RANDF   ((float)rand() / RAND_MAX)
 
@@ -36,7 +35,7 @@ static void bork_play_update(struct pg_game_state* state);
 static void bork_play_tick(struct pg_game_state* state);
 static void bork_play_draw(struct pg_game_state* state);
 
-static void bork_play_deinit(void* data)
+void bork_play_deinit(void* data)
 {
     struct bork_play_data* d = data;
     bork_map_deinit(&d->map);
@@ -131,10 +130,25 @@ void bork_play_tick(struct pg_game_state* state)
     struct bork_play_data* d = state->data;
     ++d->ticks;
     /*  Handle input    */
+    if(d->menu.state != BORK_MENU_CLOSED && d->menu.state < BORK_MENU_DOORPAD) {
+        if(pg_check_input(SDL_SCANCODE_LSHIFT, PG_CONTROL_HELD)) {
+            if(pg_check_input(SDL_SCANCODE_D, PG_CONTROL_HIT)
+            || pg_check_input(SDL_SCANCODE_RIGHT, PG_CONTROL_HIT)) {
+                ++d->menu.state;
+                if(d->menu.state > 5) d->menu.state = 1;
+            } else if(pg_check_input(SDL_SCANCODE_A, PG_CONTROL_HIT)
+            || pg_check_input(SDL_SCANCODE_LEFT, PG_CONTROL_HIT)) {
+                --d->menu.state;
+                if(d->menu.state == 0) d->menu.state = 5;
+            }
+        }
+    }
     if(d->menu.state == BORK_MENU_INVENTORY) tick_control_inv_menu(d);
     else if(d->menu.state == BORK_MENU_UPGRADES) tick_control_upgrade_menu(d);
-    else if(d->menu.state == BORK_MENU_DOORPAD) tick_doorpad(d);
     else if(d->menu.state == BORK_MENU_RECYCLER) tick_recycler_menu(d);
+    else if(d->menu.state == BORK_MENU_DATAPADS) tick_datapad_menu(d);
+    else if(d->menu.state == BORK_MENU_GAME) tick_game_menu(d, state);
+    else if(d->menu.state == BORK_MENU_DOORPAD) tick_doorpad(d);
     else if(d->menu.state == BORK_MENU_PLAYERDEAD) {
         if(pg_check_input(SDL_SCANCODE_RETURN, PG_CONTROL_HIT)) {
             struct bork_game_core* core = d->core;
@@ -186,6 +200,13 @@ static void reset_menus(struct bork_play_data* d)
     d->menu.upgrades.side = 0;
     d->menu.upgrades.confirm = 0;
     d->menu.upgrades.replace_idx = 0;
+    d->menu.recycler.selection_idx = 0;
+    d->menu.recycler.scroll_idx = 0;
+    d->menu.recycler.obj = NULL;
+    d->menu.datapads.selection_idx = 0;
+    d->menu.datapads.scroll_idx = 0;
+    d->menu.datapads.text_scroll = 0;
+    d->menu.datapads.side = 0;
 }
 
 static void tick_control_play(struct bork_play_data* d)
@@ -220,6 +241,7 @@ static void tick_control_play(struct bork_play_data* d)
                 d->hud_datapad_id = item->counter[0];
                 d->hud_datapad_ticks = 5 * 60;
                 d->hud_datapad_line = 0;
+                d->held_datapads[d->num_held_datapads++] = item->counter[0];
                 item->flags |= BORK_ENTFLAG_DEAD;
             } else if(item->type == BORK_ITEM_UPGRADE) {
                 item->flags |= BORK_ENTFLAG_IN_INVENTORY;
@@ -247,8 +269,9 @@ static void tick_control_play(struct bork_play_data* d)
                     door->door.open = 1 - door->door.open;
                 }
             } else if(d->looked_obj->type == BORK_MAP_RECYCLER) {
+                reset_menus(d);
                 d->menu.state = BORK_MENU_RECYCLER;
-                d->menu.recycler.selection_idx = 0;
+                d->menu.recycler.obj = d->looked_obj;
                 SDL_ShowCursor(SDL_ENABLE);
                 pg_mouse_mode(0);
             }
@@ -787,6 +810,7 @@ static void bork_play_draw(struct pg_game_state* state)
         bork_draw_backdrop(d->core, (vec4){ 0.7, 0.7, 0.7, 0.5 }, t);
         bork_draw_linear_vignette(d->core, (vec4){ 0, 0, 0, 0.75 });
         pg_shader_begin(&d->core->shader_2d, NULL);
+        if(d->menu.state < BORK_MENU_DOORPAD) draw_active_menu(d);
         switch(d->menu.state) {
         default: break;
         case BORK_MENU_INVENTORY:
@@ -797,6 +821,12 @@ static void bork_play_draw(struct pg_game_state* state)
             break;
         case BORK_MENU_RECYCLER:
             draw_recycler_menu(d, (float)state->ticks / (float)state->tick_rate);
+            break;
+        case BORK_MENU_DATAPADS:
+            draw_datapad_menu(d, (float)state->ticks / (float)state->tick_rate);
+            break;
+        case BORK_MENU_GAME:
+            draw_game_menu(d, (float)state->ticks / (float)state->tick_rate);
             break;
         case BORK_MENU_DOORPAD:
             draw_doorpad(d, (float)state->ticks / (float)state->tick_rate);
@@ -848,6 +878,33 @@ static void draw_lights(struct bork_play_data* d)
     }
     ARR_TRUNCATE(d->lights_buf, 0);
     ARR_TRUNCATE(d->spotlights, 0);
+}
+
+void draw_active_menu(struct bork_play_data* d)
+{
+    float ar = d->core->aspect_ratio;
+    struct pg_shader* shader = &d->core->shader_2d;
+    if(!pg_shader_is_active(shader)) pg_shader_begin(shader, NULL);
+    pg_shader_2d_resolution(shader, (vec2){ ar, 1 });
+    vec2 mouse;
+    pg_mouse_pos(mouse);
+    pg_shader_2d_set_light(&d->core->shader_2d, (vec2){}, (vec3){}, (vec3){ 1, 1, 1 });
+    pg_shader_2d_color_mod(shader, (vec4){ 1, 1, 1, 1 }, (vec4){});
+    pg_shader_2d_texture(shader, &d->core->item_tex);
+    pg_model_begin(&d->core->quad_2d_ctr, shader);
+    int i;
+    for(i = 0; i < 5; ++i) {
+        int active = ((d->menu.state - 1) == i);
+        if(d->menu.recycler.obj && i == BORK_MENU_RECYCLER - 1) {
+            pg_shader_2d_color_mod(shader, (vec4){ 0.3, 0.3, 0.9, 1 }, (vec4){});
+        } else if(active) pg_shader_2d_color_mod(shader, (vec4){ 1, 1, 1, 1 }, (vec4){});
+        else pg_shader_2d_color_mod(shader, (vec4){ 0.5, 0.5, 0.5, 1 }, (vec4){});
+        pg_shader_2d_tex_frame(shader, 166 + i * 2);
+        pg_shader_2d_add_tex_tx(shader, (vec2){ 2, 2 }, (vec2){ 0, 0 });
+        pg_shader_2d_transform(shader, (vec2){ ar * 0.75 + ((i - 2) * ar * 0.08), 0.125 },
+                               (vec2){ 0.06, 0.06 }, 0);
+        pg_model_draw(&d->core->quad_2d_ctr, NULL);
+    }
 }
 
 static void draw_hud_overlay(struct bork_play_data* d)
@@ -920,6 +977,12 @@ static void draw_hud_overlay(struct bork_play_data* d)
             (vec2){ 0.05, 0.05 }, 0);
         pg_model_draw(&d->core->quad_2d_ctr, NULL);
     }
+    pg_model_begin(&d->core->quad_2d_ctr, &d->core->shader_2d);
+    pg_shader_2d_tex_frame(&d->core->shader_2d, 214);
+    pg_shader_2d_add_tex_tx(&d->core->shader_2d, (vec2){ 2, 2 }, (vec2){});
+    pg_shader_2d_transform(&d->core->shader_2d, (vec2){ 0.5 * ar, 0.5 }, (vec2){ 0.025, 0.025 }, 0);
+    pg_shader_2d_color_mod(&d->core->shader_2d, (vec4){ 1, 1, 1, 0.5 }, (vec4){});
+    pg_model_draw(&d->core->quad_2d_ctr, NULL);
     pg_model_begin(&d->core->quad_2d, &d->core->shader_2d);
     pg_shader_2d_color_mod(&d->core->shader_2d, (vec4){ 1, 1, 1, 1 }, (vec4){});
     pg_shader_2d_tex_frame(&d->core->shader_2d, 248);
@@ -945,9 +1008,10 @@ static void draw_datapad(struct bork_play_data* d)
     pg_shader_2d_resolution(shader, (vec2){ d->core->aspect_ratio, 1 });
     pg_shader_2d_set_light(shader, (vec2){}, (vec3){}, (vec3){ 1, 1, 1 });
     pg_shader_2d_color_mod(shader, (vec4){ 1, 1, 1, 1 }, (vec4){});
+    pg_shader_2d_texture(shader, &d->core->item_tex);
     pg_shader_begin(shader, NULL);
     pg_model_begin(&d->core->quad_2d_ctr, shader);
-    pg_shader_2d_tex_frame(shader, 4);
+    pg_shader_2d_tex_frame(shader, 66);
     pg_shader_2d_transform(shader, (vec2){ 0.3, 0.84 }, (vec2){ 0.1, 0.1 }, 0);
     pg_model_draw(&d->core->quad_2d_ctr, NULL);
     pg_shader_2d_tex_frame(shader, 236);
