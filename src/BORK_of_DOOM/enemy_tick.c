@@ -220,7 +220,7 @@ void bork_tick_fang_banger(struct bork_entity* ent, struct bork_play_data* d)
         robot_dying(d, ent);
     } else if(ent->HP <= 0) {
         ent->flags |= BORK_ENTFLAG_DYING;
-        ent->dead_ticks = PLAY_SECONDS(2.5);
+        ent->dead_ticks = PLAY_SECONDS(0.5);
     } else {
         vec3 ent_head, plr_head;
         get_plr_pos_for_ai(d, plr_head);
@@ -235,7 +235,7 @@ void bork_tick_fang_banger(struct bork_entity* ent, struct bork_play_data* d)
             int y = floor(ent->pos[1] / 2);
             int z = floor(ent->pos[2] / 2);
             int plr_dist = d->map.plr_dist[x][y][z];
-            if(plr_dist >= 15) {
+            if(plr_dist >= 15 && vec3_dist(ent->pos, plr_head) < 2.5) {
                 ent->flags |= BORK_ENTFLAG_DEAD;
                 game_explosion(d, ent->pos, 0.5);
             } else if(plr_dist) {
@@ -302,7 +302,7 @@ void bork_tick_tin_canine(struct bork_entity* ent, struct bork_play_data* d)
         robot_dying(d, ent);
     } else if(ent->HP <= 0) {
         ent->flags |= BORK_ENTFLAG_DYING;
-        ent->dead_ticks = PLAY_SECONDS(2.5);
+        ent->dead_ticks = PLAY_SECONDS(1.5);
     } else {
         vec3 ent_head, plr_head;
         get_plr_pos_for_ai(d, plr_head);
@@ -397,7 +397,7 @@ void bork_tick_bottweiler(struct bork_entity* ent, struct bork_play_data* d)
         robot_dying(d, ent);
     } else if(ent->HP <= 0) {
         ent->flags |= BORK_ENTFLAG_DYING;
-        ent->dead_ticks = PLAY_SECONDS(2.5);
+        ent->dead_ticks = PLAY_SECONDS(0.5);
     } else {
         vec3 ent_head, plr_head;
         get_plr_pos_for_ai(d, plr_head);
@@ -468,7 +468,7 @@ void bork_tick_great_bane(struct bork_entity* ent, struct bork_play_data* d)
     } else if(ent->HP <= 0) {
         ent->flags |= BORK_ENTFLAG_DYING;
         ent->flags &= ~BORK_ENTFLAG_FLIES;
-        ent->dead_ticks = PLAY_SECONDS(2.5);
+        ent->dead_ticks = PLAY_SECONDS(3);
     } else {
         vec3 plr_head;
         get_plr_pos_for_ai(d, plr_head);
