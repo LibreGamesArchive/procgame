@@ -230,6 +230,13 @@ static inline void vec4_set(vec4 a, float x, float y, float z, float w)
     a[3] = w;
 }
 
+static inline void vec2_rotate(vec2 r, vec2 const a, float angle)
+{
+    float c = cosf(angle);
+    float s = sinf(angle);
+    r[0] = a[0] * s - a[1] * c;
+    r[1] = a[0] * c + a[1] * s;
+}
 static inline void vec3_mul_cross(vec3 r, vec3 const a, vec3 const b)
 {
     r[0] = a[1]*b[2] - a[2]*b[1];
@@ -266,6 +273,12 @@ static inline void vec4_reflect(vec4 r, vec4 v, vec4 n)
     int i;
     for(i=0;i<4;++i)
         r[i] = v[i] - p*n[i];
+}
+
+static inline void vec2_from_angle(vec2 r, float angle)
+{
+    r[0] = sin(angle);
+    r[1] = cos(angle);
 }
 
 static inline void spherical_to_cartesian(vec3 r, vec2 const v)
@@ -632,6 +645,7 @@ typedef float quat[4];
 #define quat_set vec4_set
 #define quat_normalize vec4_normalize
 #define quat_lerp vec4_lerp
+#define quat_dup vec4_dup
 static inline void quat_identity(quat q)
 {
     q[0] = q[1] = q[2] = 0.f;
@@ -649,15 +663,14 @@ static inline void quat_sub(quat r, quat a, quat b)
     for(i=0; i<4; ++i)
         r[i] = a[i] - b[i];
 }
-static inline void quat_mul(quat r, quat p, quat q)
+static inline void quat_mul(quat r, quat a, quat b)
 {
-    vec3 w;
-    vec3_mul_cross(r, p, q);
-    vec3_scale(w, p, q[3]);
-    vec3_add(r, r, w);
-    vec3_scale(w, q, p[3]);
-    vec3_add(r, r, w);
-    r[3] = p[3]*q[3] - vec3_mul_inner(p, q);
+    quat tmp;
+    tmp[0] = a[3]*b[0] + a[1]*b[2] - a[2]*b[1] + a[0]*b[3];
+    tmp[1] = a[3]*b[1] + a[1]*b[3] + a[2]*b[0] - a[0]*b[2];
+    tmp[2] = a[3]*b[2] - a[1]*b[0] + a[2]*b[3] + a[0]*b[1];
+    tmp[3] = a[3]*b[3] - a[1]*b[1] - a[2]*b[2] - a[0]*b[0];
+    quat_dup(r, tmp);
 }
 static inline void quat_scale(quat r, quat v, float s)
 {
