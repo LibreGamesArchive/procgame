@@ -27,6 +27,9 @@ static uint8_t ctrl_changed = 0;
 static vec2 mouse_pos = {};
 static vec2 mouse_motion = {};
 static int mouse_relative = 0;
+static int text_mode = 0;
+static char text_input[16];
+static char text_len;
 static int user_exit = 0;
 
 int pg_init(int w, int h, int fullscreen, const char* window_title)
@@ -139,6 +142,11 @@ void pg_poll_input(void)
                 ctrl_changes[ctrl_changed++] = PG_MIDDLE_MOUSE;
                 break;
             }
+        } else if(e.type == SDL_TEXTINPUT && text_mode && text_len < 16) {
+            int len = strnlen(e.text.text, 32);
+            int buf_left = 16 - text_len;
+            strncpy(text_input + text_len, e.text.text, buf_left);
+            text_len = MIN(16, text_len + len);
         } else if(e.type == SDL_KEYDOWN) {
             if(ctrl_state[e.key.keysym.scancode] != PG_CONTROL_HELD) {
                 ctrl_state[e.key.keysym.scancode] = PG_CONTROL_HIT;
@@ -247,6 +255,19 @@ int pg_check_input(uint8_t ctrl, uint8_t event)
     return 0;
 }
 
+int pg_check_keycode(int key, uint8_t event)
+{
+    uint8_t ctrl = SDL_GetScancodeFromKey(key);
+    if(ctrl_state[ctrl] & event) return 1;
+    int changes = 0;
+    int i;
+    for(i = 0; i < ctrl_changed; ++i) {
+        changes += (ctrl_changes[i] == ctrl);
+        if(changes > 1) return 1;
+    }
+    return 0;
+}
+
 void pg_flush_input(void)
 {
     int i;
@@ -264,6 +285,7 @@ void pg_flush_input(void)
     }
     vec2_set(mouse_motion, 0, 0);
     ctrl_changed = 0;
+    text_len = 0;
     if(!pg_gamepad) return;
     for(i = 0; i < gamepad_changed; ++i) {
         uint8_t c = gamepad_changes[i];
@@ -278,6 +300,19 @@ void pg_flush_input(void)
         }
     }
     gamepad_changed = 0;
+}
+
+int pg_copy_text_input(char* out, int n)
+{
+    int len = MIN(n, text_len);
+    strncpy(out, text_input, len);
+    out[len] = '\0';
+    return len;
+}
+
+void pg_text_mode(int mode)
+{
+    text_mode = mode;
 }
 
 void pg_mouse_mode(int grab)

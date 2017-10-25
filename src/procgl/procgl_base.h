@@ -61,8 +61,11 @@ void pg_screen_dst(void);
 #define PG_MIDDLE_MOUSE         255
 /*  Input functions */
 void pg_poll_input(void);
+void pg_text_mode(int mode);
+int pg_copy_text_input(char* out, int n);
 void pg_flush_input(void);
 int pg_check_input(uint8_t ctrl, uint8_t state);
+int pg_check_keycode(int key, uint8_t event);
 int pg_user_exit(void);
 void pg_mouse_mode(int grab);
 void pg_mouse_pos(vec2 out);
