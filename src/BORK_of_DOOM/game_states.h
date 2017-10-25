@@ -1,6 +1,8 @@
 struct bork_editor_tile {
     uint8_t type;
+    uint8_t alt_type;
     uint8_t dir;
+    uint8_t alt_dir;
     uint16_t obj_idx;
 };
 
@@ -13,6 +15,8 @@ struct bork_editor_data {
             uint8_t x, y, z;
             union {
                 struct { uint8_t flags; uint8_t code[4]; } door;
+                struct { uint8_t pos; uint8_t scale; char text[16];
+                         char text_len; uint8_t color[4]; } text;
             };
         }) objs;
         ARR_T(struct bork_editor_entity {
@@ -22,6 +26,7 @@ struct bork_editor_data {
         }) ents;
     } map;
     struct bork_editor_tile current_tile;
+    int text_input;
     int selected_ent;
     enum bork_entity_type ent_type;
     int upgrade_type[2];
@@ -36,4 +41,4 @@ void bork_menu_start(struct pg_game_state* state, struct bork_game_core* core);
 void bork_play_start(struct pg_game_state* state, struct bork_game_core* core);
 void bork_editor_start(struct pg_game_state* state, struct bork_game_core* core);
 int bork_editor_load_map(struct bork_editor_map* map, char* filename);
-void bork_editor_complete_map(struct bork_map* map, struct bork_editor_map* ed_map);
+void bork_editor_complete_map(struct bork_map* map, struct bork_editor_map* ed_map, int newgame);

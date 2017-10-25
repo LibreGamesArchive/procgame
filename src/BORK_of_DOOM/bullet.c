@@ -1,3 +1,4 @@
+#include <stdio.h>
 #include <stdlib.h>
 #include <limits.h>
 #include "procgl/procgl.h"
@@ -27,7 +28,7 @@ void bork_bullet_move(struct bork_bullet* blt, struct bork_map* map)
     bork_map_query_enemies(map, &surr, surr_start, surr_end);
     bork_map_query_entities(map, &surr, surr_start, surr_end);
     float curr_move = 0;
-    float max_move = 0.1;
+    float max_move = 0.01;
     float full_dist = vec3_len(blt->dir);
     vec3 max_move_dir;
     vec3_set_len(max_move_dir, blt->dir, max_move);
@@ -94,15 +95,18 @@ void bork_bullet_move(struct bork_bullet* blt, struct bork_map* map)
                 return;
             }
         }
-        if(bork_map_check_sphere(map, new_pos, 0.1)) {
+        struct bork_map_object* hit_obj = NULL;
+        if(bork_map_check_sphere(map, &hit_obj, new_pos, 0.1)) {
             blt->flags |= BORK_BULLET_DEAD;
             blt->dead_ticks = 10;
             vec3_set(blt->dir, 0, 0, 0);
-            vec3_sub(blt->pos, new_pos, max_move_dir);
+            vec3_sub(blt->pos, new_pos, blt->dir);
             vec3_set(blt->light_color, 1, 1, 0.6);
-            if(blt->type == BORK_ITEM_BULLETS_INC - BORK_ITEM_BULLETS
-            || blt->type == BORK_ITEM_SHELLS_INC - BORK_ITEM_BULLETS) {
+            if(!hit_obj && (blt->type == BORK_ITEM_BULLETS_INC - BORK_ITEM_BULLETS
+            || blt->type == BORK_ITEM_SHELLS_INC - BORK_ITEM_BULLETS)) {
                 bork_map_create_fire(map, blt->pos, 360);
+            } else if(hit_obj && hit_obj->type == BORK_MAP_GRATE) {
+                hit_obj->dead = 1;
             }
             return;
         }

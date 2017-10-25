@@ -69,21 +69,24 @@ void bork_play_start(struct pg_game_state* state, struct bork_game_core* core)
     ARR_INIT(d->inventory);
     vec3_set(d->plr.pos, 32, 32, 40);
     d->plr.HP = 100;
-    d->upgrade_selected = -1;
+    d->upgrade_selected = 3;
     d->upgrades[0] = -1;
     d->upgrades[1] = -1;
     d->upgrades[2] = -1;
+    d->upgrades[3] = BORK_UPGRADE_SCANNING;
     d->upgrade_level[0] = 0;
     d->upgrade_level[1] = 0;
     d->upgrade_level[2] = 0;
+    d->upgrade_level[3] = 0;
     /*  Generate the BONZ station   */
-    struct bork_editor_map ed_map = {};
-    bork_editor_load_map(&ed_map, "test.bork_map");
     bork_map_init(&d->map);
+    struct bork_editor_map ed_map = {};
+    char filename[1024];
+    snprintf(filename, 1024, "%stest.bork_map", core->base_path);
+    bork_editor_load_map(&ed_map, filename);
     d->map.plr = &d->plr;
-    bork_editor_complete_map(&d->map, &ed_map);
-    bork_map_init_model(&d->map, core);
-    pg_shader_buffer_model(&d->core->shader_sprite, &d->map.door_model);
+    bork_editor_complete_map(&d->map, &ed_map, 1);
+    bork_map_init_model(&d->map, &ed_map, core);
     /*  Initialize the player data  */
     /*  Assign all the pointers, and it's finished  */
     state->data = d;
@@ -131,15 +134,18 @@ void bork_play_tick(struct pg_game_state* state)
     ++d->ticks;
     /*  Handle input    */
     if(d->menu.state != BORK_MENU_CLOSED && d->menu.state < BORK_MENU_DOORPAD) {
-        if(pg_check_input(SDL_SCANCODE_LSHIFT, PG_CONTROL_HELD)) {
+        if(!(d->menu.state == BORK_MENU_GAME && d->menu.game.mode != GAME_MENU_BASE)
+        && pg_check_input(SDL_SCANCODE_LSHIFT, PG_CONTROL_HELD)) {
             if(pg_check_input(SDL_SCANCODE_D, PG_CONTROL_HIT)
             || pg_check_input(SDL_SCANCODE_RIGHT, PG_CONTROL_HIT)) {
                 ++d->menu.state;
                 if(d->menu.state > 5) d->menu.state = 1;
+                pg_flush_input();
             } else if(pg_check_input(SDL_SCANCODE_A, PG_CONTROL_HIT)
             || pg_check_input(SDL_SCANCODE_LEFT, PG_CONTROL_HIT)) {
                 --d->menu.state;
                 if(d->menu.state == 0) d->menu.state = 5;
+                pg_flush_input();
             }
         }
     }
@@ -185,6 +191,7 @@ void bork_play_tick(struct pg_game_state* state)
         tick_datapad(d);
         d->looked_item = get_looked_item(d);
         d->looked_enemy = get_looked_enemy(d);
+        d->looked_entity = get_looked_entity(d);
         d->looked_obj = get_looked_map_object(d);
     }
     pg_flush_input();
@@ -197,7 +204,7 @@ static void reset_menus(struct bork_play_data* d)
     d->menu.inv.ammo_select = 0;
     d->menu.upgrades.selection_idx = 0;
     d->menu.upgrades.scroll_idx = 0;
-    d->menu.upgrades.side = 0;
+    d->menu.upgrades.horiz_idx = 0;
     d->menu.upgrades.confirm = 0;
     d->menu.upgrades.replace_idx = 0;
     d->menu.recycler.selection_idx = 0;
@@ -207,11 +214,22 @@ static void reset_menus(struct bork_play_data* d)
     d->menu.datapads.scroll_idx = 0;
     d->menu.datapads.text_scroll = 0;
     d->menu.datapads.side = 0;
+    d->menu.game.selection_idx = 0;
+    d->menu.game.save_idx = 0;
 }
 
 static void tick_control_play(struct bork_play_data* d)
 {
     uint8_t* kmap = d->core->ctrl_map;
+    if(pg_check_input(SDL_SCANCODE_M, PG_CONTROL_HIT)) {
+        if(pg_check_input(SDL_SCANCODE_LSHIFT, PG_CONTROL_HELD)) {
+            pg_mouse_mode(0);
+            SDL_ShowCursor(SDL_ENABLE);
+        } else {
+            pg_mouse_mode(1);
+            SDL_ShowCursor(SDL_DISABLE);
+        }
+    }
     if(pg_check_input(SDL_SCANCODE_TAB, PG_CONTROL_HIT)
     || pg_check_gamepad(SDL_CONTROLLER_BUTTON_LEFTSHOULDER, PG_CONTROL_HIT)) {
         d->menu.state = BORK_MENU_INVENTORY;
@@ -231,7 +249,8 @@ static void tick_control_play(struct bork_play_data* d)
         vec3 eye_pos = { d->plr.pos[0], d->plr.pos[1], d->plr.pos[2] };
         if(d->plr.flags & BORK_ENTFLAG_CROUCH) eye_pos[2] += 0.2;
         else eye_pos[2] += 0.8;
-        if(item && bork_map_check_vis(&d->map, eye_pos, item->pos)) {
+        if(item && vec3_dist(item->pos, eye_pos) <= 2.5
+        && bork_map_check_vis(&d->map, eye_pos, item->pos)) {
             const struct bork_entity_profile* prof = &BORK_ENT_PROFILES[item->type];
             if(item->flags & BORK_ENTFLAG_IS_AMMO) {
                 int ammo_type = item->type - BORK_ITEM_BULLETS;
@@ -757,6 +776,7 @@ static void bork_play_draw(struct pg_game_state* state)
     pg_viewer_set(&d->core->view, draw_pos, draw_dir);
     /*  Drawing */
     pg_gbuffer_dst(&d->core->gbuf);
+    //glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
     pg_shader_begin(&d->core->shader_3d, &d->core->view);
     draw_weapon(d, d->hud_anim_progress + (d->hud_anim_speed * state->tick_over),
                 draw_pos, draw_dir);
@@ -775,6 +795,22 @@ static void bork_play_draw(struct pg_game_state* state)
     draw_particles(d);
     pg_shader_3d_texture(&d->core->shader_3d, &d->core->env_atlas);
     bork_map_draw(&d->map, d->core);
+    /*  Test 3d text    */
+    pg_shader_begin(&d->core->shader_text, NULL);
+    pg_shader_text_3d(&d->core->shader_text, &d->core->view);
+    mat4 text_tx;
+    mat4_translate(text_tx, 8, 46, 5.5);
+    mat4_rotate_X(text_tx, text_tx, M_PI * -0.5);
+    mat4_rotate_X(text_tx, text_tx, (float)d->ticks / 120);
+    pg_shader_text_transform_3d(&d->core->shader_text, text_tx);
+    struct pg_shader_text test_text = {
+        .use_blocks = 2,
+        .block = { "3D TEXT!", "ANOTHER LINE" },
+        .block_style = { { 0, -0.5, 1, 1.2 }, { 0, 0.6, 1, 1.2 }},
+        .block_color = { { 1, 1, 1, 0.5 }, { 1, 1, 1, 0.5 }} };
+    pg_shader_text_write(&d->core->shader_text, &test_text);
+    glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
+    /*  End text    */
     draw_map_lights(d);
     if(d->flashlight_on) {
         struct pg_light flashlight;
@@ -918,6 +954,9 @@ static void draw_hud_overlay(struct bork_play_data* d)
     int looking_at_resource = 0;
     float name_center = 0;
     struct bork_entity* looked_ent;
+    int ti = 0;
+    int len;
+    struct pg_shader_text text = { .use_blocks = 0 };
     if(d->looked_item != -1 && (looked_ent = bork_entity_get(d->looked_item))) {
         if(looked_ent->flags & BORK_ENTFLAG_IS_FOOD) {
             looking_at_resource = 1;
@@ -935,25 +974,38 @@ static void draw_hud_overlay(struct bork_play_data* d)
         const struct bork_entity_profile* prof = &BORK_ENT_PROFILES[looked_ent->type];
         float dist = vec3_dist(d->plr.pos, looked_ent->pos);
         pg_viewer_project(&d->core->view, screen_pos, looked_ent->pos);
-        struct pg_shader_text text = { .use_blocks = 1 };
-        int len = snprintf(text.block[0], 64, "%s", prof->name);
-        name_center = ((float)len * 0.04 * 1.25 * 0.5) / ar;
-        vec2_add(screen_pos, screen_pos, (vec2){ -0.04 * ar, -0.35 / MAX(dist,1) });
-        vec4_set(text.block_style[0], screen_pos[0] - name_center, screen_pos[1], 0.04, 1.25);
-        vec4_set(text.block_color[0], 1, 1, 1, 0.75);
+        ti = 0;
+        len = snprintf(text.block[++ti], 64, "%s", prof->name);
+        name_center = ((float)len * 0.04 * 1.25 * 0.5);
+        vec2_add(screen_pos, screen_pos, (vec2){ 0, -0.35 / MAX(dist,1) });
+        vec4_set(text.block_style[ti], screen_pos[0] - name_center, screen_pos[1], 0.04, 1.25);
+        vec4_set(text.block_color[ti], 1, 1, 1, 0.75);
         if(looked_ent->type == BORK_ITEM_SCHEMATIC) {
             const struct bork_schematic_detail* sch_d =
                 &BORK_SCHEMATIC_DETAIL[looked_ent->counter[0]];
             const struct bork_entity_profile* sch_prof =
                 &BORK_ENT_PROFILES[sch_d->product];
-            len = snprintf(text.block[1], 64, "%s", sch_prof->name);
+            len = snprintf(text.block[++ti], 64, "%s", sch_prof->name);
             float sch_center = (float)len * 0.04 * 1.25 * 0.5;
-            vec4_set(text.block_style[1], screen_pos[0] - sch_center, screen_pos[1] - 0.05, 0.04, 1.25);
-            vec4_set(text.block_color[1], 1, 1, 1, 0.75);
-            text.use_blocks = 2;
+            vec4_set(text.block_style[ti], screen_pos[0] - sch_center, screen_pos[1] - 0.05, 0.04, 1.25);
+            vec4_set(text.block_color[ti], 1, 1, 1, 0.75);
         }
-        pg_shader_text_write(&d->core->shader_text, &text);
     }
+    if(d->scan_ticks) {
+        len = snprintf(text.block[++ti], 64, "%s", d->scanned_name);
+        vec4_set(text.block_style[ti], 0.2 - (len * 0.02 * 1.25 * 0.5), 0.6, 0.02, 1.25);
+        float scan_alpha;
+        if(d->scan_ticks > PLAY_SECONDS(4.75)) {
+            scan_alpha = PLAY_SECONDS(5) - d->scan_ticks;
+            scan_alpha /= PLAY_SECONDS(0.25);
+        } else if(d->scan_ticks < PLAY_SECONDS(0.25)) {
+            scan_alpha = d->scan_ticks;
+            scan_alpha /= PLAY_SECONDS(0.25);
+        } else scan_alpha = 1;
+        vec4_set(text.block_color[ti], 1, 1, 1, scan_alpha);
+    }
+    text.use_blocks = ti + 1;
+    pg_shader_text_write(&d->core->shader_text, &text);
     if(d->held_item >= 0) {
         bork_entity_t held_id = d->inventory.data[d->held_item];
         struct bork_entity* held_ent = bork_entity_get(held_id);
@@ -963,6 +1015,7 @@ static void draw_hud_overlay(struct bork_play_data* d)
         }
     }
     draw_quickfetch_text(d, 0, (vec4){ 1, 1, 1, 0.15 }, (vec4){ 1, 1, 1, 0.75 });
+
     draw_quickfetch_items(d, (vec4){ 1, 1, 1, 0.15 }, (vec4){ 1, 1, 1, 0.75 });
     pg_shader_begin(&d->core->shader_2d, NULL);
     pg_model_begin(&d->core->quad_2d_ctr, &d->core->shader_2d);
@@ -985,10 +1038,17 @@ static void draw_hud_overlay(struct bork_play_data* d)
     pg_model_draw(&d->core->quad_2d_ctr, NULL);
     pg_model_begin(&d->core->quad_2d, &d->core->shader_2d);
     pg_shader_2d_color_mod(&d->core->shader_2d, (vec4){ 1, 1, 1, 1 }, (vec4){});
-    pg_shader_2d_tex_frame(&d->core->shader_2d, 248);
+    pg_shader_2d_tex_frame(&d->core->shader_2d, 232);
     float hp_frac = (float)d->plr.HP / 100.0f;
-    pg_shader_2d_add_tex_tx(&d->core->shader_2d, (vec2){ hp_frac * 4, 1 }, (vec2){ 0, 0 });
-    pg_shader_2d_transform(&d->core->shader_2d, (vec2){ ar / 2 - 0.2, 0.86 }, (vec2){ 0.4 * hp_frac, 0.1 }, 0);
+    float hp_offset = (1 - hp_frac) * (24.0f / 256.0f);
+    pg_shader_2d_add_tex_tx(&d->core->shader_2d, (vec2){ hp_frac * 3, 2 }, (vec2){ hp_offset, 0 });
+    pg_shader_2d_transform(&d->core->shader_2d,
+                           (vec2){ 0.05 + 0.15 * (1 - hp_frac), 0.75 },
+                           (vec2){ 0.3 * hp_frac, 0.2 }, 0);
+    if(hp_frac < 0.5) {
+        float red_frac = (hp_frac / 0.5);
+        pg_shader_2d_color_mod(&d->core->shader_2d, (vec4){ 1, red_frac, red_frac, 1 }, (vec4){});
+    }
     pg_model_draw(&d->core->quad_2d, NULL);
     if(d->plr.pain_ticks > 0) {
         pg_shader_2d_transform(&d->core->shader_2d, (vec2){}, (vec2){ ar, 1 }, 0);
@@ -1002,37 +1062,38 @@ static void draw_hud_overlay(struct bork_play_data* d)
 
 static void draw_datapad(struct bork_play_data* d)
 {
+    float ar = d->core->aspect_ratio;
     if(d->hud_datapad_id < 0) return;
     const struct bork_datapad* dp = &BORK_DATAPADS[d->hud_datapad_id];
     struct pg_shader* shader = &d->core->shader_2d;
-    pg_shader_2d_resolution(shader, (vec2){ d->core->aspect_ratio, 1 });
+    pg_shader_2d_resolution(shader, (vec2){ ar, 1 });
     pg_shader_2d_set_light(shader, (vec2){}, (vec3){}, (vec3){ 1, 1, 1 });
     pg_shader_2d_color_mod(shader, (vec4){ 1, 1, 1, 1 }, (vec4){});
     pg_shader_2d_texture(shader, &d->core->item_tex);
     pg_shader_begin(shader, NULL);
     pg_model_begin(&d->core->quad_2d_ctr, shader);
     pg_shader_2d_tex_frame(shader, 66);
-    pg_shader_2d_transform(shader, (vec2){ 0.3, 0.84 }, (vec2){ 0.1, 0.1 }, 0);
+    pg_shader_2d_transform(shader, (vec2){ ar * 0.5, 0.84 }, (vec2){ 0.1, 0.1 }, 0);
     pg_model_draw(&d->core->quad_2d_ctr, NULL);
     pg_shader_2d_tex_frame(shader, 236);
     pg_shader_2d_add_tex_tx(shader, (vec2){ 4, 1.5 }, (vec2){});
-    pg_shader_2d_transform(shader, (vec2){ 0.3, 0.75 }, (vec2){ 0.25, 0.1 }, 0);
+    pg_shader_2d_transform(shader, (vec2){ ar * 0.5, 0.75 }, (vec2){ 0.25, 0.1 }, 0);
     pg_model_draw(&d->core->quad_2d_ctr, NULL);
     shader = &d->core->shader_text;
     pg_shader_begin(shader, NULL);
-    pg_shader_text_resolution(shader, (vec2){ d->core->aspect_ratio, 1 });
+    pg_shader_text_resolution(shader, (vec2){ ar, 1 });
     pg_shader_text_transform(shader, (vec2){ 1, 1 }, (vec2){});
     struct pg_shader_text text = { .use_blocks = 2 };
     int len = snprintf(text.block[0], 64, "%s", dp->title);
-    vec4_set(text.block_style[0], 0.3 - (len * 0.0175 * 1.125 * 0.5), 0.95, 0.0175, 1.125);
+    vec4_set(text.block_style[0], ar * 0.5 - (len * 0.025 * 1.125 * 0.5), 0.95, 0.025, 1.125);
     vec4_set(text.block_color[0], 1, 1, 1, 1);
     len = snprintf(text.block[1], 64, "%s", dp->text[d->hud_datapad_line]);
-    vec4_set(text.block_style[1], 0.3 - (len * 0.0175 * 1.125 * 0.5), 0.6, 0.0175, 1.125);
+    vec4_set(text.block_style[1], ar * 0.5 - (len * 0.025 * 1.125 * 0.5), 0.6, 0.025, 1.125);
     vec4_set(text.block_color[1], 1, 1, 1, 1);
     if(d->hud_datapad_line < dp->lines - 1) {
         text.use_blocks = 3;
         len = snprintf(text.block[2], 64, "%s", dp->text[d->hud_datapad_line + 1]);
-        vec4_set(text.block_style[2], 0.3 - (len * 0.0175 * 1.125 * 0.5), 0.63, 0.0175, 1.125);
+        vec4_set(text.block_style[2], ar * 0.5 - (len * 0.025 * 1.125 * 0.5), 0.63, 0.025, 1.125);
         vec4_set(text.block_color[2], 1, 1, 1, 1);
     }
     pg_shader_text_write(shader, &text);
@@ -1209,7 +1270,7 @@ static void draw_entities(struct bork_play_data* d, float lerp)
                 struct pg_light new_light = {};
                 pg_light_pointlight(&new_light,
                     (vec3){ pos_lerp[0], pos_lerp[1], pos_lerp[2] + 0.75 }, 1.5,
-                    (vec3){ 0.2, 0.6, 0.2 });
+                    (vec3){ 0.0, 0.1, 0.0 });
                 ARR_PUSH(d->lights_buf, new_light);
             }
         }
@@ -1375,4 +1436,219 @@ static void draw_gameover(struct bork_play_data* d, float t)
             { ctr - (strnlen(text.block[2], 64) * 0.04 * 1.25 * 0.5), 0.6, 0.04, 1.25 } },
         .block_color = { { 1, 1, 1, 1 }, { 1, 1, 1, 1 }, { 1, 1, 1, 1 } } };
     pg_shader_text_write(shader, &text);
+}
+
+static size_t write_entity(FILE* f, struct bork_entity* ent)
+{
+    return fwrite(ent, sizeof(struct bork_entity), 1, f);
+}
+
+static size_t write_ent_arr(FILE* f, bork_entity_arr_t* arr)
+{
+    uint32_t len = arr->len;
+    size_t r = 0;
+    r += sizeof(uint32_t) * fwrite(&len, sizeof(len), 1, f);
+    r += sizeof(bork_entity_t) * fwrite(arr->data, sizeof(bork_entity_t), len, f);
+    return r;
+}
+
+static size_t read_ent_arr(FILE* f, bork_entity_arr_t* arr)
+{
+    uint32_t len;
+    size_t r = 0;
+    r += sizeof(uint32_t) * fread(&len, sizeof(len), 1, f);
+    printf("Reading ent array, length: %u\n", len);
+    ARR_RESERVE_CLEAR(*arr, len);
+    r += sizeof(bork_entity_t) * fread(arr->data, sizeof(bork_entity_t), len, f);
+    arr->len = len;
+    return r;
+}
+
+/*  Save file format:
+            Player data
+    Player entity               (1 struct bork_entity)
+    Flashlight on               (1 int)
+    Held datapads               (NUM_DATAPADS ints)
+    Held schematics bitfield    (1 uint32_t)
+    Installed upgrades          (3 ints)
+    Upgrade levels              (3 ints)
+    Upgrade counters            (3 ints)
+    Selected upgrade level      (1 int)
+    Selected upgrade            (1 int)
+    Decoy active                (1 int)
+    Decoy position              (1 vec3)
+    Reload ticks                (1 int)
+    Reload length               (1 int)
+    Ammo counts                 (BORK_AMMO_TYPES ints)
+    Held item id                (1 int)
+    Quick items                 (4 ints)
+    Inventory length            (1 int)
+    Inventory ent id's          (^ ints)
+    Held upgrades length        (1 int)
+    Held upgrade id's           (^ ints)
+            World data
+    Global entity list length   (1 int)
+    Global entity list          (^ struct bork_entity)
+    Bullets length              (1 int)
+    Bullets list                (^ struct bork_bullet)
+    Map enemies length          (1 int)
+    Map enemies list            (^ bork_entity_t)
+    Map items length            (1 int)
+    Map items list              (^ bork_entity_t)
+    Map entities length         (1 int)
+    Map entities list           (^ bork_entity_t)
+    Map fires length            (1 int)
+    Map fires list              (^ bork_fire)
+    Map doors length            (1 int)
+    Map doors list              (^ struct bork_map_object)
+*/
+
+void save_game(struct bork_play_data* d, char* name)
+{
+    char filename[1024];
+    snprintf(filename, 1024, "%ssaves/%s", d->core->base_path, name);
+    FILE* f = fopen(filename, "wb");
+    if(!f) {
+        printf("Could not open save file %s\n", filename);
+        return;
+    }
+    size_t r = 0;
+    /*  Player data */
+    r += sizeof(struct bork_entity) * fwrite(&d->plr, sizeof(struct bork_entity), 1, f);
+    r += sizeof(int) * fwrite(&d->flashlight_on, sizeof(int), 1, f);
+    r += sizeof(int) * fwrite(d->held_datapads, sizeof(int), NUM_DATAPADS, f);
+    r += sizeof(uint32_t) * fwrite(&d->held_schematics, sizeof(uint32_t), 1, f);
+    r += sizeof(enum bork_upgrade) * fwrite(d->upgrades, sizeof(enum bork_upgrade), 3, f);
+    r += sizeof(int) * fwrite(d->upgrade_level, sizeof(int), 3, f);
+    r += sizeof(int) * fwrite(d->upgrade_counters, sizeof(int), 3, f);
+    r += sizeof(int) * fwrite(&d->upgrade_use_level, sizeof(int), 1, f);
+    r += sizeof(int) * fwrite(&d->upgrade_selected, sizeof(int), 1, f);
+    r += sizeof(int) * fwrite(&d->decoy_active, sizeof(int), 1, f);
+    r += sizeof(vec3) * fwrite(d->decoy_pos, sizeof(vec3), 1, f);
+    r += sizeof(int) * fwrite(&d->reload_ticks, sizeof(int), 1, f);
+    r += sizeof(int) * fwrite(&d->reload_length, sizeof(int), 1, f);
+    r += sizeof(int) * fwrite(d->ammo, sizeof(int), BORK_AMMO_TYPES, f);
+    r += sizeof(bork_entity_t) * fwrite(&d->held_item, sizeof(int), 1, f);
+    r += sizeof(bork_entity_t) * fwrite(&d->quick_item, sizeof(int), 4, f);
+    r += write_ent_arr(f, &d->inventory);
+    r += write_ent_arr(f, &d->held_upgrades);
+    /*  World data  */
+    r += bork_entpool_write_to_file(f);
+    uint32_t len = d->bullets.len;
+    r += sizeof(uint32_t) * fwrite(&len, sizeof(uint32_t), 1, f);
+    r += sizeof(struct bork_bullet) * fwrite(d->bullets.data, sizeof(struct bork_bullet), len, f);
+    int x,y,z;
+    len = 0;
+    for(x = 0; x < 4; ++x) for(y = 0; y < 4; ++y) for(z = 0; z < 4; ++z) {
+        len += d->map.enemies[x][y][z].len;
+    }
+    r += sizeof(uint32_t) * fwrite(&len, sizeof(uint32_t), 1, f);
+    for(x = 0; x < 4; ++x) for(y = 0; y < 4; ++y) for(z = 0; z < 4; ++z) {
+        if(d->map.enemies[x][y][z].len == 0) continue;
+        r += sizeof(bork_entity_t) *
+                fwrite(d->map.enemies[x][y][z].data, sizeof(bork_entity_t),
+                       d->map.enemies[x][y][z].len, f);
+    }
+    len = 0;
+    for(x = 0; x < 4; ++x) for(y = 0; y < 4; ++y) for(z = 0; z < 4; ++z) {
+        len += d->map.items[x][y][z].len;
+    }
+    r += sizeof(uint32_t) * fwrite(&len, sizeof(uint32_t), 1, f);
+    for(x = 0; x < 4; ++x) for(y = 0; y < 4; ++y) for(z = 0; z < 4; ++z) {
+        if(d->map.items[x][y][z].len == 0) continue;
+        r += sizeof(bork_entity_t) *
+                fwrite(d->map.items[x][y][z].data, sizeof(bork_entity_t),
+                       d->map.items[x][y][z].len, f);
+    }
+    len = 0;
+    for(x = 0; x < 4; ++x) for(y = 0; y < 4; ++y) for(z = 0; z < 4; ++z) {
+        len += d->map.entities[x][y][z].len;
+    }
+    r += sizeof(uint32_t) * fwrite(&len, sizeof(uint32_t), 1, f);
+    for(x = 0; x < 4; ++x) for(y = 0; y < 4; ++y) for(z = 0; z < 4; ++z) {
+        if(d->map.entities[x][y][z].len == 0) continue;
+        r += sizeof(bork_entity_t) *
+                fwrite(d->map.entities[x][y][z].data, sizeof(bork_entity_t),
+                       d->map.entities[x][y][z].len, f);
+    }
+    len = d->map.fires.len;
+    r += sizeof(uint32_t) * fwrite(&len, sizeof(uint32_t), 1, f);
+    r += sizeof(struct bork_fire) * fwrite(d->map.fires.data, sizeof(struct bork_fire), len, f);
+    len = d->map.doors.len;
+    r += sizeof(uint32_t) * fwrite(&len, sizeof(uint32_t), 1, f);
+    r += sizeof(struct bork_map_object) * fwrite(d->map.doors.data, sizeof(struct bork_map_object), len, f);
+    printf("Saved game: wrote %zu B\n", r);
+    fclose(f);
+}
+
+void load_game(struct bork_play_data* d, char* name)
+{
+    char filename[1024];
+    snprintf(filename, 1024, "%ssaves/%s", d->core->base_path, name);
+    FILE* f = fopen(filename, "rb");
+    if(!f) {
+        printf("Could not open save file %s\n", filename);
+        return;
+    }
+    bork_map_reset(&d->map);
+    ARR_TRUNCATE_CLEAR(d->bullets, 0);
+    ARR_TRUNCATE_CLEAR(d->particles, 0);
+    size_t r = 0;
+    /*  Player data */
+    r += sizeof(struct bork_entity) * fread(&d->plr, sizeof(struct bork_entity), 1, f);
+    r += sizeof(int) * fread(&d->flashlight_on, sizeof(int), 1, f);
+    r += sizeof(int) * fread(d->held_datapads, sizeof(int), NUM_DATAPADS, f);
+    r += sizeof(uint32_t) * fread(&d->held_schematics, sizeof(uint32_t), 1, f);
+    r += sizeof(enum bork_upgrade) * fread(d->upgrades, sizeof(enum bork_upgrade), 3, f);
+    r += sizeof(int) * fread(d->upgrade_level, sizeof(int), 3, f);
+    r += sizeof(int) * fread(d->upgrade_counters, sizeof(int), 3, f);
+    r += sizeof(int) * fread(&d->upgrade_use_level, sizeof(int), 1, f);
+    r += sizeof(int) * fread(&d->upgrade_selected, sizeof(int), 1, f);
+    r += sizeof(int) * fread(&d->decoy_active, sizeof(int), 1, f);
+    r += sizeof(vec3) * fread(d->decoy_pos, sizeof(vec3), 1, f);
+    r += sizeof(int) * fread(&d->reload_ticks, sizeof(int), 1, f);
+    r += sizeof(int) * fread(&d->reload_length, sizeof(int), 1, f);
+    r += sizeof(int) * fread(d->ammo, sizeof(int), BORK_AMMO_TYPES, f);
+    r += sizeof(bork_entity_t) * fread(&d->held_item, sizeof(int), 1, f);
+    r += sizeof(bork_entity_t) * fread(&d->quick_item, sizeof(int), 4, f);
+    r += read_ent_arr(f, &d->inventory);
+    r += read_ent_arr(f, &d->held_upgrades);
+    /*  World data  */
+    r += bork_entpool_read_from_file(f);
+    uint32_t len = 0;
+    r += sizeof(uint32_t) * fread(&len, sizeof(uint32_t), 1, f);
+    ARR_RESERVE_CLEAR(d->bullets, len);
+    r += sizeof(struct bork_bullet) * fread(d->bullets.data, sizeof(struct bork_bullet), len, f);
+    d->bullets.len = len;
+    bork_entity_t ent_id;
+    int i;
+    len = 0;
+    r += sizeof(uint32_t) * fread(&len, sizeof(uint32_t), 1, f);
+    for(i = 0; i < len; ++i) {
+        r += sizeof(bork_entity_t) * fread(&ent_id, sizeof(bork_entity_t), 1, f);
+        bork_map_add_enemy(&d->map, ent_id);
+    }
+    len = 0;
+    r += sizeof(uint32_t) * fread(&len, sizeof(uint32_t), 1, f);
+    for(i = 0; i < len; ++i) {
+        r += sizeof(bork_entity_t) * fread(&ent_id, sizeof(bork_entity_t), 1, f);
+        bork_map_add_item(&d->map, ent_id);
+    }
+    len = 0;
+    r += sizeof(uint32_t) * fread(&len, sizeof(uint32_t), 1, f);
+    for(i = 0; i < len; ++i) {
+        r += sizeof(bork_entity_t) * fread(&ent_id, sizeof(bork_entity_t), 1, f);
+        bork_map_add_entity(&d->map, ent_id);
+    }
+    r += sizeof(uint32_t) * fread(&len, sizeof(uint32_t), 1, f);
+    ARR_RESERVE_CLEAR(d->map.fires, len);
+    r += sizeof(struct bork_fire) * fread(d->map.fires.data, sizeof(struct bork_fire), len, f);
+    d->map.fires.len = len;
+    r += sizeof(uint32_t) * fread(&len, sizeof(uint32_t), 1, f);
+    ARR_RESERVE_CLEAR(d->map.doors, len);
+    r += sizeof(struct bork_map_object) * fread(d->map.doors.data, sizeof(struct bork_map_object), len, f);
+    d->map.doors.len = len;
+    printf("Loaded game: read %zu B\n", r);
+    d->map.plr = &d->plr;
+    fclose(f);
 }

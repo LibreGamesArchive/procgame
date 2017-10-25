@@ -158,7 +158,7 @@ void bork_tick_snout_drone(struct bork_entity* ent, struct bork_play_data* d)
                 } else if(ent->counter[0] - d->ticks == 30) {
                     struct bork_bullet new_bullet = { .type = 6,
                         .flags = BORK_BULLET_HURTS_PLAYER,
-                        .damage = 0 };
+                        .damage = 10 };
                     vec3_set_len(new_bullet.dir, ent_to_plr, 0.4);
                     vec3_add(new_bullet.pos, ent->pos, new_bullet.dir);
                     new_bullet.pos[2] -= 0.3;
@@ -348,7 +348,7 @@ void bork_tick_tin_canine(struct bork_entity* ent, struct bork_play_data* d)
                 if(ent->counter[0] - d->ticks == 30) {
                     struct bork_bullet new_bullet = { .type = 6,
                         .flags = BORK_BULLET_HURTS_PLAYER,
-                        .damage = 0 };
+                        .damage = 10 };
                     vec3_set_len(new_bullet.dir, ent_to_plr, 0.4);
                     vec3_add(new_bullet.pos, ent->pos, new_bullet.dir);
                     new_bullet.pos[2] -= 0.1;
@@ -472,21 +472,36 @@ void bork_tick_great_bane(struct bork_entity* ent, struct bork_play_data* d)
     } else {
         vec3 plr_head;
         get_plr_pos_for_ai(d, plr_head);
+        plr_head[2] -= 0.2;
         int vis = bork_map_check_vis(&d->map, ent->pos, plr_head);
         if(vis) {
             vec3 ent_to_plr;
             vec3_sub(ent_to_plr, plr_head, ent->pos);
-            vec3_normalize(ent_to_plr, ent_to_plr);
             if(ent->counter[0] - d->ticks <= 0) {
-                ent->counter[0] = d->ticks + PLAY_SECONDS(5) + PLAY_SECONDS(RANDF);
+                ent->counter[0] = d->ticks + PLAY_SECONDS(0.5);
                 struct bork_bullet new_bullet = { .type = 9,
                     .flags = BORK_BULLET_HURTS_PLAYER,
-                    .damage = 0 };
-                vec3_set_len(new_bullet.dir, ent_to_plr, 0.25);
+                    .damage = 10 };
+                vec2 sph = {
+                    ent->dir[0] + M_PI * 0.5,
+                    M_PI - atan2f(vec2_len(ent_to_plr), ent->pos[2] - plr_head[2]) };
+                spherical_to_cartesian(new_bullet.dir, sph);
                 vec3_add(new_bullet.pos, ent->pos, new_bullet.dir);
+                vec3_set_len(new_bullet.dir, new_bullet.dir, 0.1);
                 ARR_PUSH(d->bullets, new_bullet);
-            } else if(ent->counter[0] - d->ticks < PLAY_SECONDS(2)) {
-                bork_entity_look_dir(ent, ent_to_plr);
+                sph[0] -= M_PI * 0.2;
+                spherical_to_cartesian(new_bullet.dir, sph);
+                vec3_add(new_bullet.pos, ent->pos, new_bullet.dir);
+                vec3_set_len(new_bullet.dir, new_bullet.dir, 0.1);
+                ARR_PUSH(d->bullets, new_bullet);
+                sph[0] += M_PI * 0.4;
+                spherical_to_cartesian(new_bullet.dir, sph);
+                vec3_add(new_bullet.pos, ent->pos, new_bullet.dir);
+                vec3_set_len(new_bullet.dir, new_bullet.dir, 0.1);
+                ARR_PUSH(d->bullets, new_bullet);
+            } else {
+                bork_entity_turn_toward(ent, plr_head, 0.004);
+                //bork_entity_look_dir(ent, ent_to_plr);
             }
         }
     }

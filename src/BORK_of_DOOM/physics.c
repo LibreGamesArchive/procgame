@@ -57,19 +57,19 @@ int bork_map_collide(struct bork_map* map, struct bork_collision* coll_out,
         }
     }
     /*  Next check collisions against doors (that are close enough)   */
+    quat dir;
     struct bork_map_object* obj;
     int i;
     ARR_FOREACH_PTR(map->doors, obj, i) {
-        mat4_translate(transform, obj->pos[0], obj->pos[1], obj->pos[2] + obj->door.pos);
-        mat4_mul_quat(transform, transform, obj->dir);
-        mat4 tx_inv;
-        mat4_invert(tx_inv, transform);
-        vec4 pos_tx;
-        mat4_mul_vec4(pos_tx, tx_inv, (vec4){ pos[0], pos[1], pos[2], 1 });
+        if(vec3_dist2(obj->pos, pos) > (3 * 3)) continue;
+        vec3 pos_tx = { pos[0] - obj->pos[0], pos[1] - obj->pos[1],
+                        pos[2] - (obj->pos[2] + obj->door.pos) };
+        quat_conj(dir, obj->dir);
+        quat_mul_vec3(pos_tx, dir, pos_tx);
         vec3 door_push, door_norm;
         int c = pg_model_collide_ellipsoid(&map->door_model, door_push, pos_tx, size, 1);
         if(c < 0) continue;
-        mat3_mul_vec3(door_push, transform, door_push);
+        quat_mul_vec3(door_push, obj->dir, door_push);
         pg_model_get_face_normal(&map->door_model, c, door_norm);
         float depth = vec3_len(door_push);
         if(depth <= deepest) continue;
@@ -77,6 +77,26 @@ int bork_map_collide(struct bork_map* map, struct bork_collision* coll_out,
         *coll_out = (struct bork_collision) { };
         vec3_dup(coll_out->push, door_push);
         vec3_dup(coll_out->face_norm, door_norm);
+        if(++hits > 3) return 1;
+    }
+    /*  Next check collisions against grates (that are close enough)   */
+    ARR_FOREACH_PTR(map->grates, obj, i) {
+        if(vec3_dist2(obj->pos, pos) > (3 * 3)) continue;
+        vec3 pos_tx = { pos[0] - obj->pos[0], pos[1] - obj->pos[1],
+                        pos[2] - obj->pos[2] };
+        quat_conj(dir, obj->dir);
+        quat_mul_vec3(pos_tx, dir, pos_tx);
+        vec3 grate_push, grate_norm;
+        int c = pg_model_collide_ellipsoid(&map->grate_model, grate_push, pos_tx, size, 1);
+        if(c < 0) continue;
+        quat_mul_vec3(grate_push, obj->dir, grate_push);
+        pg_model_get_face_normal(&map->grate_model, c, grate_norm);
+        float depth = vec3_len(grate_push);
+        if(depth <= deepest) continue;
+        deepest = depth;
+        *coll_out = (struct bork_collision) { };
+        vec3_dup(coll_out->push, grate_push);
+        vec3_dup(coll_out->face_norm, grate_norm);
         if(++hits > 3) return 1;
     }
     /*  Set the new position to the final pushed position   */

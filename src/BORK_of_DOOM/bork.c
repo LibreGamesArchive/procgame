@@ -7,7 +7,12 @@
 #include "entity.h"
 #include "map_area.h"
 
-void bork_init(struct bork_game_core* core)
+#define TINYFILES_IMPL
+#include "tinyfiles.h"
+
+void bork_read_saves(struct bork_game_core* core);
+
+void bork_init(struct bork_game_core* core, char* base_path)
 {
     srand(time(NULL));
     int sw, sh;
@@ -30,6 +35,15 @@ void bork_init(struct bork_game_core* core)
             [BORK_CTRL_BIND4] = SDL_SCANCODE_4,
         },
     };
+    if(base_path) {
+        core->base_path = base_path;
+        core->base_path_len = strlen(core->base_path);
+        core->free_base_path = 1;
+    } else {
+        core->base_path = "./";
+        core->base_path_len = 2;
+        core->free_base_path = 0;
+    }
     /*  Set up the gbuffer for deferred shading */
     pg_gbuffer_init(&core->gbuf, sw, sh);
     pg_gbuffer_bind(&core->gbuf, 21, 22, 23, 24);
@@ -53,6 +67,7 @@ void bork_init(struct bork_game_core* core)
     pg_shader_sprite_tex_frame(&core->shader_sprite, 0);
     pg_gamepad_config(0.125, 0.6, 0.125, 0.75);
     if(SDL_NumJoysticks()) pg_use_gamepad(0);
+    bork_read_saves(core);
 }
 
 static void backdrop_color_func(vec4 out, vec2 p, struct pg_wave* wave)
@@ -67,31 +82,41 @@ static void vignette_color_func(vec4 out, vec2 p, struct pg_wave* wave)
     vec4_set(out, 1, 1, 1, s);
 }
 
+static void load_from_base_dir(struct bork_game_core* core,
+                               struct pg_texture* tex, char* f1, char* f2)
+{
+    char f1_[1024];
+    char f2_[1024];
+    if(f1) snprintf(f1_, 1024, "%s%s", core->base_path, f1);
+    if(f2) snprintf(f2_, 1024, "%s%s", core->base_path, f2);
+    pg_texture_init_from_file(tex, f1 ? f1_ : NULL, f2 ? f2_ : NULL);
+}
+
 void bork_load_assets(struct bork_game_core* core)
 {
     /*  Loading the textures and setting the atlas dimensions   */
-    pg_texture_init_from_file(&core->font, "font_8x8.png", NULL);
+    load_from_base_dir(core, &core->font, "font_8x8.png", NULL);
     pg_texture_set_atlas(&core->font, 8, 8);
     pg_texture_bind(&core->font, 3, 4);
-    pg_texture_init_from_file(&core->env_atlas, "res/env_atlas.png", "res/env_atlas_lightmap.png");
+    load_from_base_dir(core, &core->env_atlas, "res/env_atlas.png", "res/env_atlas_lightmap.png");
     pg_texture_set_atlas(&core->env_atlas, 32, 32);
     pg_texture_bind(&core->env_atlas, 5, 6);
-    pg_texture_init_from_file(&core->editor_atlas, "res/editor_atlas.png", NULL);
+    load_from_base_dir(core, &core->editor_atlas, "res/editor_atlas.png", NULL);
     pg_texture_set_atlas(&core->editor_atlas, 32, 32);
     pg_texture_bind(&core->editor_atlas, 7, 0);
-    pg_texture_init_from_file(&core->bullet_tex, "res/bullets.png", "res/bullets_lightmap.png");
+    load_from_base_dir(core, &core->bullet_tex, "res/bullets.png", "res/bullets_lightmap.png");
     pg_texture_set_atlas(&core->bullet_tex, 16, 16);
     pg_texture_bind(&core->bullet_tex, 8, 9);
-    pg_texture_init_from_file(&core->item_tex, "res/items.png", "res/items_lightmap.png");
+    load_from_base_dir(core, &core->item_tex, "res/items.png", "res/items_lightmap.png");
     pg_texture_set_atlas(&core->item_tex, 16, 16);
     pg_texture_bind(&core->item_tex, 10, 11);
-    pg_texture_init_from_file(&core->enemies_tex, "res/enemies.png", "res/enemies_lightmap.png");
+    load_from_base_dir(core, &core->enemies_tex, "res/enemies.png", "res/enemies_lightmap.png");
     pg_texture_set_atlas(&core->enemies_tex, 32, 32);
     pg_texture_bind(&core->enemies_tex, 12, 13);
-    pg_texture_init_from_file(&core->particle_tex, "res/particles.png", "res/particles_lightmap.png");
+    load_from_base_dir(core, &core->particle_tex, "res/particles.png", "res/particles_lightmap.png");
     pg_texture_set_atlas(&core->particle_tex, 16, 16);
     pg_texture_bind(&core->particle_tex, 14, 15);
-    pg_texture_init_from_file(&core->upgrades_tex, "res/upgrades.png", NULL);
+    load_from_base_dir(core, &core->upgrades_tex, "res/upgrades.png", NULL);
     pg_texture_set_atlas(&core->upgrades_tex, 32, 32);
     pg_texture_bind(&core->upgrades_tex, 16, 0);
     /*  Generate the backdrop texture (cloudy reddish fog)  */
@@ -187,6 +212,21 @@ void bork_load_assets(struct bork_game_core* core)
     };
     pg_audio_alloc(&core->menu_sound, 0.15);
     pg_audio_generate(&core->menu_sound, 0.15, &PG_WAVE_ARRAY(menu_wave, 4), &env);
+}
+
+static void list_save(tfFILE* f, void* udata)
+{
+    struct bork_game_core* core = udata;
+    struct bork_save save;
+    strncpy(save.name, f->name, 32);
+    ARR_PUSH(core->save_files, save);
+}
+
+void bork_read_saves(struct bork_game_core* core)
+{
+    char filename[1024];
+    snprintf(filename, 1024, "%ssaves", core->base_path);
+    tfTraverse(filename, list_save, core);
 }
 
 void bork_draw_fps(struct bork_game_core* core)

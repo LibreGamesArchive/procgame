@@ -8,9 +8,13 @@ int main(int argc, char *argv[])
     /*  Read the options file   */
     int w, h, fullscreen, opts_read;
     float mouse_sens;
-    FILE* config = fopen("./options.txt", "r");
+    char* base_path = SDL_GetBasePath();
+    char config_path[1024];
+    snprintf(config_path, 1024, "%soptions.txt", base_path);
+    FILE* config = fopen(config_path, "r");
     if(!config) {
         printf("Could not read options.txt, exiting.\n");
+        return 0;
     }
     opts_read = fscanf(config, "x:%d\ny:%d\nfullscreen:%d\nmouse:%f",
                            &w, &h, &fullscreen, &mouse_sens);
@@ -24,7 +28,7 @@ int main(int argc, char *argv[])
     /*  Init BORK OF DOOM   */
     struct bork_game_core bork;
     struct pg_game_state game;
-    bork_init(&bork);
+    bork_init(&bork, base_path);
     bork.mouse_sensitivity = mouse_sens;
     bork_menu_start(&game, &bork);
     /*  Main loop   */

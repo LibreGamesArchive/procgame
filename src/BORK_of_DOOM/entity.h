@@ -77,8 +77,8 @@ struct bork_entity {
         BORK_ITEM_LEADPIPE,
         BORK_ITEM_BEAMSWORD,
         BORK_ITEM_SCRAPMETAL,
-        BORK_ITEM_WIRES,
         BORK_ITEM_STEELPLATE,
+        BORK_ITEM_WIRES,
         BORK_ITEM_BEARTRAP,
         BORK_ITEM_GRENADE_EMP,
         BORK_ITEM_GRENADE_FRAG,
@@ -409,17 +409,17 @@ static const struct bork_entity_profile {
         .sprite_tx = { 1, 1, 0, 0 },
         .front_frame = 80 },
     [BORK_ITEM_SCRAPMETAL] = { .name = "CHUNK OF METAL",
-        .base_flags = BORK_ENTFLAG_ITEM | BORK_ENTFLAG_STACKS,
+        .base_flags = BORK_ENTFLAG_ITEM | BORK_ENTFLAG_STACKS | BORK_ENTFLAG_IS_RAW_MATERIAL,
         .size = { 0.3, 0.3, 0.3 },
         .sprite_tx = { 1, 1, 0, 0 },
         .front_frame = 48 },
     [BORK_ITEM_WIRES] = { .name = "FRAYED WIRING",
-        .base_flags = BORK_ENTFLAG_ITEM | BORK_ENTFLAG_STACKS,
+        .base_flags = BORK_ENTFLAG_ITEM | BORK_ENTFLAG_STACKS | BORK_ENTFLAG_IS_RAW_MATERIAL,
         .size = { 0.3, 0.3, 0.3 },
         .sprite_tx = { 1, 1, 0, 0 },
         .front_frame = 49 },
     [BORK_ITEM_STEELPLATE] = { .name = "STEEL PLATING",
-        .base_flags = BORK_ENTFLAG_ITEM | BORK_ENTFLAG_STACKS,
+        .base_flags = BORK_ENTFLAG_ITEM | BORK_ENTFLAG_STACKS | BORK_ENTFLAG_IS_RAW_MATERIAL,
         .size = { 0.3, 0.3, 0.3 },
         .sprite_tx = { 1, 1, 0, 0 },
         .front_frame = 50 },
@@ -586,6 +586,8 @@ static const struct bork_entity_profile {
 
 typedef int bork_entity_t;
 typedef ARR_T(bork_entity_t) bork_entity_arr_t;
+size_t bork_entpool_write_to_file(FILE* f);
+size_t bork_entpool_read_from_file(FILE* f);
 bork_entity_t bork_entity_new(int n);
 struct bork_entity* bork_entity_get(bork_entity_t ent);
 bork_entity_t bork_entity_id(struct bork_entity* ent);
@@ -598,3 +600,4 @@ void bork_entity_get_view(struct bork_entity* ent, mat4 view);
 void bork_entity_get_eye(struct bork_entity* ent, vec3 out_dir, vec3 out_pos);
 void bork_entity_look_at(struct bork_entity* ent, vec3 look);
 void bork_entity_look_dir(struct bork_entity* ent, vec3 look);
+void bork_entity_turn_toward(struct bork_entity* ent, vec3 look, float rate);

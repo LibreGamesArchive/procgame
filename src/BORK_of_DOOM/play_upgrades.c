@@ -212,6 +212,38 @@ static void tick_defense(struct bork_play_data* d, int l, int idx)
     }
 }
 
+static void tick_scanning(struct bork_play_data* d, int l, int idx)
+{
+    if(d->upgrade_selected == idx && pg_check_input(PG_RIGHT_MOUSE, PG_CONTROL_HIT)) {
+        struct bork_entity* looked[2] = { bork_entity_get(d->looked_enemy),
+                                          bork_entity_get(d->looked_entity) };
+        float dist[2] = {
+            looked[0] ? vec3_dist2(d->plr.pos, looked[0]->pos) : 100,
+            looked[1] ? vec3_dist2(d->plr.pos, looked[1]->pos) : 100 };
+        int closest = (dist[0] < dist[1] ? 0 : 1);
+        float closest_dist = dist[closest];
+        float obj_dist = d->looked_obj ? vec3_dist2(d->plr.pos, d->looked_obj->pos) : 100;
+        if(obj_dist < dist[closest]) {
+            closest = 2;
+            closest_dist = obj_dist;
+        }
+        if(closest_dist <= 4) {
+            if(closest == 2) {
+                switch(d->looked_obj->type) {
+                    case BORK_MAP_DOOR: strncpy(d->scanned_name, "DOOR", 32); break;
+                    case BORK_MAP_DOORPAD: strncpy(d->scanned_name, "KEYPAD", 32); break;
+                    case BORK_MAP_RECYCLER: strncpy(d->scanned_name, "RECYCLER", 32); break;
+                    case BORK_MAP_GRATE: strncpy(d->scanned_name, "GRATE", 32); break;
+                }
+            } else {
+                const struct bork_entity_profile* prof = &BORK_ENT_PROFILES[looked[closest]->type];
+                strncpy(d->scanned_name, prof->name, 32);
+            }
+        } else return;
+        d->scan_ticks = PLAY_SECONDS(5);
+    } else if(d->scan_ticks > 0) --d->scan_ticks;
+}
+
 void tick_upgrades(struct bork_play_data* d)
 {
     int i;
@@ -227,6 +259,7 @@ void tick_upgrades(struct bork_play_data* d)
         default: break;
         }
     }
+    tick_scanning(d, d->upgrade_level[3], 3);
 }
 
 /*  HUD drawing functions for each upgrade. Certain passive upgrades can
@@ -234,7 +267,7 @@ void tick_upgrades(struct bork_play_data* d)
 void hud_passive(struct bork_play_data* d, int l, int idx, int passive_i)
 {
     pg_shader_2d_transform(&d->core->shader_2d,
-        (vec2){ 0.3 + passive_i * 0.075, 0.885 }, (vec2){ 0.03, 0.03 }, 0);
+        (vec2){ 0.425 + passive_i * 0.125, 0.885 }, (vec2){ 0.05, 0.05 }, 0);
     if(l == 1) {
         pg_shader_2d_tex_frame(&d->core->shader_2d, 14);
         pg_model_draw(&d->core->quad_2d_ctr, NULL);
@@ -247,7 +280,7 @@ void hud_passive(struct bork_play_data* d, int l, int idx, int passive_i)
 void hud_jetpack(struct bork_play_data* d, int l, int idx, int passive_i)
 {
     pg_shader_2d_transform(&d->core->shader_2d,
-        (vec2){ 0.3 + passive_i * 0.075, 0.885 }, (vec2){ 0.03, 0.03 }, 0);
+        (vec2){ 0.425 + passive_i * 0.125, 0.885 }, (vec2){ 0.05, 0.05 }, 0);
     pg_shader_2d_color_mod(&d->core->shader_2d,
         (vec4){ 1, 1, 1, d->upgrade_counters[idx] / (float)PLAY_SECONDS(10) }, (vec4){});
     if(l == 1) {
@@ -266,8 +299,8 @@ void hud_doorhack(struct bork_play_data* d, int l, int idx)
     if(d->upgrade_counters[idx] > 0) {
         scale = (d->upgrade_counters[idx] / (float)PLAY_SECONDS(1)) * 0.75 + 0.25;
     }
-    pg_shader_2d_transform(&d->core->shader_2d, (vec2){ 0.15, 0.85 },
-                           (vec2){ 0.075 * scale, 0.075 * scale }, 0);
+    pg_shader_2d_transform(&d->core->shader_2d, (vec2){ 0.2, 0.75 },
+                           (vec2){ 0.1 * scale, 0.1 * scale }, 0);
     if(d->upgrade_use_level == 1) {
         pg_shader_2d_tex_frame(&d->core->shader_2d, 14);
         pg_model_draw(&d->core->quad_2d_ctr, NULL);
@@ -284,8 +317,8 @@ void hud_bothack(struct bork_play_data* d, int l, int idx)
         float s = (l == 1) ? PLAY_SECONDS(3) : PLAY_SECONDS(1.5);
         scale = (d->upgrade_counters[idx] / s) * 0.75 + 0.25;
     }
-    pg_shader_2d_transform(&d->core->shader_2d, (vec2){ 0.15, 0.85 },
-                           (vec2){ 0.075 * scale, 0.075 * scale }, 0);
+    pg_shader_2d_transform(&d->core->shader_2d, (vec2){ 0.2, 0.75 },
+                           (vec2){ 0.1 * scale, 0.1 * scale }, 0);
     if(d->looked_enemy == -1) {
         pg_shader_2d_color_mod(&d->core->shader_2d, (vec4){ 1, 1, 1, 0.25 }, (vec4){});
     } else {
@@ -303,8 +336,8 @@ void hud_bothack(struct bork_play_data* d, int l, int idx)
 void hud_decoy(struct bork_play_data* d, int l, int idx)
 {
     if(d->upgrade_selected == idx) {
-        pg_shader_2d_transform(&d->core->shader_2d, (vec2){ 0.15, 0.85 },
-                               (vec2){ 0.075, 0.075 }, 0);
+        pg_shader_2d_transform(&d->core->shader_2d, (vec2){ 0.2, 0.75 },
+                               (vec2){ 0.1, 0.1 }, 0);
         float a = 1.0f;
         if(d->upgrade_counters[idx] > 0) {
             a = (1.0f - (d->upgrade_counters[idx] / (float)PLAY_SECONDS(15))) * 0.7 + 0.05;
@@ -328,8 +361,8 @@ void hud_healing(struct bork_play_data* d, int l, int idx, int passive_i)
     }
     if(d->upgrade_selected == idx) {
         pg_shader_2d_tex_frame(&d->core->shader_2d, BORK_UPGRADE_HEALING);
-        pg_shader_2d_transform(&d->core->shader_2d, (vec2){ 0.15, 0.85 },
-                               (vec2){ 0.075, 0.075 }, 0);
+        pg_shader_2d_transform(&d->core->shader_2d, (vec2){ 0.2, 0.75 },
+                               (vec2){ 0.1, 0.1 }, 0);
         float a = 1.0f;
         if(d->upgrade_counters[idx] > 0) {
             a = (1.0f - (d->upgrade_counters[idx] / (float)PLAY_SECONDS(8))) * 0.7 + 0.05;
@@ -343,8 +376,8 @@ void hud_healing(struct bork_play_data* d, int l, int idx, int passive_i)
 void hud_defense(struct bork_play_data* d, int l, int idx, int passive_i)
 {
     if(d->upgrade_selected == idx) {
-        pg_shader_2d_transform(&d->core->shader_2d, (vec2){ 0.15, 0.85 },
-                               (vec2){ 0.075, 0.075 }, 0);
+        pg_shader_2d_transform(&d->core->shader_2d, (vec2){ 0.2, 0.75 },
+                               (vec2){ 0.1, 0.1 }, 0);
         float a = 1.0f;
         if(d->upgrade_counters[idx] > 0) {
             a = (1.0f - (d->upgrade_counters[idx] / (float)PLAY_SECONDS(6))) * 0.7 + 0.05;
@@ -359,6 +392,23 @@ void hud_defense(struct bork_play_data* d, int l, int idx, int passive_i)
         pg_shader_2d_color_mod(&d->core->shader_2d, (vec4){ 1, 1, 1, 1 }, (vec4){});
     }
 }
+
+void hud_scanning(struct bork_play_data* d, int l, int idx)
+{
+    if(d->upgrade_selected == idx) {
+        pg_shader_2d_transform(&d->core->shader_2d, (vec2){ 0.2, 0.75 },
+                               (vec2){ 0.1, 0.1 }, 0);
+        pg_shader_2d_color_mod(&d->core->shader_2d, (vec4){ 1, 1, 1, 1 }, (vec4){});
+        if(l == 1) {
+            pg_shader_2d_tex_frame(&d->core->shader_2d, 14);
+            pg_model_draw(&d->core->quad_2d_ctr, NULL);
+        }
+        pg_shader_2d_tex_frame(&d->core->shader_2d, 9);
+        pg_model_draw(&d->core->quad_2d_ctr, NULL);
+        pg_shader_2d_color_mod(&d->core->shader_2d, (vec4){ 1, 1, 1, 1 }, (vec4){});
+    }
+}
+
 
 void draw_upgrade_hud(struct bork_play_data* d)
 {
@@ -400,6 +450,7 @@ void draw_upgrade_hud(struct bork_play_data* d)
         default: break;
         }
     }
+    hud_scanning(d, d->upgrade_level[3], i);
 }
 
 int get_upgrade_level(struct bork_play_data* d, enum bork_upgrade up)
@@ -440,17 +491,12 @@ static int can_install(struct bork_play_data* d, int up_type)
 void tick_control_upgrade_menu(struct bork_play_data* d)
 {
     uint8_t* kmap = d->core->ctrl_map;
-    if(pg_check_input(SDL_SCANCODE_TAB, PG_CONTROL_HIT)) {
-        d->menu.state = BORK_MENU_INVENTORY;
-        d->menu.upgrades.confirm = 0;
-        return;
-    }
     struct bork_entity* item = NULL;
-    if(d->held_upgrades.len > 0) {
+    if(d->held_upgrades.len > 0 && d->menu.upgrades.selection_idx < d->held_upgrades.len) {
         item = bork_entity_get(d->held_upgrades.data[d->menu.upgrades.selection_idx]);
     }
     d->menu.upgrades.selection_idx =
-        CLAMP(d->menu.upgrades.selection_idx, 0, d->held_upgrades.len - 1);
+        CLAMP(d->menu.upgrades.selection_idx, 0, d->held_upgrades.len);
     int stick_ctrl_y = 0, stick_ctrl_x = 0;
     if(pg_check_gamepad(PG_LEFT_STICK, PG_CONTROL_HIT)) {
         vec2 stick;
@@ -462,26 +508,35 @@ void tick_control_upgrade_menu(struct bork_play_data* d)
         if(pg_check_input(kmap[BORK_CTRL_DOWN], PG_CONTROL_HIT)
                 || stick_ctrl_y == 1) {
             d->menu.upgrades.selection_idx = MIN(d->menu.upgrades.selection_idx + 1,
-                                                 d->held_upgrades.len - 1);
-            if(d->menu.upgrades.selection_idx >= d->menu.upgrades.scroll_idx + 4)
+                                                 d->held_upgrades.len);
+            if(d->menu.upgrades.selection_idx == d->held_upgrades.len)
+                d->menu.upgrades.horiz_idx = 0;
+            else if(d->menu.upgrades.selection_idx >= d->menu.upgrades.scroll_idx + 4)
                 ++d->menu.upgrades.scroll_idx;
         } else if(pg_check_input(kmap[BORK_CTRL_UP], PG_CONTROL_HIT)
                 || stick_ctrl_y == -1) {
             d->menu.upgrades.selection_idx = MAX(d->menu.upgrades.selection_idx - 1, 0);
             if(d->menu.upgrades.selection_idx < d->menu.upgrades.scroll_idx)
                 --d->menu.upgrades.scroll_idx;
+            d->menu.upgrades.horiz_idx = MIN(1, d->menu.upgrades.horiz_idx);
         } else if(pg_check_input(kmap[BORK_CTRL_LEFT], PG_CONTROL_HIT)
                 || stick_ctrl_x == -1) {
-            d->menu.upgrades.side = 0;
+            if(d->menu.upgrades.selection_idx == d->held_upgrades.len) {
+                d->menu.upgrades.horiz_idx = MAX(0, d->menu.upgrades.horiz_idx - 1);
+            } else d->menu.upgrades.horiz_idx = 0;
         } else if(pg_check_input(kmap[BORK_CTRL_RIGHT], PG_CONTROL_HIT)
                 || stick_ctrl_x == 1) {
-            d->menu.upgrades.side = 1;
-        } else if(item && pg_check_input(SDL_SCANCODE_SPACE, PG_CONTROL_HIT)) {
-            int can = can_install(d, item->counter[d->menu.upgrades.side]);
+            if(d->menu.upgrades.selection_idx == d->held_upgrades.len) {
+                d->menu.upgrades.horiz_idx = MIN(4, d->menu.upgrades.horiz_idx + 1);
+                if(d->upgrades[MOD(d->menu.upgrades.horiz_idx - 1, 4)] == -1)
+                    --d->menu.upgrades.horiz_idx;
+            } else d->menu.upgrades.horiz_idx = 1;
+        } else if(item && (pg_check_input(SDL_SCANCODE_SPACE, PG_CONTROL_HIT)
+               || pg_check_gamepad(SDL_CONTROLLER_BUTTON_A, PG_CONTROL_HIT))) {
+            int can = can_install(d, item->counter[d->menu.upgrades.horiz_idx]);
             d->menu.upgrades.confirm = can;
         } else if(pg_check_input(SDL_SCANCODE_ESCAPE, PG_CONTROL_HIT)
-                || pg_check_gamepad(SDL_CONTROLLER_BUTTON_B, PG_CONTROL_HIT)
-                || pg_check_gamepad(SDL_CONTROLLER_BUTTON_LEFTSHOULDER, PG_CONTROL_HIT)) {
+               || pg_check_gamepad(SDL_CONTROLLER_BUTTON_B, PG_CONTROL_HIT)) {
             d->menu.state = BORK_MENU_CLOSED;
             SDL_ShowCursor(SDL_DISABLE);
             pg_mouse_mode(1);
@@ -492,14 +547,16 @@ void tick_control_upgrade_menu(struct bork_play_data* d)
             d->menu.upgrades.replace_idx = MAX(0, d->menu.upgrades.replace_idx - 1);
         } else if(pg_check_input(kmap[BORK_CTRL_RIGHT], PG_CONTROL_HIT) || stick_ctrl_x == 1) {
             d->menu.upgrades.replace_idx = MIN(2, d->menu.upgrades.replace_idx + 1);
-        } else if(pg_check_input(SDL_SCANCODE_SPACE, PG_CONTROL_HIT)) {
+        } else if(pg_check_input(SDL_SCANCODE_SPACE, PG_CONTROL_HIT)
+               || pg_check_gamepad(SDL_CONTROLLER_BUTTON_A, PG_CONTROL_HIT)) {
             d->menu.upgrades.confirm = CONFIRM_REPLACE;
-        } else if(pg_check_input(SDL_SCANCODE_ESCAPE, PG_CONTROL_HIT)) {
+        } else if(pg_check_input(SDL_SCANCODE_ESCAPE, PG_CONTROL_HIT)
+               || pg_check_gamepad(SDL_CONTROLLER_BUTTON_B, PG_CONTROL_HIT)) {
             d->menu.upgrades.confirm = 0;
         }
     } else if(d->menu.upgrades.confirm == CONFIRM_REPLACE) {
         if(pg_check_input(SDL_SCANCODE_SPACE, PG_CONTROL_HIT)) {
-            d->upgrades[d->menu.upgrades.replace_idx] = item->counter[d->menu.upgrades.side];
+            d->upgrades[d->menu.upgrades.replace_idx] = item->counter[d->menu.upgrades.horiz_idx];
             d->upgrade_level[d->menu.upgrades.replace_idx] = 0;
             ARR_SPLICE(d->held_upgrades, d->menu.upgrades.selection_idx, 1);
             d->menu.upgrades.confirm = 0;
@@ -515,12 +572,14 @@ void tick_control_upgrade_menu(struct bork_play_data* d)
             d->menu.upgrades.confirm = 0;
         }
     } else if(d->menu.upgrades.confirm == CAN_INSTALL) {
-        if(pg_check_input(SDL_SCANCODE_SPACE, PG_CONTROL_HIT)) {
-            d->upgrades[d->menu.upgrades.replace_idx] = item->counter[d->menu.upgrades.side];
+        if(pg_check_input(SDL_SCANCODE_SPACE, PG_CONTROL_HIT)
+        || pg_check_gamepad(SDL_CONTROLLER_BUTTON_A, PG_CONTROL_HIT)) {
+            d->upgrades[d->menu.upgrades.replace_idx] = item->counter[d->menu.upgrades.horiz_idx];
             d->upgrade_level[d->menu.upgrades.replace_idx] = 0;
             ARR_SPLICE(d->held_upgrades, d->menu.upgrades.selection_idx, 1);
             d->menu.upgrades.confirm = 0;
-        } else if(pg_check_input(SDL_SCANCODE_ESCAPE, PG_CONTROL_HIT)) {
+        } else if(pg_check_input(SDL_SCANCODE_ESCAPE, PG_CONTROL_HIT)
+               || pg_check_gamepad(SDL_CONTROLLER_BUTTON_B, PG_CONTROL_HIT)) {
             d->menu.upgrades.confirm = 0;
         }
     }
@@ -555,24 +614,27 @@ void draw_upgrade_menu(struct bork_play_data* d, float t)
     }
     pg_shader_2d_texture(shader, &d->core->upgrades_tex);
     int i;
-    for(i = 0; i < 3; ++i) {
-        if(d->menu.upgrades.confirm != 0 && i == d->menu.upgrades.replace_idx) {
+    for(i = 0; i < 4; ++i) {
+        int up_i = MOD(i - 1, 4);
+        if((d->menu.upgrades.confirm != 0 && up_i == d->menu.upgrades.replace_idx)
+        || (d->menu.upgrades.selection_idx == d->held_upgrades.len
+            && d->menu.upgrades.confirm == 0 && i == d->menu.upgrades.horiz_idx)) {
             pg_shader_2d_transform(shader,
-                (vec2){ ar * 0.5 + (i - 1) * (0.15 * ar), 0.8 },
+                (vec2){ ar * 0.5 + (i - 1.5) * (0.15 * ar), 0.8 },
                 (vec2){ 0.1, 0.1 }, 0);
         } else {
             pg_shader_2d_transform(shader,
-                (vec2){ ar * 0.5 + (i - 1) * (0.15 * ar), 0.8 },
+                (vec2){ ar * 0.5 + (i - 1.5) * (0.15 * ar), 0.8 },
                 (vec2){ 0.075, 0.075 }, 0);
         }
-        if(d->upgrade_level[i] == 1) {
+        if(d->upgrade_level[up_i] == 1) {
             pg_shader_2d_tex_frame(shader, 14);
             pg_model_draw(&d->core->quad_2d_ctr, NULL);
         }
-        if(d->upgrades[i] == -1) {
+        if(d->upgrades[up_i] == -1) {
             pg_shader_2d_tex_frame(shader, 15);
         } else {
-            pg_shader_2d_tex_frame(shader, d->upgrades[i]);
+            pg_shader_2d_tex_frame(shader, d->upgrades[up_i]);
         }
         pg_model_draw(&d->core->quad_2d_ctr, NULL);
     }
@@ -584,7 +646,7 @@ void draw_upgrade_menu(struct bork_play_data* d, float t)
         const struct bork_upgrade_detail* up_d[2] =
             { bork_upgrade_detail(up0), bork_upgrade_detail(up1) };
         if(i + inv_start == d->menu.upgrades.selection_idx
-        && d->menu.upgrades.side == 0) {
+        && d->menu.upgrades.horiz_idx == 0) {
             selected_upgrade = up_d[0];
             pg_shader_2d_transform(shader,
                 (vec2){ 0.2, 0.3 + (i * 0.125) }, (vec2){ 0.065, 0.065 }, 0);
@@ -600,7 +662,7 @@ void draw_upgrade_menu(struct bork_play_data* d, float t)
         pg_shader_2d_tex_frame(shader, item->counter[0]);
         pg_model_draw(&d->core->quad_2d_ctr, NULL);
         if(i + inv_start == d->menu.upgrades.selection_idx
-        && d->menu.upgrades.side == 1) {
+        && d->menu.upgrades.horiz_idx == 1) {
             selected_upgrade = up_d[1];
             pg_shader_2d_transform(shader,
                 (vec2){ 0.325, 0.325 + (i * 0.125) }, (vec2){ 0.065, 0.065 }, 0);
@@ -645,6 +707,15 @@ void draw_upgrade_menu(struct bork_play_data* d, float t)
             snprintf(text.block[++ti], 32, "%s", selected_upgrade->description[i]);
             vec4_set(text.block_style[ti], ar * 0.4, 0.3 + i * 0.035, 0.02, 1.25);
         }
+    } else if(d->menu.upgrades.selection_idx == d->held_upgrades.len) {
+        selected_upgrade = bork_upgrade_detail(d->upgrades[MOD(d->menu.upgrades.horiz_idx - 1, 4)]);
+        int len = snprintf(text.block[ti], 32, "%s", selected_upgrade->name);
+        vec4_set(text.block_style[ti], ar * 0.6 - (len * 0.04 * 1.25 * 0.5), 0.2, 0.04, 1.25);
+        for(i = 0; i < 8; ++i) {
+            if(!selected_upgrade->description[i]) break;
+            snprintf(text.block[++ti], 32, "%s", selected_upgrade->description[i]);
+            vec4_set(text.block_style[ti], ar * 0.4, 0.3 + i * 0.035, 0.02, 1.25);
+        }
     }
     static const char* confirm_strings[6][3] = {
         [0] = { "[SPACE] INSTALL TECH", "", "" },
@@ -662,7 +733,7 @@ void draw_upgrade_menu(struct bork_play_data* d, float t)
                               "[ESCAPE] CANCEL" },
         [CANNOT_UPGRADE] = { "[SPACE] INSTALL TECH",
                              "TECH ALREADY INSTALLED", "" } };
-    if(d->held_upgrades.len > 0) {
+    if(d->menu.upgrades.selection_idx < d->held_upgrades.len) {
         strncpy(text.block[++ti], confirm_strings[d->menu.upgrades.confirm][0], 32);
         vec4_set(text.block_style[ti], ar * 0.35, 0.55, 0.03, 1.25);
         vec4_set(text.block_color[ti], 1, 1, 1, 1);
@@ -683,9 +754,9 @@ void select_next_upgrade(struct bork_play_data* d)
     int i;
     if(d->upgrade_selected == -1) i = -1;
     else i = d->upgrade_selected * 2 + d->upgrade_use_level;
-    while(checks < 6) {
+    while(checks < 8) {
         ++checks;
-        i = (i + 1) % 6;
+        i = (i + 1) % 8;
         int u = i / 2;
         int l = i % 2;
         const struct bork_upgrade_detail* up = bork_upgrade_detail(d->upgrades[u]);

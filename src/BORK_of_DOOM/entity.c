@@ -16,9 +16,31 @@ static ARR_T(struct bork_entity) ent_pool = {};
 void bork_entpool_clear(void)
 {
     int i;
-    struct bork_entity* ent;
-    ARR_FOREACH_PTR(ent_pool, ent, i)
-        *ent = (struct bork_entity){ .flags = BORK_ENTFLAG_DEAD };
+    for(i = 0; i < ent_pool.cap; ++i) {
+        ent_pool.data[i] = (struct bork_entity){ .flags = BORK_ENTFLAG_DEAD };
+    }
+}
+
+size_t bork_entpool_write_to_file(FILE* f)
+{
+    size_t r = 0;
+    uint32_t len = ent_pool.cap;
+    r += fwrite(&len, sizeof(len), 1, f);
+    r += fwrite(ent_pool.data, sizeof(struct bork_entity), len, f);
+    return r;
+}
+
+size_t bork_entpool_read_from_file(FILE* f)
+{
+    uint32_t len;
+    size_t r;
+    r = fread(&len, sizeof(len), 1, f);
+    ARR_TRUNCATE_CLEAR(ent_pool, 0);
+    ARR_RESERVE_CLEAR(ent_pool, len);
+    r += fread(ent_pool.data, sizeof(struct bork_entity), len, f);
+    printf("len %u r %zu\n", len, r);
+    ent_pool.cap = len;
+    return r;
 }
 
 bork_entity_t bork_entity_new(int n)
@@ -184,3 +206,12 @@ void bork_entity_look_dir(struct bork_entity* ent, vec3 look)
     ent->dir[0] = M_PI + atan2f(look[0], -look[1]);
 }
 
+void bork_entity_turn_toward(struct bork_entity* ent, vec3 look, float rate)
+{
+    float angle = M_PI + atan2f(look[0] - ent->pos[0], -(look[1] - ent->pos[1]));
+    float diff = ent->dir[0] - angle;
+    diff = FMOD(diff, M_PI * 2);
+    float t = diff < M_PI ? -1 : 1;
+    ent->dir[0] += t * rate;
+    ent->dir[0] = FMOD(ent->dir[0], M_PI * 2);
+}

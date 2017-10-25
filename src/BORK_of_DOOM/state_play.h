@@ -19,9 +19,9 @@ struct bork_play_data {
     int reload_ticks, reload_length;
     int ammo[BORK_AMMO_TYPES];
     int jump_released;
-    enum bork_upgrade upgrades[3];
-    int upgrade_level[3];
-    int upgrade_counters[3];
+    enum bork_upgrade upgrades[4];
+    int upgrade_level[4];
+    int upgrade_counters[4];
     int upgrade_use_level;
     int upgrade_selected;
     int decoy_active;
@@ -76,7 +76,7 @@ struct bork_play_data {
             int resources[4];
         } recycler;
         struct {
-            int selection_idx, scroll_idx, side;
+            int selection_idx, scroll_idx, horiz_idx;
             int confirm;
             int replace_idx;
         } upgrades;
@@ -85,7 +85,13 @@ struct bork_play_data {
             int side;
         } datapads;
         struct {
+            enum { GAME_MENU_BASE, GAME_MENU_LOAD, GAME_MENU_SELECT_SAVE,
+                   GAME_MENU_EDIT_SAVE, GAME_MENU_CONFIRM_OVERWRITE } mode;
+            int save_scroll;
+            int save_idx;
             int selection_idx;
+            char save_name[32];
+            int save_name_len;
         } game;
         struct {
             int selection[2];
@@ -95,8 +101,11 @@ struct bork_play_data {
             uint8_t chars[8];
         } doorpad;
     } menu;
+    char scanned_name[32];
+    int scan_ticks;
     bork_entity_t looked_item;
     bork_entity_t looked_enemy;
+    bork_entity_t looked_entity;
     struct bork_map_object* looked_obj;
 };
 /*  Miscellaneous game functions        play_misc.c */
@@ -105,6 +114,7 @@ void get_plr_pos_for_ai(struct bork_play_data* d, vec3 out);
 void entity_on_fire(struct bork_play_data* d, struct bork_entity* ent);
 bork_entity_t get_looked_item(struct bork_play_data* d);
 bork_entity_t get_looked_enemy(struct bork_play_data* d);
+bork_entity_t get_looked_entity(struct bork_play_data* d);
 struct bork_map_object* get_looked_map_object(struct bork_play_data* d);
 void game_explosion(struct bork_play_data* d, vec3 pos, float intensity);
 
@@ -151,6 +161,8 @@ void draw_datapad_menu(struct bork_play_data* d, float t);
 /*  Game menu functions                 play_game_menu.c    */
 void tick_game_menu(struct bork_play_data* d, struct pg_game_state* state);
 void draw_game_menu(struct bork_play_data* d, float t);
+void save_game(struct bork_play_data* d, char* filename);
+void load_game(struct bork_play_data* d, char* filename);
 
 /*  Door keypad menu functions          play_menu_doorpad.c     */
 void tick_doorpad(struct bork_play_data* d);

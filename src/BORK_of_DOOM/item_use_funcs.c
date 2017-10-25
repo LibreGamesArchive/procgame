@@ -1,4 +1,3 @@
-#include <stdio.h>
 #include <stdlib.h>
 #include <limits.h>
 #include "procgl/procgl.h"
@@ -242,19 +241,21 @@ void bork_use_firstaid(struct bork_entity* ent, struct bork_play_data* d)
 
 static void melee_callback(struct bork_entity* item, struct bork_play_data* d)
 {
-    if(d->looked_enemy == -1) return;
     struct bork_entity* ent = bork_entity_get(d->looked_enemy);
-    if(!ent) return;
-    vec3 ent_to_plr;
-    vec3_sub(ent_to_plr, ent->pos, d->plr.pos);
-    if(vec3_len(ent_to_plr) >= 2.5) return;
-    vec3 look_dir, look_pos;
-    bork_entity_get_eye(&d->plr, look_dir, look_pos);
-    if(!bork_map_check_vis(&d->map, look_pos, ent->pos)) return;
-    vec3_scale(look_dir, look_dir, 0.3);
-    vec3_add(ent->vel, ent->vel, look_dir);
-    const struct bork_entity_profile* item_prof = &BORK_ENT_PROFILES[item->type];
-    ent->HP -= item_prof->damage;
+    if(ent) {
+        vec3 ent_to_plr;
+        vec3_sub(ent_to_plr, ent->pos, d->plr.pos);
+        if(vec3_len(ent_to_plr) >= 2.5) return;
+        vec3 look_dir, look_pos;
+        bork_entity_get_eye(&d->plr, look_dir, look_pos);
+        if(!bork_map_check_vis(&d->map, look_pos, ent->pos)) return;
+        vec3_scale(look_dir, look_dir, 0.3);
+        vec3_add(ent->vel, ent->vel, look_dir);
+        const struct bork_entity_profile* item_prof = &BORK_ENT_PROFILES[item->type];
+        ent->HP -= item_prof->damage;
+    } else if(d->looked_obj && d->looked_obj->type == BORK_MAP_GRATE) {
+        d->looked_obj->dead = 1;
+    }
 }
 
 void bork_use_melee(struct bork_entity* ent, struct bork_play_data* d)

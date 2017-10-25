@@ -1,3 +1,5 @@
+struct bork_editor_map;
+
 enum bork_area {
     BORK_AREA_PETS,
     BORK_AREA_WAREHOUSE,
@@ -57,9 +59,11 @@ enum bork_tile_type {
     BORK_TILE_RAMP_BOTTOM, BORK_TILE_RAMP_TOP,
     BORK_TILE_EDITOR_DOOR,
     BORK_TILE_EDITOR_RECYCLER,
+    BORK_TILE_EDITOR_TEXT,
     BORK_TILE_EDITOR_LIGHT1,
     BORK_TILE_EDITOR_LIGHT_WALLMOUNT,
     BORK_TILE_EDITOR_LIGHT_SMALLMOUNT,
+    BORK_TILE_EDITOR_LIGHT2,
     BORK_TILE_COUNT,
 };
 
@@ -76,7 +80,10 @@ struct bork_map_object {
         BORK_MAP_DOOR,
         BORK_MAP_DOORPAD,
         BORK_MAP_RECYCLER,
+        BORK_MAP_TEXT,
+        BORK_MAP_GRATE
     } type;
+    int dead;
     vec3 pos;
     quat dir;
     union {
@@ -92,6 +99,11 @@ struct bork_map_object {
         struct {
             vec3 out_pos;
         } recycler;
+        struct {
+            char text[16];
+            vec4 color;
+            float scale;
+        } text;
     };
 };
 
@@ -119,6 +131,8 @@ struct bork_map {
     ARR_T(struct bork_map_object) doors;
     ARR_T(struct bork_map_object) doorpads;
     ARR_T(struct bork_map_object) recyclers;
+    ARR_T(struct bork_map_object) texts;
+    ARR_T(struct bork_map_object) grates;
     ARR_T(struct bork_map_light_fixture) light_fixtures;
     ARR_T(struct bork_fire) fires;
     ARR_T(struct pg_light) lights;
@@ -128,6 +142,7 @@ struct bork_map {
     struct pg_model oven_model;
     struct pg_model bed_model;
     struct pg_model small_table_model;
+    struct pg_model grate_model;
     struct bork_entity* plr;
 };
 
@@ -137,22 +152,25 @@ struct bork_tile_detail {
     float face_inset[6];
     int tex_tile[6];
     char name[32];
-    int (*add_model)(struct bork_map*, struct pg_texture*,
+    int (*add_model)(struct bork_map*, struct bork_editor_map*, struct pg_texture*,
                      struct bork_tile*, int, int, int);
 };
 const struct bork_tile_detail* bork_tile_detail(enum bork_tile_type type);
 
 void bork_map_init(struct bork_map* map);
-void bork_map_init_model(struct bork_map* map, struct bork_game_core* core);
+void bork_map_reset(struct bork_map* map);
+void bork_map_init_model(struct bork_map* map, struct bork_editor_map* ed_map,
+                         struct bork_game_core* core);
 void bork_map_deinit(struct bork_map* map);
 struct bork_tile* bork_map_tile_ptr(struct bork_map* map, vec3 const pos);
 struct bork_tile* bork_map_tile_ptri(struct bork_map* map, int x, int y, int z);
 void bork_map_write_to_file(struct bork_map* map, char* filename);
-void bork_map_load_from_file(struct bork_map* map, char* filename);
+void bork_map_load_from_file(struct bork_map* map, char* filename, int newgame);
 void bork_map_update(struct bork_map* map, struct bork_entity* plr);
 void bork_map_draw(struct bork_map* map, struct bork_game_core* core);
 int bork_map_check_ellipsoid(struct bork_map* map, vec3 const pos, vec3 const r);
-int bork_map_check_sphere(struct bork_map* map, vec3 const pos, float r);
+int bork_map_check_sphere(struct bork_map* map, struct bork_map_object** hit_obj,
+                          vec3 const pos, float r);
 int bork_map_check_vis(struct bork_map* map, vec3 const start, vec3 const end);
 float bork_map_vis_dist(struct bork_map* map, vec3 const start, vec3 const dir);
 int bork_map_tile_walkable(struct bork_map* map, int x, int y, int z);

@@ -60,7 +60,12 @@ static void bork_editor_place_tile(struct bork_editor_data* d,
                                    int x, int y, int z)
 {
     struct bork_editor_tile* dst = &d->map.tiles[x][y][z];
-    if(dst->type == BORK_TILE_EDITOR_DOOR) {
+    if(tile->type >= BORK_TILE_EDITOR_LIGHT1 && tile->type <= BORK_TILE_EDITOR_LIGHT2) {
+        dst->alt_type = tile->type;
+        dst->alt_dir = tile->dir;
+        return;
+    }
+    if(dst->type == BORK_TILE_EDITOR_DOOR || dst->type == BORK_TILE_EDITOR_TEXT) {
         ARR_SWAPSPLICE(d->map.objs, dst->obj_idx, 1);
         if(dst->obj_idx < d->map.objs.len) {
             struct bork_editor_obj* dst_obj = &d->map.objs.data[dst->obj_idx];
@@ -68,9 +73,9 @@ static void bork_editor_place_tile(struct bork_editor_data* d,
                 &d->map.tiles[dst_obj->x][dst_obj->y][dst_obj->z];
             swapped_obj_tile->obj_idx = dst->obj_idx;
         }
-    }
+    } 
     *dst = *tile;
-    if(tile->type == BORK_TILE_EDITOR_DOOR) {
+    if(tile->type == BORK_TILE_EDITOR_DOOR || tile->type == BORK_TILE_EDITOR_TEXT) {
         dst->obj_idx = d->map.objs.len;
         ARR_PUSH(d->map.objs, (struct bork_editor_obj){ .x = x, .y = y, .z = z });
     }
@@ -78,6 +83,22 @@ static void bork_editor_place_tile(struct bork_editor_data* d,
 
 static void bork_editor_update_map(struct bork_editor_data* d)
 {
+    if(d->text_input) {
+        struct bork_editor_tile* tile = &d->map.tiles[31 - d->cursor[0]][d->cursor[1]][d->cursor[2]];
+        struct bork_editor_obj* obj = &d->map.objs.data[tile->obj_idx];
+        int len = pg_copy_text_input(obj->text.text + obj->text.text_len, 16 - obj->text.text_len);
+        obj->text.text_len += len;
+        if(pg_check_input(SDL_SCANCODE_ESCAPE, PG_CONTROL_HIT)) {
+            d->text_input = 0;
+            pg_text_mode(0);
+        } else if(pg_check_keycode(SDLK_BACKSPACE, PG_CONTROL_HIT)) {
+            if(obj->text.text_len > 0) {
+                --obj->text.text_len;
+                obj->text.text[(int)obj->text.text_len] = '\0';
+            }
+        }
+        return;
+    }
     int ctrl = pg_check_input(SDL_SCANCODE_LCTRL, PG_CONTROL_HIT | PG_CONTROL_HELD);
     int shift = pg_check_input(SDL_SCANCODE_LSHIFT, PG_CONTROL_HIT | PG_CONTROL_HELD);
     if(pg_check_input(PG_LEFT_MOUSE, PG_CONTROL_HIT)) {
@@ -183,7 +204,7 @@ static void bork_editor_update_map(struct bork_editor_data* d)
         else if(shift) bork_editor_load_map(&d->map, "test.bork_map");
     }
     if(pg_check_input(SDL_SCANCODE_P, PG_CONTROL_HIT)) {
-        d->current_tile.dir ^=  (1 << 7);
+        d->current_tile.dir ^= (1 << 7);
     }
     if(pg_check_input(SDL_SCANCODE_SPACE, PG_CONTROL_HIT)) {
         if(d->select_mode == -1) {
@@ -203,6 +224,11 @@ static void bork_editor_update_map(struct bork_editor_data* d)
         }
     }
     struct bork_editor_tile* tile = &d->map.tiles[31 - d->cursor[0]][d->cursor[1]][d->cursor[2]];
+    if(pg_check_input(SDL_SCANCODE_T, PG_CONTROL_HIT)) {
+        tile->alt_type = MOD((int)tile->alt_type + 1, BORK_TILE_COUNT);
+    } else if(pg_check_input(SDL_SCANCODE_G, PG_CONTROL_HIT)) {
+        tile->alt_type = MOD((int)tile->alt_type - 1, BORK_TILE_COUNT);
+    }
     if(tile->type == BORK_TILE_EDITOR_DOOR) {
         struct bork_editor_obj* obj = &d->map.objs.data[tile->obj_idx];
         if(pg_check_input(SDL_SCANCODE_D, PG_CONTROL_HIT)) {
@@ -219,6 +245,29 @@ static void bork_editor_update_map(struct bork_editor_data* d)
                 if(shift) code_idx += 2;
                 obj->door.code[code_idx] = MOD((int)obj->door.code[code_idx] + code_move, 10);
             }
+        }
+    } else if(tile->type == BORK_TILE_EDITOR_TEXT) {
+        struct bork_editor_obj* obj = &d->map.objs.data[tile->obj_idx];
+        if(pg_check_input(SDL_SCANCODE_RETURN, PG_CONTROL_HIT)) {
+            d->text_input = 1;
+            pg_text_mode(1);
+        } else if(pg_check_input(SDL_SCANCODE_LEFT, PG_CONTROL_HIT)) {
+            if(ctrl) obj->text.color[0] -= shift ? 16 : 1;
+            else obj->text.color[0] += shift ? 16 : 1;
+        } else if(pg_check_input(SDL_SCANCODE_DOWN, PG_CONTROL_HIT)) {
+            if(ctrl) obj->text.color[1] -= shift ? 16 : 1;
+            else obj->text.color[1] += shift ? 16 : 1;
+        } else if(pg_check_input(SDL_SCANCODE_RIGHT, PG_CONTROL_HIT)) {
+            if(ctrl) obj->text.color[2] -= shift ? 16 : 1;
+            else obj->text.color[2] += shift ? 16 : 1;
+        } else if(pg_check_input(SDL_SCANCODE_UP, PG_CONTROL_HIT)) {
+            if(ctrl) obj->text.color[3] -= shift ? 16 : 1;
+            else obj->text.color[3] += shift ? 16 : 1;
+        } else if(pg_check_input(SDL_SCANCODE_PAGEUP, PG_CONTROL_HIT)) {
+            obj->text.pos = MOD(obj->text.pos + 1, 5);
+        } else if(pg_check_input(SDL_SCANCODE_PAGEDOWN, PG_CONTROL_HIT)) {
+            if(ctrl) obj->text.scale -= shift ? 16 : 1;
+            else obj->text.scale += shift ? 16 : 1;
         }
     } else if(d->ent_type == BORK_ITEM_DATAPAD) {
         if(pg_check_input(SDL_SCANCODE_UP, PG_CONTROL_HIT)) {
@@ -245,7 +294,6 @@ static void bork_editor_update_map(struct bork_editor_data* d)
         d->selection[2] = d->cursor[0];
         d->selection[3] = d->cursor[1];
     }
-    pg_flush_input();
 }
 
 static void bork_editor_update(struct pg_game_state* state)
@@ -254,6 +302,7 @@ static void bork_editor_update(struct pg_game_state* state)
     pg_poll_input();
     if(pg_user_exit()) state->running = 0;
     bork_editor_update_map(d);
+    pg_flush_input();
 }
 
 static void bork_editor_draw_items(struct bork_editor_data* d)
@@ -359,6 +408,10 @@ static void bork_editor_draw(struct pg_game_state* state)
             pg_model_draw(&d->core->quad_2d_ctr, NULL);
         }
     }
+    pg_shader_2d_tex_frame(&d->core->shader_2d, tile->alt_type);
+    pg_shader_2d_transform(&d->core->shader_2d,
+        (vec2){ 0.95, 0.15 }, (vec2){ 0.03, 0.03 }, 0);
+    pg_model_draw(&d->core->quad_2d_ctr, NULL);
     bork_editor_draw_items(d);
     /*  Text UI */
     shader = &d->core->shader_text;
@@ -371,12 +424,12 @@ static void bork_editor_draw(struct pg_game_state* state)
     vec4_set(text.block_style[0], 0.25, 0.1, 0.02, 1.2);
     vec4_set(text.block_color[0], 1, 1, 1, 1);
     snprintf(text.block[1], 64, "TILE DETAIL: %s %s", detail->name,
-        (tile->type >= BORK_TILE_EDITOR_DOOR && (tile->dir & (1 << 7)))
+        (tile->alt_type >= BORK_TILE_EDITOR_LIGHT1 && (tile->alt_dir & (1 << 7)))
             ? "(PUSH)" : "");
     vec4_set(text.block_style[1], 1, 0.2, 0.02, 1.2);
     vec4_set(text.block_color[1], 1, 1, 1, 1);
     snprintf(text.block[2], 64, "PLACING TILE: %s %s", cursor_detail->name,
-        (d->current_tile.type >= BORK_TILE_EDITOR_DOOR && (d->current_tile.dir & (1 << 7)))
+        (d->current_tile.type >= BORK_TILE_EDITOR_LIGHT1 && (d->current_tile.dir & (1 << 7)))
             ? "(PUSH)" : "");
     vec4_set(text.block_style[2], 1, 0.23, 0.02, 1.2);
     vec4_set(text.block_color[2], 1, 1, 1, 1);
@@ -437,6 +490,31 @@ static void bork_editor_draw(struct pg_game_state* state)
         vec4_set(text.block_style[b], 1, 0.17, 0.02, 1.2);
         vec4_set(text.block_color[b], 1, 1, 1, 1);
         ++text.use_blocks;
+    } else if(tile->type == BORK_TILE_EDITOR_TEXT) {
+        int b = text.use_blocks;
+        struct bork_editor_obj* obj = &d->map.objs.data[tile->obj_idx];
+        snprintf(text.block[b], 64, "TEXT: %s", obj->text.text);
+        vec4_set(text.block_style[b], 1, 0.17, 0.02, 1.2);
+        vec4_set(text.block_color[b],
+            (float)obj->text.color[0] / 255.0f, (float)obj->text.color[1] / 255.0f,
+            (float)obj->text.color[2] / 255.0f, 1);
+        ++text.use_blocks;
+        snprintf(text.block[++b], 64, "COLOR: %02hhX %02hhX %02hhX %02hhX",
+            obj->text.color[0], obj->text.color[1],
+            obj->text.color[2], obj->text.color[3]);
+        vec4_set(text.block_style[b], 1, 0.14, 0.02, 1.2);
+        vec4_set(text.block_color[b], 1, 1, 1, 1);
+        ++text.use_blocks;
+        static char* pos_str[5] = {
+            "FLOOR", "BOTTOM", "MID", "TOP", "CEILING" };
+        snprintf(text.block[++b], 64, "POS: %s", pos_str[obj->text.pos]);
+        vec4_set(text.block_style[b], 1, 0.11, 0.02, 1.2);
+        vec4_set(text.block_color[b], 1, 1, 1, 1);
+        ++text.use_blocks;
+        snprintf(text.block[++b], 64, "SCALE: %f", obj->text.scale / 32.0f);
+        vec4_set(text.block_style[b], 1, 0.08, 0.02, 1.2);
+        vec4_set(text.block_color[b], 1, 1, 1, 1);
+        ++text.use_blocks;
     }
     pg_shader_text_write(shader, &text);
     bork_editor_draw_items_text(d);
@@ -451,6 +529,7 @@ static void bork_editor_write_map(struct bork_editor_map* map, char* filename)
     }
     fwrite(map->tiles, sizeof(struct bork_editor_tile), 32 * 32 *32, file);
     uint32_t len = map->objs.len;
+    printf("Writing %d map objects\n", (int)len);
     fwrite(&len, sizeof(len), 1, file);
     fwrite(map->objs.data, sizeof(struct bork_editor_obj), len, file);
     len = map->ents.len;
@@ -473,6 +552,7 @@ int bork_editor_load_map(struct bork_editor_map* map, char* filename)
     }
     uint32_t num_objs = 0;
     r = fread(&num_objs, sizeof(num_objs), 1, file);
+    printf("%d\n", (int)num_objs);
     ARR_RESERVE_CLEAR(map->objs, num_objs);
     r = fread(map->objs.data, sizeof(struct bork_editor_obj), num_objs, file);
     if(r != num_objs) {
@@ -545,7 +625,147 @@ void bork_editor_complete_door(struct bork_map* map, struct bork_editor_map* ed_
     ARR_PUSH(map->doorpads, new_obj);
 }
 
-void bork_editor_complete_map(struct bork_map* map, struct bork_editor_map* ed_map)
+void bork_editor_complete_recycler(struct bork_map* map, struct bork_editor_map* ed_map,
+                                   int x, int y, int z)
+{
+    struct bork_editor_tile* ed_tile = &ed_map->tiles[x][y][z];
+    vec3 pos = { x * 2 + 1, y * 2 + 1, z * 2 + 1 };
+    vec3 out_pos = { x * 2 + 1, y * 2 + 1, z * 2 + 0.5 };
+    if(ed_tile->dir & (1 << PG_LEFT)) {
+        out_pos[0] += 0.5;
+    } else if(ed_tile->dir & (1 << PG_BACK)) {
+        out_pos[1] -= 0.5;
+    } else if(ed_tile->dir & (1 << PG_RIGHT)) {
+        out_pos[0] -= 0.5;
+    } else {
+        out_pos[1] += 0.5;
+    }
+    struct bork_map_object new_obj = {
+        .type = BORK_MAP_RECYCLER,
+        .pos = { x * 2 + 1, y * 2 + 1, z * 2 + 1.5 },
+        .recycler = { .out_pos = { out_pos[0], out_pos[1], out_pos[2] } }
+    };
+    ARR_PUSH(map->recyclers, new_obj);
+}
+
+void bork_editor_complete_duct(struct bork_map* map, struct bork_editor_map* ed_map,
+                               int x, int y, int z)
+{
+    quat dir;
+    struct bork_editor_tile* ed_tile = &ed_map->tiles[x][y][z];
+    vec3 pos = { x * 2 + 1, y * 2 + 1, z * 2 + 0.5 };
+    if(ed_tile->dir & (1 << PG_LEFT)) {
+        struct bork_editor_tile* opp_tile = &ed_map->tiles[x + 1][y][z];
+        if(opp_tile->type <= BORK_TILE_ATMO
+        || opp_tile->type == BORK_TILE_CATWALK) {
+            quat_rotate(dir, M_PI * 1.5, (vec3){ 0, 0, 1 });
+            struct bork_map_object new_obj = {
+                .type = BORK_MAP_GRATE,
+                .pos = { pos[0] + 1, pos[1], pos[2] },
+                .dir = { dir[0], dir[1], dir[2], dir[3] }
+            };
+            ARR_PUSH(map->grates, new_obj);
+        }
+    }
+    if(ed_tile->dir & (1 << PG_BACK)) {
+        struct bork_editor_tile* opp_tile = &ed_map->tiles[x][y - 1][z];
+        if(opp_tile->type <= BORK_TILE_ATMO
+        || opp_tile->type == BORK_TILE_CATWALK) {
+            quat_rotate(dir, M_PI, (vec3){ 0, 0, 1 });
+            struct bork_map_object new_obj = {
+                .type = BORK_MAP_GRATE,
+                .pos = { pos[0], pos[1] - 1, pos[2] },
+                .dir = { dir[0], dir[1], dir[2], dir[3] }
+            };
+            ARR_PUSH(map->grates, new_obj);
+        }
+    }
+    if(ed_tile->dir & (1 << PG_RIGHT)) {
+        struct bork_editor_tile* opp_tile = &ed_map->tiles[x - 1][y][z];
+        if(opp_tile->type <= BORK_TILE_ATMO
+        || opp_tile->type == BORK_TILE_CATWALK) {
+            quat_rotate(dir, M_PI * 0.5, (vec3){ 0, 0, 1 });
+            struct bork_map_object new_obj = {
+                .type = BORK_MAP_GRATE,
+                .pos = { pos[0] - 1, pos[1], pos[2] },
+                .dir = { dir[0], dir[1], dir[2], dir[3] }
+            };
+            ARR_PUSH(map->grates, new_obj);
+        }
+    }
+    if(ed_tile->dir & (1 << PG_FRONT)) {
+        struct bork_editor_tile* opp_tile = &ed_map->tiles[x][y + 1][z];
+        if(opp_tile->type <= BORK_TILE_ATMO
+        || opp_tile->type == BORK_TILE_CATWALK) {
+            quat_identity(dir);
+            struct bork_map_object new_obj = {
+                .type = BORK_MAP_GRATE,
+                .pos = { pos[0], pos[1] + 1, pos[2] },
+                .dir = { dir[0], dir[1], dir[2], dir[3] }
+            };
+            ARR_PUSH(map->grates, new_obj);
+        }
+    }
+}
+
+void bork_editor_complete_text(struct bork_map* map, struct bork_editor_map* ed_map,
+                               int x, int y, int z)
+{
+    vec3 tile_ctr = { x * 2 + 1, y * 2 + 1, z * 2 + 1 };
+    vec3 pos = { tile_ctr[0], tile_ctr[1], tile_ctr[2] };
+    quat text_dir, surface_dir;
+    struct bork_editor_tile* ed_tile = &ed_map->tiles[x][y][z];
+    struct bork_editor_obj* ed_obj = &ed_map->objs.data[ed_tile->obj_idx];
+    float pos_scale = 1;
+    switch(ed_obj->text.pos) {
+    case 0:
+        quat_rotate(surface_dir, M_PI * -0.5, (vec3){ 1, 0, 0 });
+        pos[2] -= 0.975;
+        pos_scale = 0.25;
+        break;
+    case 1:
+        quat_identity(surface_dir);
+        pos[2] -= 0.75;
+        break;
+    case 2:
+        quat_identity(surface_dir);
+        break;
+    case 3:
+        quat_identity(surface_dir);
+        pos[2] += 0.75;
+        break;
+    case 4:
+        quat_rotate(surface_dir, M_PI * 0.5, (vec3){ 1, 0, 0 });
+        pos_scale = 0.25;
+        break;
+    }
+    quat_identity(text_dir);
+    if(ed_tile->dir & (1 << PG_LEFT)) {
+        pos[0] += 0.975 * pos_scale;
+        quat_rotate(text_dir, M_PI * 1.5, (vec3){ 0, 0, 1 });
+    } else if(ed_tile->dir & (1 << PG_BACK)) {
+        pos[1] -= 0.975 * pos_scale;
+        quat_rotate(text_dir, M_PI, (vec3){ 0, 0, 1 });
+    } else if(ed_tile->dir & (1 << PG_RIGHT)) {
+        pos[0] -= 0.975 * pos_scale;
+        quat_rotate(text_dir, M_PI * 0.5, (vec3){ 0, 0, 1 });
+    } else if(ed_tile->dir & (1 << PG_FRONT)) {
+        pos[1] += 0.975 * pos_scale;
+    }
+    quat_mul(text_dir, text_dir, surface_dir);
+    struct bork_map_object new_obj = { .type = BORK_MAP_TEXT,
+        .text = { .color = { (float)ed_obj->text.color[0] / 255.0f,
+                             (float)ed_obj->text.color[1] / 255.0f,
+                             (float)ed_obj->text.color[2] / 255.0f,
+                             (float)ed_obj->text.color[3] / 255.0f },
+                  .scale = ed_obj->text.scale / 32.0f },
+        .pos = { pos[0], pos[1], pos[2] },
+        .dir = { text_dir[0], text_dir[1], text_dir[2], text_dir[3] } };
+    strncpy(new_obj.text.text, ed_obj->text.text, 16);
+    ARR_PUSH(map->texts, new_obj);
+}
+
+void bork_editor_complete_map(struct bork_map* map, struct bork_editor_map* ed_map, int newgame)
 {
     int i, j, k;
     for(i = 0; i < 32; ++i) {
@@ -556,16 +776,24 @@ void bork_editor_complete_map(struct bork_map* map, struct bork_editor_map* ed_m
                 *tile = (struct bork_tile) {
                     .type = ed_tile->type,
                     .orientation = ed_tile->dir & 0x0F };
-                if(tile->type == BORK_TILE_EDITOR_DOOR) {
+                if(newgame && tile->type == BORK_TILE_EDITOR_DOOR) {
                     bork_editor_complete_door(map, ed_map, i, j, k);
                     tile->type = BORK_TILE_ATMO;
-                } else if(tile->type == BORK_TILE_EDITOR_LIGHT1) {
+                } else if(newgame && tile->type == BORK_TILE_DUCT) {
+                    bork_editor_complete_duct(map, ed_map, i, j, k);
+                } else if(tile->type == BORK_TILE_EDITOR_RECYCLER) {
+                    bork_editor_complete_recycler(map, ed_map, i, j, k);
+                } else if(tile->type == BORK_TILE_EDITOR_TEXT) {
+                    bork_editor_complete_text(map, ed_map, i, j, k);
+                    tile->type = BORK_TILE_ATMO;
+                }
+                if(ed_tile->alt_type == BORK_TILE_EDITOR_LIGHT1) {
                     struct pg_light new_light;
                     pg_light_spotlight(&new_light,
-                        (vec3){ i * 2 + 1, j * 2 + 1, k * 2 + 1.75 }, 9,
+                        (vec3){ i * 2 + 1, j * 2 + 1, k * 2 + 1.75 }, 5.5,
                         (vec3){ 1.5, 1.5, 1.3 }, (vec3){ 0, 0, -1 }, 1.7);
                     int push = 0;
-                    if(ed_tile->dir & (1 << 7)) {
+                    if(ed_tile->alt_dir & (1 << 7)) {
                         push = 1;
                         new_light.pos[2] += 1.3;
                     }
@@ -576,27 +804,44 @@ void bork_editor_complete_map(struct bork_map* map, struct bork_editor_map* ed_m
                     };
                     ARR_PUSH(map->light_fixtures, new_lfix);
                     tile->type = BORK_TILE_ATMO;
-                } else if(tile->type == BORK_TILE_EDITOR_LIGHT_WALLMOUNT) {
+                } else if(ed_tile->alt_type == BORK_TILE_EDITOR_LIGHT2) {
+                    struct pg_light new_light;
+                    pg_light_spotlight(&new_light,
+                        (vec3){ i * 2 + 1, j * 2 + 1, k * 2 + 1.75 }, 9,
+                        (vec3){ 1.5, 1.5, 1.3 }, (vec3){ 0, 0, -1 }, 1.7);
+                    int push = 0;
+                    if(ed_tile->alt_dir & (1 << 7)) {
+                        push = 1;
+                        new_light.pos[2] += 1.3;
+                    }
+                    ARR_PUSH(map->spotlights, new_light);
+                    struct bork_map_light_fixture new_lfix = {
+                        .pos = { new_light.pos[0], new_light.pos[1], new_light.pos[2] - 0.2 },
+                        .type = 0 + (push ? 2 : 0),
+                    };
+                    ARR_PUSH(map->light_fixtures, new_lfix);
+                    tile->type = BORK_TILE_ATMO;
+                } else if(ed_tile->alt_type == BORK_TILE_EDITOR_LIGHT_WALLMOUNT) {
                     vec3 dir_angle = { 0, 0, -1 };
                     vec3 pos = { i * 2 + 1, j * 2 + 1, k * 2 + 1.75 };
-                    if(ed_tile->dir & (1 << PG_FRONT)) {
+                    if(ed_tile->alt_dir & (1 << PG_FRONT)) {
                         dir_angle[1] = 1;
                         pos[1] -= 0.8;
                     }
-                    if(ed_tile->dir & (1 << PG_BACK)) {
+                    if(ed_tile->alt_dir & (1 << PG_BACK)) {
                         dir_angle[1] = -1;
                         pos[1] += 0.8;
                     }
-                    if(ed_tile->dir & (1 << PG_LEFT)) {
+                    if(ed_tile->alt_dir & (1 << PG_LEFT)) {
                         dir_angle[0] = 1;
                         pos[0] -= 0.8;
                     }
-                    if(ed_tile->dir & (1 << PG_RIGHT)) {
+                    if(ed_tile->alt_dir & (1 << PG_RIGHT)) {
                         dir_angle[0] = -1;
                         pos[0] += 0.8;
                     }
                     int push = 0;
-                    if(ed_tile->dir & (1 << 7)) {
+                    if(ed_tile->alt_dir & (1 << 7)) {
                         push = 1;
                         pos[2] += 1.3;
                     }
@@ -611,27 +856,27 @@ void bork_editor_complete_map(struct bork_map* map, struct bork_editor_map* ed_m
                     };
                     ARR_PUSH(map->light_fixtures, new_lfix);
                     tile->type = BORK_TILE_ATMO;
-                } else if(tile->type == BORK_TILE_EDITOR_LIGHT_SMALLMOUNT) {
+                } else if(ed_tile->alt_type == BORK_TILE_EDITOR_LIGHT_SMALLMOUNT) {
                     vec3 dir_angle = { 0, 0, -1 };
                     vec3 pos = { i * 2 + 1, j * 2 + 1, k * 2 + 1 };
-                    if(ed_tile->dir & (1 << PG_FRONT)) {
+                    if(ed_tile->alt_dir & (1 << PG_FRONT)) {
                         dir_angle[1] = 0.3;
                         pos[1] -= 0.8;
                     }
-                    if(ed_tile->dir & (1 << PG_BACK)) {
+                    if(ed_tile->alt_dir & (1 << PG_BACK)) {
                         dir_angle[1] = -0.3;
                         pos[1] += 0.8;
                     }
-                    if(ed_tile->dir & (1 << PG_LEFT)) {
+                    if(ed_tile->alt_dir & (1 << PG_LEFT)) {
                         dir_angle[0] = 0.3;
                         pos[0] -= 0.8;
                     }
-                    if(ed_tile->dir & (1 << PG_RIGHT)) {
+                    if(ed_tile->alt_dir & (1 << PG_RIGHT)) {
                         dir_angle[0] = -0.3;
                         pos[0] += 0.8;
                     }
                     int push = 0;
-                    if(ed_tile->dir & (1 << 7)) {
+                    if(ed_tile->alt_dir & (1 << 7)) {
                         push = 1;
                         pos[2] += 1.3;
                     }
@@ -651,6 +896,7 @@ void bork_editor_complete_map(struct bork_map* map, struct bork_editor_map* ed_m
         }
     }
     bork_map_calc_travel(map);
+    if(!newgame) return;
     bork_entity_t ent_arr = bork_entity_new(ed_map->ents.len);
     struct bork_editor_entity* ed_ent;
     ARR_FOREACH_PTR(ed_map->ents, ed_ent, i) {

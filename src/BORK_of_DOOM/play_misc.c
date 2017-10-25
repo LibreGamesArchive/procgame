@@ -79,8 +79,33 @@ bork_entity_t get_looked_item(struct bork_play_data* d)
     bork_entity_t looked_id = -1;
     bork_entity_t ent_id;
     struct bork_entity* ent = NULL;
-    float closest_angle = 0.3f, closest_dist = 2.5f;
+    float closest_angle = 0.1f, closest_dist = 2.5f;
     ARR_FOREACH(d->plr_item_query, ent_id, i) {
+        ent = bork_entity_get(ent_id);
+        if(!ent || ent->flags & BORK_ENTFLAG_NOT_INTERACTIVE) continue;
+        vec3 ent_to_plr;
+        vec3_sub(ent_to_plr, ent->pos, look_pos);
+        float dist = vec3_len(ent_to_plr);
+        if(dist >= closest_dist) continue;
+        vec3_normalize(ent_to_plr, ent_to_plr);
+        float angle = acosf(vec3_mul_inner(ent_to_plr, look_dir)) / dist;
+        if(angle >= closest_angle) continue;
+        closest_dist = dist;
+        looked_id = ent_id;
+    }
+    return looked_id;
+}
+
+bork_entity_t get_looked_entity(struct bork_play_data* d)
+{
+    vec3 look_dir, look_pos;
+    bork_entity_get_eye(&d->plr, look_dir, look_pos);
+    int i;
+    bork_entity_t looked_id = -1;
+    bork_entity_t ent_id;
+    struct bork_entity* ent = NULL;
+    float closest_angle = 0.3f, closest_dist = 5.0f;
+    ARR_FOREACH(d->plr_entity_query, ent_id, i) {
         ent = bork_entity_get(ent_id);
         if(!ent || ent->flags & BORK_ENTFLAG_NOT_INTERACTIVE) continue;
         vec3 ent_to_plr;
@@ -151,6 +176,18 @@ struct bork_map_object* get_looked_map_object(struct bork_play_data* d)
         if(dist >= closest_dist) continue;
         vec3_normalize(ent_to_plr, ent_to_plr);
         float angle = acosf(vec3_mul_inner(ent_to_plr, look_dir));
+        if(angle >= closest_angle) continue;
+        closest_dist = dist;
+        closest_angle = angle;
+        looked_obj = obj;
+    }
+    ARR_FOREACH_PTR(d->map.grates, obj, i) {
+        vec3 ent_to_plr;
+        vec3_sub(ent_to_plr, obj->pos, look_pos);
+        float dist = vec3_len(ent_to_plr);
+        if(dist >= closest_dist) continue;
+        vec3_normalize(ent_to_plr, ent_to_plr);
+        float angle = acosf(vec3_mul_inner(ent_to_plr, look_dir)) * 0.75;
         if(angle >= closest_angle) continue;
         closest_dist = dist;
         closest_angle = angle;

@@ -9,6 +9,8 @@
 #include "recycler.h"
 #include "game_states.h"
 
+#define RANDF   ((float)rand() / RAND_MAX)
+
 static const char* BORK_AREA_STRING[] = {
     [BORK_AREA_PETS] = "P.E.T.S.",
     [BORK_AREA_WAREHOUSE] = "WAREHOUSE",
@@ -25,23 +27,23 @@ const char* bork_map_area_str(enum bork_area area) {
     else return BORK_AREA_STRING[BORK_AREA_EXTERIOR];
 }
 
-static int tile_model_basic(struct bork_map*, struct pg_texture*,
-                            struct bork_tile*, int, int, int);
-static int tile_model_spec_wall(struct bork_map*, struct pg_texture*,
-                                struct bork_tile*, int, int, int);
-static int tile_model_duct(struct bork_map*, struct pg_texture*,
-                           struct bork_tile*, int, int, int);
-static int tile_model_ramp(struct bork_map*, struct pg_texture*,
-                           struct bork_tile*, int, int, int);
-static int tile_model_recycler(struct bork_map*, struct pg_texture*,
-                               struct bork_tile*, int, int, int);
-static int tile_model_oven(struct bork_map*, struct pg_texture*,
-                           struct bork_tile*, int, int, int);
-static int tile_model_bed(struct bork_map*, struct pg_texture*,
-                          struct bork_tile*, int, int, int);
-static int tile_model_small_table(struct bork_map*, struct pg_texture*,
-                                  struct bork_tile*, int, int, int);
-static void bork_map_generate_model(struct bork_map* map,
+static int tile_model_basic(struct bork_map*, struct bork_editor_map*,
+                            struct pg_texture*, struct bork_tile*, int, int, int);
+static int tile_model_spec_wall(struct bork_map*, struct bork_editor_map*,
+                            struct pg_texture*, struct bork_tile*, int, int, int);
+static int tile_model_duct(struct bork_map*, struct bork_editor_map*,
+                            struct pg_texture*, struct bork_tile*, int, int, int);
+static int tile_model_ramp(struct bork_map*, struct bork_editor_map*,
+                            struct pg_texture*, struct bork_tile*, int, int, int);
+static int tile_model_recycler(struct bork_map*, struct bork_editor_map*,
+                            struct pg_texture*, struct bork_tile*, int, int, int);
+static int tile_model_oven(struct bork_map*, struct bork_editor_map*,
+                            struct pg_texture*, struct bork_tile*, int, int, int);
+static int tile_model_bed(struct bork_map*, struct bork_editor_map*,
+                            struct pg_texture*, struct bork_tile*, int, int, int);
+static int tile_model_small_table(struct bork_map*, struct bork_editor_map*,
+                            struct pg_texture*, struct bork_tile*, int, int, int);
+static void bork_map_generate_model(struct bork_map* map, struct bork_editor_map* ed_map,
                                     struct pg_texture* env_atlas);
 
 /*  Tile details */
@@ -281,6 +283,8 @@ struct bork_tile_detail BORK_TILE_DETAILS[] = {
         .tile_flags = BORK_TILE_HAS_ORIENTATION },
     [BORK_TILE_EDITOR_LIGHT_SMALLMOUNT] = { .name = "SMALL LIGHT",
         .tile_flags = BORK_TILE_HAS_ORIENTATION },
+    [BORK_TILE_EDITOR_TEXT] = { .name = "TEXT",
+        .tile_flags = BORK_TILE_HAS_ORIENTATION },
 };
 
 const struct bork_tile_detail* bork_tile_detail(enum bork_tile_type type)
@@ -295,7 +299,20 @@ void bork_map_init(struct bork_map* map)
     *map = (struct bork_map){};
 }
 
-void bork_map_init_model(struct bork_map* map, struct bork_game_core* core)
+void bork_map_reset(struct bork_map* map)
+{
+    ARR_TRUNCATE_CLEAR(map->doors, 0);
+    ARR_TRUNCATE_CLEAR(map->fires, 0);
+    int x, y, z;
+    for(x = 0; x < 4; ++x) for(y = 0; y < 4; ++y) for(z = 0; z < 4; ++z) {
+        ARR_TRUNCATE_CLEAR(map->enemies[x][y][z], 0);
+        ARR_TRUNCATE_CLEAR(map->items[x][y][z], 0);
+        ARR_TRUNCATE_CLEAR(map->entities[x][y][z], 0);
+    }
+}
+
+void bork_map_init_model(struct bork_map* map, struct bork_editor_map* ed_map,
+                         struct bork_game_core* core)
 {
     /*  And the door model  */
     pg_model_init(&map->door_model);
@@ -376,9 +393,26 @@ void bork_map_init_model(struct bork_map* map, struct bork_game_core* core)
     pg_model_rect_prism(&map->small_table_model, (vec3){ 0.5, 0.5, 0.5 }, face_uv);
     pg_model_precalc_ntb(&map->small_table_model);
     pg_shader_buffer_model(&core->shader_3d, &map->small_table_model);
+    /*  The grate model */
+    pg_model_init(&map->grate_model);
+    pg_texture_get_frame(&core->env_atlas, 98, face_uv[PG_FRONT]);
+    pg_texture_frame_tx(face_uv[PG_FRONT], face_uv[PG_FRONT],
+                        (vec2){ 1, 0.5 }, (vec2){ 0, 0 });
+    pg_texture_frame_flip(face_uv[PG_BACK], face_uv[PG_FRONT], 0, 1);
+    pg_texture_get_frame(&core->env_atlas, 98, face_uv[PG_TOP]);
+    pg_texture_frame_tx(face_uv[PG_TOP], face_uv[PG_TOP],
+                        (vec2){ 1, 0.0625 }, (vec2){ 0, 16.0f / 512.0f });
+    pg_texture_frame_flip(face_uv[PG_BOTTOM], face_uv[PG_TOP], 0, 1);
+    pg_texture_get_frame(&core->env_atlas, 2, face_uv[PG_LEFT]);
+    pg_texture_frame_tx(face_uv[PG_LEFT], face_uv[PG_LEFT],
+                        (vec2){ 0.0625, 0.5 }, (vec2){ -2.0f / 512.0f, 0 });
+    pg_texture_frame_flip(face_uv[PG_RIGHT], face_uv[PG_LEFT], 0, 1);
+    pg_model_rect_prism(&map->grate_model, (vec3){ 1, 0.0625, 0.5 }, face_uv);
+    pg_model_precalc_ntb(&map->grate_model);
+    pg_shader_buffer_model(&core->shader_3d, &map->grate_model);
     /*  Generate the map model  */
     pg_model_init(&map->model);
-    bork_map_generate_model(map, &core->env_atlas);
+    bork_map_generate_model(map, ed_map, &core->env_atlas);
     pg_shader_buffer_model(&core->shader_3d, &map->model);
 }
 
@@ -403,6 +437,38 @@ void bork_map_update(struct bork_map* map, struct bork_entity* plr)
         } else if(obj->door.pos > 0) {
             obj->door.pos -= 0.1;
             if(obj->door.pos < 0) obj->door.pos = 0;
+        }
+    }
+    ARR_FOREACH_PTR(map->grates, obj, i) {
+        if(obj->dead) {
+            bork_entity_t new_id = bork_entity_new(1);
+            struct bork_entity* new_item = bork_entity_get(new_id);
+            if(!new_item) continue;
+            bork_entity_init(new_item, BORK_ITEM_SCRAPMETAL);
+            vec3_set(new_item->pos,
+                obj->pos[0] + (RANDF - 0.5) * 0.25,
+                obj->pos[1] + (RANDF - 0.5) * 0.25,
+                obj->pos[2]);
+            vec3_set(new_item->vel,
+                (RANDF - 0.5) * 0.1,
+                (RANDF - 0.5) * 0.1,
+                (RANDF - 0.2) * 0.1);
+            bork_map_add_item(map, new_id);
+            new_id = bork_entity_new(1);
+            new_item = bork_entity_get(new_id);
+            if(!new_item) continue;
+            bork_entity_init(new_item, BORK_ITEM_STEELPLATE);
+            vec3_set(new_item->pos,
+                obj->pos[0] + (RANDF - 0.5) * 0.25,
+                obj->pos[1] + (RANDF - 0.5) * 0.25,
+                obj->pos[2]);
+            vec3_set(new_item->vel,
+                (RANDF - 0.5) * 0.1,
+                (RANDF - 0.5) * 0.1,
+                (RANDF - 0.2) * 0.1);
+            bork_map_add_item(map, new_id);
+            ARR_SWAPSPLICE(map->grates, i, 1);
+            --i;
         }
     }
 }
@@ -444,6 +510,30 @@ void bork_map_draw(struct bork_map* map, struct bork_game_core* core)
                                        (vec2){ 0, 48.0f / 512.0f });
         }
         pg_model_draw(&map->door_model, model_transform);
+    }
+    pg_shader_3d_tex_transform(shader, (vec2){ 1, 1 }, (vec2){});
+    pg_model_begin(&map->grate_model, shader);
+    ARR_FOREACH_PTR(map->grates, obj, i) {
+        mat4_translate(model_transform, obj->pos[0], obj->pos[1], obj->pos[2]);
+        //mat4_translate(model_transform, 32, 32, 4);
+        mat4_mul_quat(model_transform, model_transform, obj->dir);
+        pg_model_draw(&map->grate_model, model_transform);
+    }
+    pg_shader_begin(&core->shader_text, NULL);
+    pg_shader_text_3d(&core->shader_text, &core->view);
+    ARR_FOREACH_PTR(map->texts, obj, i) {
+        struct pg_shader_text text = { .use_blocks = 1 };
+        int len = snprintf(text.block[0], 16, "%s", obj->text.text);
+        vec4_set(text.block_style[0], len * 1.2 * -0.5 * 0.2 * obj->text.scale + 0.025 * obj->text.scale,
+                                      -0.1 * obj->text.scale,
+                                      0.2 * obj->text.scale, 1.2);
+        vec4_dup(text.block_color[0], obj->text.color);
+        mat4 text_tx;
+        mat4_translate(text_tx, obj->pos[0], obj->pos[1], obj->pos[2]);
+        mat4_rotate_X(text_tx, text_tx, M_PI * -0.5);
+        mat4_mul_quat(text_tx, text_tx, obj->dir);
+        pg_shader_text_transform_3d(&core->shader_text, text_tx);
+        pg_shader_text_write(&core->shader_text, &text);
     }
     shader = &core->shader_sprite;
     pg_shader_begin(shader, &core->view);
@@ -514,7 +604,8 @@ int bork_map_check_ellipsoid(struct bork_map* map, vec3 const pos, vec3 const r)
     return 0;
 }
 
-int bork_map_check_sphere(struct bork_map* map, vec3 const pos, float r)
+int bork_map_check_sphere(struct bork_map* map, struct bork_map_object** hit_obj,
+                          vec3 const pos, float r)
 {
     box bbox;
     vec3 r_scaled = { r * 1.25, r * 1.25, r * 1.25 };
@@ -544,6 +635,36 @@ int bork_map_check_sphere(struct bork_map* map, vec3 const pos, float r)
             }
         }
     }
+    quat dir;
+    struct bork_map_object* obj;
+    int i;
+    ARR_FOREACH_PTR(map->doors, obj, i) {
+        if(vec3_dist2(obj->pos, pos) > (3 * 3)) continue;
+        vec3 pos_tx = { pos[0] - obj->pos[0], pos[1] - obj->pos[1],
+                        pos[2] - (obj->pos[2] + obj->door.pos) };
+        quat_conj(dir, obj->dir);
+        quat_mul_vec3(pos_tx, dir, pos_tx);
+        vec3 door_push;
+        int c = pg_model_collide_sphere(&map->door_model, door_push, pos_tx, r, 1);
+        if(c >= 0) {
+            if(hit_obj) *hit_obj = obj;
+            return 1;
+        }
+    }
+    ARR_FOREACH_PTR(map->grates, obj, i) {
+        if(vec3_dist2(obj->pos, pos) > (3 * 3)) continue;
+        vec3 pos_tx = { pos[0] - obj->pos[0], pos[1] - obj->pos[1],
+                        pos[2] - obj->pos[2] };
+        quat_conj(dir, obj->dir);
+        quat_mul_vec3(pos_tx, dir, pos_tx);
+        vec3 grate_push;
+        int c = pg_model_collide_sphere(&map->grate_model, grate_push, pos_tx, r, 1);
+        if(c >= 0) {
+            if(hit_obj) *hit_obj = obj;
+            return 1;
+        }
+    }
+    if(hit_obj) *hit_obj = NULL;
     return 0;
 }
 
@@ -557,7 +678,7 @@ int bork_map_check_vis(struct bork_map* map, vec3 const start, vec3 const end)
     vec3_set_len(part_vec, full_vec, part_dist);
     vec3_dup(curr_point, start);
     while(curr_dist <= full_dist) {
-        if(bork_map_check_sphere(map, curr_point, 0.25)) return 0;
+        if(bork_map_check_sphere(map, NULL, curr_point, 0.25)) return 0;
         if(curr_dist + part_dist > full_dist) vec3_dup(curr_point, end);
         else vec3_add(curr_point, curr_point, part_vec);
         curr_dist += part_dist;
@@ -573,7 +694,7 @@ float bork_map_vis_dist(struct bork_map* map, vec3 const start, vec3 const dir)
     vec3_set_len(part_vec, dir, part_dist);
     vec3_dup(curr_point, start);
     while(bork_map_tile_ptr(map, curr_point)) {
-        if(bork_map_check_sphere(map, curr_point, 0.25)) return curr_dist;
+        if(bork_map_check_sphere(map, NULL, curr_point, 0.25)) return curr_dist;
         vec3_add(curr_point, curr_point, part_vec);
         curr_dist += part_dist;
     }
@@ -701,11 +822,157 @@ void bork_map_calc_travel(struct bork_map* map)
     }
 }
 
+void bork_map_create_fire(struct bork_map* map, vec3 pos, int lifetime)
+{
+    struct bork_fire new_fire = {
+        .pos = { pos[0], pos[1], pos[2] },
+        .lifetime = lifetime
+    };
+    ARR_PUSH(map->fires, new_fire);
+}
+
+void bork_map_add_enemy(struct bork_map* map, bork_entity_t ent_id)
+{
+    struct bork_entity* ent = bork_entity_get(ent_id);
+    if(!ent) return;
+    int x, y, z;
+    x = (int)ent->pos[0] / 16;
+    y = (int)ent->pos[1] / 16;
+    z = (int)ent->pos[2] / 16;
+    ARR_PUSH(map->enemies[x][y][z], ent_id);
+}
+
+void bork_map_add_entity(struct bork_map* map, bork_entity_t ent_id)
+{
+    struct bork_entity* ent = bork_entity_get(ent_id);
+    if(!ent) return;
+    int x, y, z;
+    x = (int)ent->pos[0] / 16;
+    y = (int)ent->pos[1] / 16;
+    z = (int)ent->pos[2] / 16;
+    ARR_PUSH(map->entities[x][y][z], ent_id);
+}
+
+void bork_map_add_item(struct bork_map* map, bork_entity_t ent_id)
+{
+    struct bork_entity* ent = bork_entity_get(ent_id);
+    if(!ent) return;
+    int x, y, z;
+    x = (int)ent->pos[0] / 16;
+    y = (int)ent->pos[1] / 16;
+    z = (int)ent->pos[2] / 16;
+    ARR_PUSH(map->items[x][y][z], ent_id);
+}
+
+void bork_map_query_enemies(struct bork_map* map, bork_entity_arr_t* arr,
+                            vec3 start, vec3 end)
+{
+    int start_i[3];
+    int end_i[3];
+    start_i[0] = CLAMP((int)start[0] / 16, 0, 3);
+    start_i[1] = CLAMP((int)start[1] / 16, 0, 3);
+    start_i[2] = CLAMP((int)start[2] / 16, 0, 3);
+    end_i[0] = CLAMP((int)end[0] / 16, 0, 3);
+    end_i[1] = CLAMP((int)end[1] / 16, 0, 3);
+    end_i[2] = CLAMP((int)end[2] / 16, 0, 3);
+    int x = start_i[0], y = start_i[1], z = start_i[2];
+    do {
+        do {
+            do {
+                int i;
+                bork_entity_t ent_id;
+                struct bork_entity* ent;
+                ARR_FOREACH(map->enemies[x][y][z], ent_id, i) {
+                    ent = bork_entity_get(ent_id);
+                    if(!ent) continue;
+                    //printf("%d\n", ent_id);
+                    if(ent->pos[0] >= start[0] && ent->pos[0] <= end[0]
+                    && ent->pos[1] >= start[1] && ent->pos[1] <= end[1]
+                    && ent->pos[2] >= start[2] && ent->pos[2] <= end[2]) {
+                        ARR_PUSH(*arr, ent_id);
+                    }
+                }
+            } while(x++ < end_i[0]);
+            x = start_i[0];
+        } while(y++ < end_i[1]);
+        y = start_i[1];
+    } while(z++ < end_i[2]);
+}
+
+void bork_map_query_entities(struct bork_map* map, bork_entity_arr_t* arr,
+                             vec3 start, vec3 end)
+{
+    int start_i[3];
+    int end_i[3];
+    start_i[0] = CLAMP((int)start[0] / 16, 0, 3);
+    start_i[1] = CLAMP((int)start[1] / 16, 0, 3);
+    start_i[2] = CLAMP((int)start[2] / 16, 0, 3);
+    end_i[0] = CLAMP((int)end[0] / 16, 0, 3);
+    end_i[1] = CLAMP((int)end[1] / 16, 0, 3);
+    end_i[2] = CLAMP((int)end[2] / 16, 0, 3);
+    int x = start_i[0], y = start_i[1], z = start_i[2];
+    do {
+        do {
+            do {
+                int i;
+                bork_entity_t ent_id;
+                struct bork_entity* ent;
+                ARR_FOREACH(map->entities[x][y][z], ent_id, i) {
+                    ent = bork_entity_get(ent_id);
+                    if(!ent) continue;
+                    if(ent->pos[0] >= start[0] && ent->pos[0] <= end[0]
+                    && ent->pos[1] >= start[1] && ent->pos[1] <= end[1]
+                    && ent->pos[2] >= start[2] && ent->pos[2] <= end[2]) {
+                        ARR_PUSH(*arr, ent_id);
+                    }
+                }
+            } while(x++ < end_i[0]);
+            x = start_i[0];
+        } while(y++ < end_i[1]);
+        y = start_i[1];
+    } while(z++ < end_i[2]);
+}
+
+void bork_map_query_items(struct bork_map* map, bork_entity_arr_t* arr,
+                          vec3 start, vec3 end)
+{
+    int start_i[3];
+    int end_i[3];
+    start_i[0] = CLAMP((int)start[0] / 16, 0, 3);
+    start_i[1] = CLAMP((int)start[1] / 16, 0, 3);
+    start_i[2] = CLAMP((int)start[2] / 16, 0, 3);
+    end_i[0] = CLAMP((int)end[0] / 16, 0, 3);
+    end_i[1] = CLAMP((int)end[1] / 16, 0, 3);
+    end_i[2] = CLAMP((int)end[2] / 16, 0, 3);
+    int x = start_i[0], y = start_i[1], z = start_i[2];
+    do {
+        do {
+            do {
+                int i;
+                bork_entity_t ent_id;
+                struct bork_entity* ent;
+                ARR_FOREACH(map->items[x][y][z], ent_id, i) {
+                    ent = bork_entity_get(ent_id);
+                    if(!ent) continue;
+                    if(ent->pos[0] >= start[0] && ent->pos[0] <= end[0]
+                    && ent->pos[1] >= start[1] && ent->pos[1] <= end[1]
+                    && ent->pos[2] >= start[2] && ent->pos[2] <= end[2]) {
+                        ARR_PUSH(*arr, ent_id);
+                    }
+                }
+            } while(x++ < end_i[0]);
+            x = start_i[0];
+        } while(y++ < end_i[1]);
+        y = start_i[1];
+    } while(z++ < end_i[2]);
+}
+
 /*  Model generation code   */
 
-static void bork_map_generate_model(struct bork_map* map, struct pg_texture* env_atlas)
+static void bork_map_generate_model(struct bork_map* map, struct bork_editor_map* ed_map,
+                                    struct pg_texture* env_atlas)
 {
-    pg_model_init(&map->model);
+    pg_model_reset(&map->model);
     map->model.components = PG_MODEL_COMPONENT_POSITION | PG_MODEL_COMPONENT_UV;
     struct bork_tile* tile;
     int x, y, z;
@@ -716,7 +983,7 @@ static void bork_map_generate_model(struct bork_map* map, struct pg_texture* env
                 if(!tile || tile->type < 2) continue;
                 struct bork_tile_detail* detail = &BORK_TILE_DETAILS[tile->type];
                 tile->model_tri_idx = map->model.tris.len;
-                tile->num_tris = detail->add_model(map, env_atlas, tile, x, y, z);
+                tile->num_tris = detail->add_model(map, ed_map, env_atlas, tile, x, y, z);
             }
         }
     }
@@ -834,8 +1101,9 @@ static int tile_face_basic(struct bork_map* map, struct pg_texture* env_atlas,
     return num_tris;
 }
 
-static int tile_model_basic(struct bork_map* map, struct pg_texture* env_atlas,
-                            struct bork_tile* tile, int x, int y, int z)
+static int tile_model_basic(struct bork_map* map, struct bork_editor_map* ed_map,
+                            struct pg_texture* env_atlas, struct bork_tile* tile,
+                            int x, int y, int z)
 {
     int tri_count = 0;
     int s;
@@ -938,8 +1206,9 @@ static int tile_face_spec_wall(struct bork_map* map, struct pg_texture* env_atla
     return num_tris;
 }
 
-static int tile_model_spec_wall(struct bork_map* map, struct pg_texture* env_atlas,
-                                struct bork_tile* tile, int x, int y, int z)
+static int tile_model_spec_wall(struct bork_map* map, struct bork_editor_map* ed_map,
+                            struct pg_texture* env_atlas, struct bork_tile* tile,
+                            int x, int y, int z)
 {
     int tri_count = 0;
     int s;
@@ -949,11 +1218,13 @@ static int tile_model_spec_wall(struct bork_map* map, struct pg_texture* env_atl
     return tri_count;
 }
 
-static int tile_face_duct(struct bork_map* map, struct pg_texture* env_atlas,
-                          struct bork_tile* tile, int x, int y, int z,
-                          enum pg_direction dir)
+static int tile_face_duct(struct bork_map* map, struct bork_editor_map* ed_map,
+                          struct pg_texture* env_atlas, struct bork_tile* tile,
+                          int x, int y, int z, enum pg_direction dir)
 {
     /*  Get details for the opposing face   */
+    struct bork_editor_tile* ed_tile = &ed_map->tiles[x][y][z];
+    struct bork_tile_detail* alt_detail = &BORK_TILE_DETAILS[ed_tile->alt_type];
     int opp[3] = { x + PG_DIR_VEC[dir][0], y + PG_DIR_VEC[dir][1], z + PG_DIR_VEC[dir][2] };
     struct bork_tile* opp_tile = bork_map_tile_ptri(map, opp[0], opp[1], opp[2]);
     struct bork_tile_detail* opp_detail = opp_tile ?
@@ -1044,9 +1315,9 @@ static int tile_face_duct(struct bork_map* map, struct pg_texture* env_atlas,
         pg_model_add_triangle(model, vert_idx + 5, vert_idx + 4, vert_idx + 6);
         pg_model_add_triangle(model, vert_idx + 5, vert_idx + 6, vert_idx + 7);
         return 4;
-    } else if(!(opp_flags & BORK_FACE_HAS_SURFACE) || (opp_flags & BORK_FACE_SEETHRU_SURFACE)) {
+    } else if(ed_tile->alt_type > BORK_TILE_ATMO) {
         /*  Make the "outward" faces ie. regular walls  */
-        pg_texture_get_frame(env_atlas, 19, tex_frame);
+        pg_texture_get_frame(env_atlas, alt_detail->tex_tile[0], tex_frame);
         for(i = 0; i < 4; ++i) {
             vec2_set(new_vert.uv, tex_frame[(1 - (i < 2)) * 2],
                      tex_frame[(1 - (i % 2)) * 2 + 1]);
@@ -1067,21 +1338,23 @@ static int tile_face_duct(struct bork_map* map, struct pg_texture* env_atlas,
     return 0;
 }
 
-static int tile_model_duct(struct bork_map* map, struct pg_texture* env_atlas,
-                           struct bork_tile* tile, int x, int y, int z)
+static int tile_model_duct(struct bork_map* map, struct bork_editor_map* ed_map,
+                            struct pg_texture* env_atlas, struct bork_tile* tile,
+                            int x, int y, int z)
 {
     int tri_count = 0;
-    tri_count += tile_face_duct(map, env_atlas, tile, x, y, z, PG_LEFT);
-    tri_count += tile_face_duct(map, env_atlas, tile, x, y, z, PG_RIGHT);
-    tri_count += tile_face_duct(map, env_atlas, tile, x, y, z, PG_FRONT);
-    tri_count += tile_face_duct(map, env_atlas, tile, x, y, z, PG_BACK);
-    tri_count += tile_face_duct(map, env_atlas, tile, x, y, z, PG_TOP);
-    tri_count += tile_face_duct(map, env_atlas, tile, x, y, z, PG_BOTTOM);
+    tri_count += tile_face_duct(map, ed_map, env_atlas, tile, x, y, z, PG_LEFT);
+    tri_count += tile_face_duct(map, ed_map, env_atlas, tile, x, y, z, PG_RIGHT);
+    tri_count += tile_face_duct(map, ed_map, env_atlas, tile, x, y, z, PG_FRONT);
+    tri_count += tile_face_duct(map, ed_map, env_atlas, tile, x, y, z, PG_BACK);
+    tri_count += tile_face_duct(map, ed_map, env_atlas, tile, x, y, z, PG_TOP);
+    tri_count += tile_face_duct(map, ed_map, env_atlas, tile, x, y, z, PG_BOTTOM);
     return tri_count;
 }
 
-static int tile_model_ramp(struct bork_map* map, struct pg_texture* env_atlas,
-                           struct bork_tile* tile, int x, int y, int z)
+static int tile_model_ramp(struct bork_map* map, struct bork_editor_map* ed_map,
+                            struct pg_texture* env_atlas, struct bork_tile* tile,
+                            int x, int y, int z)
 {
     struct pg_model* model = &map->model;
     struct pg_vertex_full new_vert = { .components =
@@ -1129,8 +1402,9 @@ static int tile_model_ramp(struct bork_map* map, struct pg_texture* env_atlas,
     return 4;
 }
 
-static int tile_model_recycler(struct bork_map* map, struct pg_texture* env_atlas,
-                               struct bork_tile* tile, int x, int y, int z)
+static int tile_model_recycler(struct bork_map* map, struct bork_editor_map* ed_map,
+                            struct pg_texture* env_atlas, struct bork_tile* tile,
+                            int x, int y, int z)
 {
     vec3 pos = { x * 2 + 1, y * 2 + 1, z * 2 + 1 };
     vec3 out_pos = { x * 2 + 1, y * 2 + 1, z * 2 + 0.5 };
@@ -1156,17 +1430,12 @@ static int tile_model_recycler(struct bork_map* map, struct pg_texture* env_atla
     mat4_translate(model_transform, pos[0], pos[1], pos[2]);
     mat4_mul_quat(model_transform, model_transform, dir);
     pg_model_append(&map->model, &map->recycler_model, model_transform);
-    struct bork_map_object new_obj = {
-        .type = BORK_MAP_RECYCLER,
-        .pos = { x * 2 + 1, y * 2 + 1, z * 2 + 1.5 },
-        .recycler = { .out_pos = { out_pos[0], out_pos[1], out_pos[2] } }
-    };
-    ARR_PUSH(map->recyclers, new_obj);
     return 12;
 }
 
-static int tile_model_oven(struct bork_map* map, struct pg_texture* env_atlas,
-                           struct bork_tile* tile, int x, int y, int z)
+static int tile_model_oven(struct bork_map* map, struct bork_editor_map* ed_map,
+                            struct pg_texture* env_atlas, struct bork_tile* tile,
+                            int x, int y, int z)
 {
     vec3 pos = { x * 2 + 1, y * 2 + 1, z * 2 + 0.5 };
     quat dir;
@@ -1185,8 +1454,9 @@ static int tile_model_oven(struct bork_map* map, struct pg_texture* env_atlas,
     return 12;
 }
 
-static int tile_model_bed(struct bork_map* map, struct pg_texture* env_atlas,
-                          struct bork_tile* tile, int x, int y, int z)
+static int tile_model_bed(struct bork_map* map, struct bork_editor_map* ed_map,
+                            struct pg_texture* env_atlas, struct bork_tile* tile,
+                            int x, int y, int z)
 {
     vec3 pos = { x * 2 + 1, y * 2 + 1, z * 2 + 0.3 };
     quat dir;
@@ -1205,8 +1475,9 @@ static int tile_model_bed(struct bork_map* map, struct pg_texture* env_atlas,
     return 12;
 }
 
-static int tile_model_small_table(struct bork_map* map, struct pg_texture* env_atlas,
-                                  struct bork_tile* tile, int x, int y, int z)
+static int tile_model_small_table(struct bork_map* map, struct bork_editor_map* ed_map,
+                            struct pg_texture* env_atlas, struct bork_tile* tile,
+                            int x, int y, int z)
 {
     vec3 pos = { x * 2 + 1, y * 2 + 1, z * 2 + 0.3 };
     quat dir;
@@ -1225,159 +1496,3 @@ static int tile_model_small_table(struct bork_map* map, struct pg_texture* env_a
     pg_model_append(&map->model, &map->small_table_model, model_transform);
     return 12;
 }
-
-int bork_map_load_editor_map(struct bork_map* map, char* filename)
-{
-    struct bork_editor_map ed_map;
-    int loaded = bork_editor_load_map(&ed_map, filename);
-    if(!loaded) return 0;
-    else bork_editor_complete_map(map, &ed_map);
-    return 1;
-}
-
-void bork_map_create_fire(struct bork_map* map, vec3 pos, int lifetime)
-{
-    struct bork_fire new_fire = {
-        .pos = { pos[0], pos[1], pos[2] },
-        .lifetime = lifetime
-    };
-    ARR_PUSH(map->fires, new_fire);
-}
-
-void bork_map_add_enemy(struct bork_map* map, bork_entity_t ent_id)
-{
-    struct bork_entity* ent = bork_entity_get(ent_id);
-    if(!ent) return;
-    int x, y, z;
-    x = (int)ent->pos[0] / 16;
-    y = (int)ent->pos[1] / 16;
-    z = (int)ent->pos[2] / 16;
-    ARR_PUSH(map->enemies[x][y][z], ent_id);
-}
-
-void bork_map_add_entity(struct bork_map* map, bork_entity_t ent_id)
-{
-    struct bork_entity* ent = bork_entity_get(ent_id);
-    if(!ent) return;
-    int x, y, z;
-    x = (int)ent->pos[0] / 16;
-    y = (int)ent->pos[1] / 16;
-    z = (int)ent->pos[2] / 16;
-    ARR_PUSH(map->entities[x][y][z], ent_id);
-}
-
-void bork_map_add_item(struct bork_map* map, bork_entity_t ent_id)
-{
-    struct bork_entity* ent = bork_entity_get(ent_id);
-    if(!ent) return;
-    int x, y, z;
-    x = (int)ent->pos[0] / 16;
-    y = (int)ent->pos[1] / 16;
-    z = (int)ent->pos[2] / 16;
-    ARR_PUSH(map->items[x][y][z], ent_id);
-}
-
-void bork_map_query_enemies(struct bork_map* map, bork_entity_arr_t* arr,
-                            vec3 start, vec3 end)
-{
-    int start_i[3];
-    int end_i[3];
-    start_i[0] = CLAMP((int)start[0] / 16, 0, 3);
-    start_i[1] = CLAMP((int)start[1] / 16, 0, 3);
-    start_i[2] = CLAMP((int)start[2] / 16, 0, 3);
-    end_i[0] = CLAMP((int)end[0] / 16, 0, 3);
-    end_i[1] = CLAMP((int)end[1] / 16, 0, 3);
-    end_i[2] = CLAMP((int)end[2] / 16, 0, 3);
-    int x = start_i[0], y = start_i[1], z = start_i[2];
-    do {
-        do {
-            do {
-                int i;
-                bork_entity_t ent_id;
-                struct bork_entity* ent;
-                ARR_FOREACH(map->enemies[x][y][z], ent_id, i) {
-                    ent = bork_entity_get(ent_id);
-                    if(!ent) continue;
-                    //printf("%d\n", ent_id);
-                    if(ent->pos[0] >= start[0] && ent->pos[0] <= end[0]
-                    && ent->pos[1] >= start[1] && ent->pos[1] <= end[1]
-                    && ent->pos[2] >= start[2] && ent->pos[2] <= end[2]) {
-                        ARR_PUSH(*arr, ent_id);
-                    }
-                }
-            } while(x++ < end_i[0]);
-            x = start_i[0];
-        } while(y++ < end_i[1]);
-        y = start_i[1];
-    } while(z++ < end_i[2]);
-}
-
-void bork_map_query_entities(struct bork_map* map, bork_entity_arr_t* arr,
-                             vec3 start, vec3 end)
-{
-    int start_i[3];
-    int end_i[3];
-    start_i[0] = CLAMP((int)start[0] / 16, 0, 3);
-    start_i[1] = CLAMP((int)start[1] / 16, 0, 3);
-    start_i[2] = CLAMP((int)start[2] / 16, 0, 3);
-    end_i[0] = CLAMP((int)end[0] / 16, 0, 3);
-    end_i[1] = CLAMP((int)end[1] / 16, 0, 3);
-    end_i[2] = CLAMP((int)end[2] / 16, 0, 3);
-    int x = start_i[0], y = start_i[1], z = start_i[2];
-    do {
-        do {
-            do {
-                int i;
-                bork_entity_t ent_id;
-                struct bork_entity* ent;
-                ARR_FOREACH(map->entities[x][y][z], ent_id, i) {
-                    ent = bork_entity_get(ent_id);
-                    if(!ent) continue;
-                    //printf("%d\n", ent_id);
-                    if(ent->pos[0] >= start[0] && ent->pos[0] <= end[0]
-                    && ent->pos[1] >= start[1] && ent->pos[1] <= end[1]
-                    && ent->pos[2] >= start[2] && ent->pos[2] <= end[2]) {
-                        ARR_PUSH(*arr, ent_id);
-                    }
-                }
-            } while(x++ < end_i[0]);
-            x = start_i[0];
-        } while(y++ < end_i[1]);
-        y = start_i[1];
-    } while(z++ < end_i[2]);
-}
-
-void bork_map_query_items(struct bork_map* map, bork_entity_arr_t* arr,
-                          vec3 start, vec3 end)
-{
-    int start_i[3];
-    int end_i[3];
-    start_i[0] = CLAMP((int)start[0] / 16, 0, 3);
-    start_i[1] = CLAMP((int)start[1] / 16, 0, 3);
-    start_i[2] = CLAMP((int)start[2] / 16, 0, 3);
-    end_i[0] = CLAMP((int)end[0] / 16, 0, 3);
-    end_i[1] = CLAMP((int)end[1] / 16, 0, 3);
-    end_i[2] = CLAMP((int)end[2] / 16, 0, 3);
-    int x = start_i[0], y = start_i[1], z = start_i[2];
-    do {
-        do {
-            do {
-                int i;
-                bork_entity_t ent_id;
-                struct bork_entity* ent;
-                ARR_FOREACH(map->items[x][y][z], ent_id, i) {
-                    ent = bork_entity_get(ent_id);
-                    if(!ent) continue;
-                    if(ent->pos[0] >= start[0] && ent->pos[0] <= end[0]
-                    && ent->pos[1] >= start[1] && ent->pos[1] <= end[1]
-                    && ent->pos[2] >= start[2] && ent->pos[2] <= end[2]) {
-                        ARR_PUSH(*arr, ent_id);
-                    }
-                }
-            } while(x++ < end_i[0]);
-            x = start_i[0];
-        } while(y++ < end_i[1]);
-        y = start_i[1];
-    } while(z++ < end_i[2]);
-}
-

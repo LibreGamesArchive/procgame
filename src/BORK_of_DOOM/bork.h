@@ -14,7 +14,14 @@ enum bork_control {
     BORK_CTRL_NULL,
 };
 
+struct bork_save {
+    char name[32];
+};
+
 struct bork_game_core {
+    char* base_path;
+    int base_path_len;
+    int free_base_path;
     int user_exit;
     /*  Rendering data  */
     vec2 screen_size;
@@ -52,12 +59,14 @@ struct bork_game_core {
     float mouse_sensitivity;
     int mouse_relative;
     SDL_GameController* gpad;
+    /*  Save files  */
+    ARR_T(struct bork_save) save_files;
 };
 
 struct bork_map;
 struct bork_play_data;
 
-void bork_init(struct bork_game_core* core);
+void bork_init(struct bork_game_core* core, char* base_path);
 void bork_deinit(struct bork_game_core* core);
 void bork_load_assets(struct bork_game_core* core);
 void bork_menu_start(struct pg_game_state* state, struct bork_game_core* core);

@@ -114,8 +114,6 @@ void create_smoke(struct bork_play_data* d, vec3 pos, vec3 dir, int lifetime)
     ARR_PUSH(d->particles, new_part);
 }
 
-#define RANDF   ((float)rand() / RAND_MAX)
-
 void robot_explosion(struct bork_play_data* d, vec3 pos)
 {
     vec3 pos_ = { pos[0], pos[1], pos[2] };

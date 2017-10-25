@@ -78,7 +78,14 @@ static const struct bork_upgrade_detail BORK_UPGRADE_DETAIL[] = {
             "MUSCLE ENHANCING NANO-BOTS",
             "GREATLY INCREASE MELEE DAMAGE.",
             "UPDATE FURTHER INCREASES",
-            "DAMAGE AND KNOCKBACK." } }
+            "DAMAGE AND KNOCKBACK." } },
+    [BORK_UPGRADE_SCANNING] = { .name = "SCANNING",
+        .description = {
+            "OCULAR IMPLANT PERFORMS ACTIVE",
+            "SCANNING OF VISIBLE OBJECTS AND",
+            "PASSIVE TEXT/AUDIO TRANSLATION",
+            "FROM RUSSIAN TO ENGLISH." },
+        .active = { 1, 1 } },
 };
 
 const struct bork_upgrade_detail* bork_upgrade_detail(enum bork_upgrade u)
