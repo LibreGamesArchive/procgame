@@ -85,8 +85,8 @@ void pg_gbuffer_init(struct pg_gbuffer* gbuf, int w, int h)
         deferred_frag_glsl, deferred_frag_glsl_len);
 #else
     pg_compile_glsl(&gbuf->l_vert, &gbuf->l_frag, &gbuf->l_prog,
-                    "src/procgl/shaders/deferred_vert.glsl",
-                    "src/procgl/shaders/deferred_frag.glsl");
+                    SHADER_BASE_DIR "deferred_vert.glsl",
+                    SHADER_BASE_DIR "deferred_frag.glsl");
 #endif
     gbuf->uni_projview = glGetUniformLocation(gbuf->l_prog, "projview_matrix");
     gbuf->uni_view = glGetUniformLocation(gbuf->l_prog, "view_matrix");
@@ -103,8 +103,8 @@ void pg_gbuffer_init(struct pg_gbuffer* gbuf, int w, int h)
         deferred_spot_frag_glsl, deferred_spot_frag_glsl_len);
 #else
     pg_compile_glsl(&gbuf->spot_vert, &gbuf->spot_frag, &gbuf->spot_prog,
-                    "src/procgl/shaders/deferred_spot_vert.glsl",
-                    "src/procgl/shaders/deferred_spot_frag.glsl");
+                    SHADER_BASE_DIR "deferred_spot_vert.glsl",
+                    SHADER_BASE_DIR "deferred_spot_frag.glsl");
 #endif
     gbuf->uni_projview_spot = glGetUniformLocation(gbuf->spot_prog, "projview_matrix");
     gbuf->uni_view_spot = glGetUniformLocation(gbuf->spot_prog, "view_matrix");
@@ -146,8 +146,8 @@ void pg_gbuffer_init(struct pg_gbuffer* gbuf, int w, int h)
         screen_frag_glsl, screen_frag_glsl_len);
 #else
     pg_compile_glsl(&gbuf->f_vert, &gbuf->f_frag, &gbuf->f_prog,
-                    "src/procgl/shaders/screen_vert.glsl",
-                    "src/procgl/shaders/screen_frag.glsl");
+                    SHADER_BASE_DIR "screen_vert.glsl",
+                    SHADER_BASE_DIR "screen_frag.glsl");
 #endif
     gbuf->f_color = glGetUniformLocation(gbuf->f_prog, "color");
     gbuf->f_light = glGetUniformLocation(gbuf->f_prog, "light");

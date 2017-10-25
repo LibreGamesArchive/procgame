@@ -1,3 +1,6 @@
+#ifndef SHADER_BASE_DIR
+    #define SHADER_BASE_DIR "."
+#endif
 struct pg_shader;
 struct pg_texture;
 

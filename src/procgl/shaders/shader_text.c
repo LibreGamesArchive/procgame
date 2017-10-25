@@ -49,8 +49,8 @@ int pg_shader_text(struct pg_shader* shader)
                                      text_frag_glsl, text_frag_glsl_len);
 #else
     int load = pg_shader_load(shader,
-                              "src/procgl/shaders/text_vert.glsl",
-                              "src/procgl/shaders/text_frag.glsl");
+                              SHADER_BASE_DIR "text_vert.glsl",
+                              SHADER_BASE_DIR "text_frag.glsl");
 #endif
     if(!load) return 0;
     struct data* d = malloc(sizeof(struct data));
@@ -106,7 +106,9 @@ void pg_shader_text_ndc(struct pg_shader* shader, vec2 const scale)
 void pg_shader_text_transform_3d(struct pg_shader* shader, mat4 tx)
 {
     struct data* d = shader->data;
-    glUniform3f(d->uni_normal, tx[0][2], tx[1][2], tx[2][2]);
+    vec3 normal = { -tx[2][0], -tx[2][1], -tx[2][2] };
+    vec3_normalize(normal, normal);
+    glUniform3f(d->uni_normal, normal[0], normal[1], normal[2]);
     pg_shader_set_matrix(shader, PG_MODEL_MATRIX, tx);
     pg_shader_rebuild_matrices(shader);
 }

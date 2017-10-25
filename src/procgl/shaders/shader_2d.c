@@ -70,8 +70,8 @@ int pg_shader_2d(struct pg_shader* shader)
         __2d_frag_glsl, __2d_frag_glsl_len);
 #else
     int load = pg_shader_load(shader,
-                              "src/procgl/shaders/2d_vert.glsl",
-                              "src/procgl/shaders/2d_frag.glsl");
+                              SHADER_BASE_DIR "2d_vert.glsl",
+                              SHADER_BASE_DIR "2d_frag.glsl");
 #endif
     if(!load) return 0;
     struct data_2d* d = malloc(sizeof(struct data_2d));

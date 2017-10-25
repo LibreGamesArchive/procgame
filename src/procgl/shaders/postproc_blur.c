@@ -49,18 +49,18 @@ void pg_postproc_blur(struct pg_postproc* pp, enum pg_postproc_blur_level level)
 #else
     switch(level) {
     case PG_BLUR3:
-        pg_postproc_load(pp, "src/procgl/shaders/screen_vert.glsl",
-                             "src/procgl/shaders/post_blur3_frag.glsl",
+        pg_postproc_load(pp, SHADER_BASE_DIR "screen_vert.glsl",
+                             SHADER_BASE_DIR "post_blur3_frag.glsl",
                              "color", "resolution");
         break;
     case PG_BLUR5:
-        pg_postproc_load(pp, "src/procgl/shaders/screen_vert.glsl",
-                             "src/procgl/shaders/post_blur5_frag.glsl",
+        pg_postproc_load(pp, SHADER_BASE_DIR "screen_vert.glsl",
+                             SHADER_BASE_DIR "post_blur5_frag.glsl",
                              "color", "resolution");
         break;
     case PG_BLUR7:
-        pg_postproc_load(pp, "src/procgl/shaders/screen_vert.glsl",
-                             "src/procgl/shaders/post_blur7_frag.glsl",
+        pg_postproc_load(pp, SHADER_BASE_DIR "screen_vert.glsl",
+                             SHADER_BASE_DIR "post_blur7_frag.glsl",
                              "color", "resolution");
         break;
     }

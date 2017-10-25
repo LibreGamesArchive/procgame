@@ -157,8 +157,8 @@ void pg_postproc_screen(struct pg_postproc* pp)
                             screen_frag_glsl, screen_frag_glsl_len,
                             "color", "resolution");
 #else
-    pg_postproc_load(pp, "src/procgl/shaders/screen_vert.glsl",
-                         "src/procgl/shaders/post_screen_frag.glsl",
+    pg_postproc_load(pp, SHADER_BASE_DIR "screen_vert.glsl",
+                         SHADER_BASE_DIR "post_screen_frag.glsl",
                          "color", "resolution");
 #endif
 }

@@ -33,7 +33,7 @@ PROCGL_LIBS := obj/lodepng.o obj/noise1234.o obj/wavfile.o obj/easing.o
 
 debug_linux: INCLUDES += -Isrc/libs/linux
 debug_linux: LIBS := $(LIBS_LINUX)
-debug_linux: CFLAGS := $(CFLAGS_DEBUG)
+debug_linux: CFLAGS := $(CFLAGS_DEBUG) -DSHADER_BASE_DIR='"${CURDIR}/src/procgl/shaders/"'
 debug_linux: procgame
 
 release_linux: INCLUDES += -Isrc/libs/linux

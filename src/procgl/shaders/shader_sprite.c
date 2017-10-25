@@ -66,8 +66,8 @@ int pg_shader_sprite(struct pg_shader* shader)
         sprite_frag_glsl, sprite_frag_glsl_len);
 #else
     int load = pg_shader_load(shader,
-                              "src/procgl/shaders/sprite_vert.glsl",
-                              "src/procgl/shaders/sprite_frag.glsl");
+                              SHADER_BASE_DIR "sprite_vert.glsl",
+                              SHADER_BASE_DIR "sprite_frag.glsl");
 #endif
     if(!load) return 0;
     struct data_sprite* d = malloc(sizeof(struct data_sprite));
