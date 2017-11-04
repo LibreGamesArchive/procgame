@@ -86,6 +86,7 @@ void pg_model_reset(struct pg_model* model)
     pg_model_reset_buffers(model);
     ARR_TRUNCATE(model->tris, 0);
     model->components = 0;
+    model->v_count = 0;
 }
 
 void pg_model_deinit(struct pg_model* model)
