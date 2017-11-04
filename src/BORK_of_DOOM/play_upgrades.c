@@ -22,7 +22,8 @@ static void tick_jetpack(struct bork_play_data* d, int l, int idx)
     uint8_t* kmap = d->core->ctrl_map;
     if(!(d->plr.flags & BORK_ENTFLAG_GROUND)
     && d->jump_released && d->upgrade_counters[idx] >= 3
-    && pg_check_input(kmap[BORK_CTRL_JUMP], PG_CONTROL_HELD)) {
+    && (pg_check_input(kmap[BORK_CTRL_JUMP], PG_CONTROL_HELD)
+        || pg_check_gamepad(SDL_CONTROLLER_BUTTON_A, PG_CONTROL_HELD))) {
         d->upgrade_counters[idx] -= 3;
         if(l == 0) d->plr.vel[2] = MAX(-0.02, d->plr.vel[2]);
         else if(d->plr.vel[2] < 0.05) d->plr.vel[2] += 0.008;
@@ -34,15 +35,15 @@ static void tick_jetpack(struct bork_play_data* d, int l, int idx)
 static void tick_doorhack(struct bork_play_data* d, int l, int idx)
 {
     static int mouse_released = 1;
+    int pressed = (pg_check_input(PG_RIGHT_MOUSE, PG_CONTROL_HELD)
+                    || pg_check_gamepad(PG_LEFT_TRIGGER, PG_CONTROL_HELD));
     if(d->upgrade_selected != idx) return;
-    if(!mouse_released && pg_check_input(PG_RIGHT_MOUSE, PG_CONTROL_RELEASED))
-        mouse_released = 1;
+    if(!mouse_released && !pressed) mouse_released = 1;
     if(!mouse_released) {
         d->upgrade_counters[idx] = 0;
         return;
     }
-    if(pg_check_input(PG_RIGHT_MOUSE, PG_CONTROL_HELD)
-    && d->looked_obj && d->looked_obj->type == BORK_MAP_DOORPAD) {
+    if(pressed && d->looked_obj && d->looked_obj->type == BORK_MAP_DOORPAD) {
         struct bork_map_object* door = &d->map.doors.data[d->looked_obj->doorpad.door_idx];
         if(d->upgrade_use_level == 0 && door->door.locked == 1) {
             d->upgrade_counters[idx] = 0;
@@ -72,14 +73,15 @@ static void tick_bothack(struct bork_play_data* d, int l, int idx)
 {
     static int mouse_released = 1;
     static bork_entity_t curr_enemy = -1;
+    int pressed = (pg_check_input(PG_RIGHT_MOUSE, PG_CONTROL_HELD)
+                    || pg_check_gamepad(PG_LEFT_TRIGGER, PG_CONTROL_HELD));
     if(d->upgrade_selected != idx) return;
-    if(!mouse_released && pg_check_input(PG_RIGHT_MOUSE, PG_CONTROL_RELEASED))
-        mouse_released = 1;
+    if(!mouse_released && !pressed) mouse_released = 1;
     if(!mouse_released) {
         d->upgrade_counters[idx] = 0;
         return;
     }
-    if(pg_check_input(PG_RIGHT_MOUSE, PG_CONTROL_HELD) && d->looked_enemy >= 0) {
+    if(pressed && d->looked_enemy >= 0) {
         if(d->looked_enemy != curr_enemy) {
             d->upgrade_counters[idx] = 0;
             curr_enemy = d->looked_enemy;
@@ -119,9 +121,10 @@ static void tick_bothack(struct bork_play_data* d, int l, int idx)
 
 static void tick_decoy(struct bork_play_data* d, int l, int idx)
 {
+    int pressed = (pg_check_input(PG_RIGHT_MOUSE, PG_CONTROL_HIT)
+                    || pg_check_gamepad(PG_LEFT_TRIGGER, PG_CONTROL_HIT));
     if(d->upgrade_counters[idx] <= 0) {
-        if(d->upgrade_selected == idx
-        && pg_check_input(PG_RIGHT_MOUSE, PG_CONTROL_HIT)) {
+        if(d->upgrade_selected == idx && pressed) {
             vec3 dir, pos;
             bork_entity_get_eye(&d->plr, dir, pos);
             if(l == 0) {
@@ -155,6 +158,8 @@ static void tick_decoy(struct bork_play_data* d, int l, int idx)
 
 static void tick_healing(struct bork_play_data* d, int l, int idx)
 {
+    int pressed = (pg_check_input(PG_RIGHT_MOUSE, PG_CONTROL_HIT)
+                    || pg_check_gamepad(PG_LEFT_TRIGGER, PG_CONTROL_HIT));
     if(l == 1) {
         ++d->upgrade_counters[idx];
         if(d->upgrade_counters[idx] >= PLAY_SECONDS(0.5)) {
@@ -163,7 +168,7 @@ static void tick_healing(struct bork_play_data* d, int l, int idx)
         }
     } else {
         if(d->upgrade_selected == idx && d->upgrade_counters[idx] <= 0
-        && pg_check_input(PG_RIGHT_MOUSE, PG_CONTROL_HIT)) {
+        && pressed) {
             d->plr.HP += 15;
             d->upgrade_counters[idx] = PLAY_SECONDS(8);
         }
@@ -173,6 +178,8 @@ static void tick_healing(struct bork_play_data* d, int l, int idx)
 
 static void tick_defense(struct bork_play_data* d, int l, int idx)
 {
+    int pressed = (pg_check_input(PG_RIGHT_MOUSE, PG_CONTROL_HIT)
+                    || pg_check_gamepad(PG_LEFT_TRIGGER, PG_CONTROL_HIT));
     int i;
     bork_entity_t ent_id;
     struct bork_entity* ent;
@@ -192,7 +199,7 @@ static void tick_defense(struct bork_play_data* d, int l, int idx)
     }
     if(d->upgrade_counters[idx] > 0) --d->upgrade_counters[idx];
     if(d->upgrade_selected == idx && d->upgrade_counters[idx] <= 0) {
-        if(pg_check_input(PG_RIGHT_MOUSE, PG_CONTROL_HIT)) {
+        if(pressed) {
             d->upgrade_counters[idx] = PLAY_SECONDS(6);
             ARR_FOREACH(d->plr_enemy_query, ent_id, i) {
                 ent = bork_entity_get(ent_id);
@@ -214,7 +221,9 @@ static void tick_defense(struct bork_play_data* d, int l, int idx)
 
 static void tick_scanning(struct bork_play_data* d, int l, int idx)
 {
-    if(d->upgrade_selected == idx && pg_check_input(PG_RIGHT_MOUSE, PG_CONTROL_HIT)) {
+    int pressed = (pg_check_input(PG_RIGHT_MOUSE, PG_CONTROL_HIT)
+                    || pg_check_gamepad(PG_LEFT_TRIGGER, PG_CONTROL_HIT));
+    if(d->upgrade_selected == idx && pressed) {
         struct bork_entity* looked[2] = { bork_entity_get(d->looked_enemy),
                                           bork_entity_get(d->looked_entity) };
         float dist[2] = {
@@ -231,6 +240,7 @@ static void tick_scanning(struct bork_play_data* d, int l, int idx)
             if(closest == 2) {
                 switch(d->looked_obj->type) {
                     case BORK_MAP_DOOR: strncpy(d->scanned_name, "DOOR", 32); break;
+                    case BORK_MAP_TELEPORT: strncpy(d->scanned_name, "TELEPORTER", 32); break;
                     case BORK_MAP_DOORPAD: strncpy(d->scanned_name, "KEYPAD", 32); break;
                     case BORK_MAP_RECYCLER: strncpy(d->scanned_name, "RECYCLER", 32); break;
                     case BORK_MAP_GRATE: strncpy(d->scanned_name, "GRATE", 32); break;
@@ -497,12 +507,110 @@ void tick_control_upgrade_menu(struct bork_play_data* d)
     }
     d->menu.upgrades.selection_idx =
         CLAMP(d->menu.upgrades.selection_idx, 0, d->held_upgrades.len);
+    int inv_len = MIN(4, d->held_upgrades.len);
+    int inv_start = d->menu.upgrades.scroll_idx;
     int stick_ctrl_y = 0, stick_ctrl_x = 0;
+    float ar = d->core->aspect_ratio;
+    vec2 mouse_pos;
+    int click;
+    pg_mouse_pos(mouse_pos);
+    vec2_mul(mouse_pos, mouse_pos, (vec2){ ar / d->core->screen_size[0],
+                                           1 / d->core->screen_size[1] });
+    click = pg_check_input(PG_LEFT_MOUSE, PG_CONTROL_HIT);
     if(pg_check_gamepad(PG_LEFT_STICK, PG_CONTROL_HIT)) {
         vec2 stick;
         pg_gamepad_stick(0, stick);
         if(fabsf(stick[1]) > 0.6) stick_ctrl_y = SGN(stick[1]);
         else if(fabsf(stick[0]) > 0.6) stick_ctrl_x = SGN(stick[0]);
+    }
+    if(click) {
+        int i;
+        for(i = 0; i < inv_len; ++i) {
+            vec2 up0_pos = { 0.2, 0.3 + (i * 0.125) };
+            vec2 up1_pos = { 0.325, 0.325 + (i * 0.125) };
+            if(vec2_dist(mouse_pos, up0_pos) < 0.06) {
+                d->menu.upgrades.selection_idx = inv_start + i;
+                d->menu.upgrades.horiz_idx = 0;
+                d->menu.upgrades.confirm = 0;
+            } else if(vec2_dist(mouse_pos, up1_pos) < 0.06) {
+                d->menu.upgrades.selection_idx = inv_start + i;
+                d->menu.upgrades.horiz_idx = 1;
+                d->menu.upgrades.confirm = 0;
+            }
+        }
+        for(i = 0; i < 4; ++i) {
+            if(d->upgrades[MOD(i - 1, 4)] == -1) break;
+            vec2 up_pos = { ar * 0.5 + (i - 1.5) * (0.15 * ar), 0.8 };
+            if(vec2_dist(up_pos, mouse_pos) < 0.075) {
+                if(i > 0 && d->menu.upgrades.confirm == MUST_REPLACE) {
+                    d->menu.upgrades.replace_idx = i - 1;
+                } else {
+                    d->menu.upgrades.selection_idx = d->held_upgrades.len;
+                    d->menu.upgrades.horiz_idx = i;
+                    d->menu.upgrades.confirm = 0;
+                }
+            }
+        }
+        if(d->menu.upgrades.confirm == 0) {
+            if(vec2_dist(mouse_pos, (vec2){ 0.15, 0.2 }) < 0.04
+            && d->menu.upgrades.scroll_idx > 0) {
+                --d->menu.upgrades.scroll_idx;
+            } else if(vec2_dist(mouse_pos, (vec2){ 0.15, 0.775 }) < 0.04
+                   && d->menu.upgrades.scroll_idx + 4 < d->held_upgrades.len) {
+                ++d->menu.upgrades.scroll_idx;
+            } else if(fabs(mouse_pos[0] - (ar * 0.6)) < 0.2
+                   && fabs(mouse_pos[1] - 0.565) < 0.02) {
+                int can = can_install(d, item->counter[d->menu.upgrades.horiz_idx]);
+                d->menu.upgrades.confirm = can;
+            }
+        }
+        if(d->menu.upgrades.confirm == CONFIRM_REPLACE
+        || d->menu.upgrades.confirm == CAN_UPGRADE
+        || d->menu.upgrades.confirm == CAN_INSTALL) {
+            if(fabs(mouse_pos[0] - (ar * 0.55)) < 0.07
+            && fabs(mouse_pos[1] - 0.615) < 0.03) {
+                if(d->menu.upgrades.confirm == CONFIRM_REPLACE) {
+                    d->upgrades[d->menu.upgrades.replace_idx] = item->counter[d->menu.upgrades.horiz_idx];
+                    d->upgrade_level[d->menu.upgrades.replace_idx] = 0;
+                    ARR_SPLICE(d->held_upgrades, d->menu.upgrades.selection_idx, 1);
+                    d->menu.upgrades.confirm = 0;
+                } else if(d->menu.upgrades.confirm == CAN_UPGRADE) {
+                    d->upgrade_level[d->menu.upgrades.replace_idx] = 1;
+                    ARR_SPLICE(d->held_upgrades, d->menu.upgrades.selection_idx, 1);
+                    d->menu.upgrades.confirm = 0;
+                } else if(d->menu.upgrades.confirm == CAN_INSTALL) {
+                    d->upgrades[d->menu.upgrades.replace_idx] = item->counter[d->menu.upgrades.horiz_idx];
+                    d->upgrade_level[d->menu.upgrades.replace_idx] = 0;
+                    ARR_SPLICE(d->held_upgrades, d->menu.upgrades.selection_idx, 1);
+                    d->menu.upgrades.confirm = 0;
+                }
+            } else if(fabs(mouse_pos[0] - (ar * 0.65)) < 0.05
+            && fabs(mouse_pos[1] - 0.615) < 0.03) {
+                d->menu.upgrades.confirm = 0;
+            }
+        }
+    } else {
+        if(d->menu.upgrades.confirm == CONFIRM_REPLACE
+        || d->menu.upgrades.confirm == CAN_UPGRADE
+        || d->menu.upgrades.confirm == CAN_INSTALL) {
+            if(fabs(mouse_pos[0] - (ar * 0.55)) < 0.07
+            && fabs(mouse_pos[1] - 0.615) < 0.03) {
+                d->menu.upgrades.confirm_opt = 0;
+            } else if(fabs(mouse_pos[0] - (ar * 0.65)) < 0.05
+            && fabs(mouse_pos[1] - 0.615) < 0.03) {
+                d->menu.upgrades.confirm_opt = 1;
+            }
+            if(pg_check_input(kmap[BORK_CTRL_LEFT], PG_CONTROL_HIT)
+            || stick_ctrl_x == -1) {
+                d->menu.upgrades.confirm_opt = 0;
+            } else if(pg_check_input(kmap[BORK_CTRL_RIGHT], PG_CONTROL_HIT)
+                   || stick_ctrl_x == 1) {
+                d->menu.upgrades.confirm_opt = 1;
+            } else if(pg_check_input(SDL_SCANCODE_ESCAPE, PG_CONTROL_HIT)
+                   || pg_check_gamepad(SDL_CONTROLLER_BUTTON_B, PG_CONTROL_HIT)) {
+                d->menu.upgrades.confirm = 0;
+            }
+        }
     }
     if(!d->menu.upgrades.confirm) {
         if(pg_check_input(kmap[BORK_CTRL_DOWN], PG_CONTROL_HIT)
@@ -555,32 +663,35 @@ void tick_control_upgrade_menu(struct bork_play_data* d)
             d->menu.upgrades.confirm = 0;
         }
     } else if(d->menu.upgrades.confirm == CONFIRM_REPLACE) {
-        if(pg_check_input(SDL_SCANCODE_SPACE, PG_CONTROL_HIT)) {
-            d->upgrades[d->menu.upgrades.replace_idx] = item->counter[d->menu.upgrades.horiz_idx];
-            d->upgrade_level[d->menu.upgrades.replace_idx] = 0;
-            ARR_SPLICE(d->held_upgrades, d->menu.upgrades.selection_idx, 1);
-            d->menu.upgrades.confirm = 0;
-        } else if(pg_check_input(SDL_SCANCODE_ESCAPE, PG_CONTROL_HIT)) {
-            d->menu.upgrades.confirm = 0;
+        if(pg_check_input(SDL_SCANCODE_SPACE, PG_CONTROL_HIT)
+        || pg_check_gamepad(SDL_CONTROLLER_BUTTON_A, PG_CONTROL_HIT)) {
+            if(d->menu.upgrades.confirm_opt == 1) d->menu.upgrades.confirm = 0;
+            else {
+                d->upgrades[d->menu.upgrades.replace_idx] = item->counter[d->menu.upgrades.horiz_idx];
+                d->upgrade_level[d->menu.upgrades.replace_idx] = 0;
+                ARR_SPLICE(d->held_upgrades, d->menu.upgrades.selection_idx, 1);
+                d->menu.upgrades.confirm = 0;
+            }
         }
     } else if(d->menu.upgrades.confirm == CAN_UPGRADE) {
         if(pg_check_input(SDL_SCANCODE_SPACE, PG_CONTROL_HIT)) {
-            d->upgrade_level[d->menu.upgrades.replace_idx] = 1;
-            ARR_SPLICE(d->held_upgrades, d->menu.upgrades.selection_idx, 1);
-            d->menu.upgrades.confirm = 0;
-        } else if(pg_check_input(SDL_SCANCODE_ESCAPE, PG_CONTROL_HIT)) {
-            d->menu.upgrades.confirm = 0;
+            if(d->menu.upgrades.confirm_opt == 1) d->menu.upgrades.confirm = 0;
+            else {
+                d->upgrade_level[d->menu.upgrades.replace_idx] = 1;
+                ARR_SPLICE(d->held_upgrades, d->menu.upgrades.selection_idx, 1);
+                d->menu.upgrades.confirm = 0;
+            }
         }
     } else if(d->menu.upgrades.confirm == CAN_INSTALL) {
         if(pg_check_input(SDL_SCANCODE_SPACE, PG_CONTROL_HIT)
         || pg_check_gamepad(SDL_CONTROLLER_BUTTON_A, PG_CONTROL_HIT)) {
-            d->upgrades[d->menu.upgrades.replace_idx] = item->counter[d->menu.upgrades.horiz_idx];
-            d->upgrade_level[d->menu.upgrades.replace_idx] = 0;
-            ARR_SPLICE(d->held_upgrades, d->menu.upgrades.selection_idx, 1);
-            d->menu.upgrades.confirm = 0;
-        } else if(pg_check_input(SDL_SCANCODE_ESCAPE, PG_CONTROL_HIT)
-               || pg_check_gamepad(SDL_CONTROLLER_BUTTON_B, PG_CONTROL_HIT)) {
-            d->menu.upgrades.confirm = 0;
+            if(d->menu.upgrades.confirm_opt == 1) d->menu.upgrades.confirm = 0;
+            else {
+                d->upgrades[d->menu.upgrades.replace_idx] = item->counter[d->menu.upgrades.horiz_idx];
+                d->upgrade_level[d->menu.upgrades.replace_idx] = 0;
+                ARR_SPLICE(d->held_upgrades, d->menu.upgrades.selection_idx, 1);
+                d->menu.upgrades.confirm = 0;
+            }
         }
     }
 }
@@ -589,6 +700,7 @@ void draw_upgrade_menu(struct bork_play_data* d, float t)
 {
     float ar = d->core->aspect_ratio;
     const struct bork_upgrade_detail* selected_upgrade = NULL;
+    enum bork_upgrade selected_upgrade_type = -1;
     struct bork_entity* item;
     struct pg_shader* shader = &d->core->shader_2d;
     pg_shader_begin(shader, NULL);
@@ -648,6 +760,7 @@ void draw_upgrade_menu(struct bork_play_data* d, float t)
         if(i + inv_start == d->menu.upgrades.selection_idx
         && d->menu.upgrades.horiz_idx == 0) {
             selected_upgrade = up_d[0];
+            selected_upgrade_type = item->counter[0];
             pg_shader_2d_transform(shader,
                 (vec2){ 0.2, 0.3 + (i * 0.125) }, (vec2){ 0.065, 0.065 }, 0);
             pg_shader_2d_color_mod(shader, (vec4){ 1, 1, 1, 1 }, (vec4){});
@@ -664,6 +777,7 @@ void draw_upgrade_menu(struct bork_play_data* d, float t)
         if(i + inv_start == d->menu.upgrades.selection_idx
         && d->menu.upgrades.horiz_idx == 1) {
             selected_upgrade = up_d[1];
+            selected_upgrade_type = item->counter[1];
             pg_shader_2d_transform(shader,
                 (vec2){ 0.325, 0.325 + (i * 0.125) }, (vec2){ 0.065, 0.065 }, 0);
             pg_shader_2d_color_mod(shader, (vec4){ 1, 1, 1, 1 }, (vec4){});
@@ -717,32 +831,33 @@ void draw_upgrade_menu(struct bork_play_data* d, float t)
             vec4_set(text.block_style[ti], ar * 0.4, 0.3 + i * 0.035, 0.02, 1.25);
         }
     }
-    static const char* confirm_strings[6][3] = {
-        [0] = { "[SPACE] INSTALL TECH", "", "" },
-        [CAN_INSTALL] = { "   ARE YOU SURE?",
-                          "[SPACE] CONFIRM INSTALL",
-                          "[ESCAPE] CANCEL" },
-        [CAN_UPGRADE] = { "   ARE YOU SURE?",
-                          "[SPACE] CONFIRM UPGRADE",
-                          "[ESCAPE] CANCEL" },
-        [MUST_REPLACE] = { "SELECT TECH TO REPLACE",
-                           "[SPACE] SELECT",
-                           "[ESCAPE] CANCEL" },
-        [CONFIRM_REPLACE] = { "  ARE YOU SURE?",
-                              "[SPACE] CONFIRM REPLACE",
-                              "[ESCAPE] CANCEL" },
-        [CANNOT_UPGRADE] = { "[SPACE] INSTALL TECH",
-                             "TECH ALREADY INSTALLED", "" } };
-    if(d->menu.upgrades.selection_idx < d->held_upgrades.len) {
-        strncpy(text.block[++ti], confirm_strings[d->menu.upgrades.confirm][0], 32);
-        vec4_set(text.block_style[ti], ar * 0.35, 0.55, 0.03, 1.25);
+    if(d->menu.upgrades.confirm == 0 && d->menu.upgrades.selection_idx < d->held_upgrades.len) {
+        int len;
+        if(selected_upgrade && get_upgrade_level(d, selected_upgrade_type) >= 0)
+            len = snprintf(text.block[++ti], 16, "UPGRADE");
+        else len = snprintf(text.block[++ti], 16, "INSTALL");
+        vec4_set(text.block_style[ti], ar * 0.6 - (len * 0.03 * 1.25 * 0.5), 0.55, 0.03, 1.25);
         vec4_set(text.block_color[ti], 1, 1, 1, 1);
-        strncpy(text.block[++ti], confirm_strings[d->menu.upgrades.confirm][1], 32);
-        vec4_set(text.block_style[ti], ar * 0.35, 0.6, 0.03, 1.25);
+    } else if(d->menu.upgrades.confirm == MUST_REPLACE) {
+        int len = snprintf(text.block[++ti], 16, "SELECT TECH TO REPLACE");
+        vec4_set(text.block_style[ti], ar * 0.6 - (len * 0.03 * 1.25 * 0.5), 0.55, 0.03, 1.25);
         vec4_set(text.block_color[ti], 1, 1, 1, 1);
-        strncpy(text.block[++ti], confirm_strings[d->menu.upgrades.confirm][2], 32);
-        vec4_set(text.block_style[ti], ar * 0.35, 0.65, 0.03, 1.25);
+    } else if(d->menu.upgrades.confirm == CONFIRM_REPLACE
+           || d->menu.upgrades.confirm == CAN_UPGRADE
+           || d->menu.upgrades.confirm == CAN_INSTALL) {
+        int len = snprintf(text.block[++ti], 16, "ARE YOU SURE?");
+        vec4_set(text.block_style[ti], ar * 0.6 - (len * 0.03 * 1.25 * 0.5), 0.55, 0.03, 1.25);
         vec4_set(text.block_color[ti], 1, 1, 1, 1);
+        len = snprintf(text.block[++ti], 16, "YES");
+        vec4_set(text.block_style[ti], ar * 0.55 - (len * 0.03 * 1.25 * 0.5), 0.6, 0.03, 1.25);
+        if(d->menu.upgrades.confirm_opt)
+            vec4_set(text.block_color[ti], 0.2, 0.2, 0.2, 0.9);
+        else vec4_set(text.block_color[ti], 1, 1, 1, 1);
+        len = snprintf(text.block[++ti], 16, "NO");
+        vec4_set(text.block_style[ti], ar * 0.65 - (len * 0.03 * 1.25 * 0.5), 0.6, 0.03, 1.25);
+        if(!d->menu.upgrades.confirm_opt)
+            vec4_set(text.block_color[ti], 0.2, 0.2, 0.2, 0.9);
+        else vec4_set(text.block_color[ti], 1, 1, 1, 1);
     }
     text.use_blocks = ti + 1;
     pg_shader_text_write(&d->core->shader_text, &text);

@@ -19,6 +19,7 @@ struct bork_play_data {
     int reload_ticks, reload_length;
     int ammo[BORK_AMMO_TYPES];
     int jump_released;
+    int teleport_ticks;
     enum bork_upgrade upgrades[4];
     int upgrade_level[4];
     int upgrade_counters[4];
@@ -77,7 +78,7 @@ struct bork_play_data {
         } recycler;
         struct {
             int selection_idx, scroll_idx, horiz_idx;
-            int confirm;
+            int confirm, confirm_opt;
             int replace_idx;
         } upgrades;
         struct {
@@ -92,6 +93,7 @@ struct bork_play_data {
             int selection_idx;
             char save_name[32];
             int save_name_len;
+            int confirm_opt;
         } game;
         struct {
             int selection[2];
@@ -109,6 +111,7 @@ struct bork_play_data {
     struct bork_map_object* looked_obj;
 };
 /*  Miscellaneous game functions        play_misc.c */
+void load_game(struct bork_play_data* d, char* name);
 void bork_play_reset_hud_anim(struct bork_play_data* d);
 void get_plr_pos_for_ai(struct bork_play_data* d, vec3 out);
 void entity_on_fire(struct bork_play_data* d, struct bork_entity* ent);
@@ -126,6 +129,8 @@ void robot_explosion(struct bork_play_data* d, vec3 pos);
 void create_spark(struct bork_play_data* d, vec3 pos);
 void create_sparks(struct bork_play_data* d, vec3 pos, float expand, int sparks);
 void create_elec_sparks(struct bork_play_data* d, vec3 pos, float expand, int sparks);
+void red_sparks(struct bork_play_data* d, vec3 pos, float expand, int sparks);
+void blue_sparks(struct bork_play_data* d, vec3 pos, float expand, int sparks);
 
 /*  General menu functions  */
 void bork_play_deinit(void* data);

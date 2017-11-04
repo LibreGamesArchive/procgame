@@ -10,7 +10,8 @@ struct bork_bullet {
     vec3 light_color;
     vec3 pos;
     vec3 dir;
+    float range, dist_moved;
 };
 
 void bork_bullet_init(struct bork_bullet* ent, vec3 pos, vec3 dir);
-void bork_bullet_move(struct bork_bullet* blt, struct bork_map* map);
+void bork_bullet_move(struct bork_bullet* blt, struct bork_play_data* d);

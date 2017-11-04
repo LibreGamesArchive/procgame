@@ -1,12 +1,16 @@
-#include <stdio.h>
 #include <stdlib.h>
 #include <limits.h>
 #include "procgl/procgl.h"
 #include "bork.h"
 #include "entity.h"
-#include "map_area.h"
 #include "bullet.h"
+#include "map_area.h"
 #include "physics.h"
+#include "particle.h"
+#include "upgrades.h"
+#include "recycler.h"
+#include "state_play.h"
+#include "game_states.h"
 
 void bork_bullet_init(struct bork_bullet* blt, vec3 pos, vec3 dir)
 {
@@ -15,8 +19,86 @@ void bork_bullet_init(struct bork_bullet* blt, vec3 pos, vec3 dir)
         .dir = { dir[0], dir[1], dir[2] } };
 }
 
-void bork_bullet_move(struct bork_bullet* blt, struct bork_map* map)
+static void bullet_die(struct bork_bullet* blt, struct bork_play_data* d)
 {
+    static bork_entity_arr_t surr = {};
+    switch(blt->type) {
+        case 0: case 1: case 2: case 3: case 4: case 5: {
+            struct bork_particle new_part = {
+                .flags = BORK_PARTICLE_SPRITE,
+                .pos = { blt->pos[0], blt->pos[1], blt->pos[2] },
+                .vel = { 0, 0, 0 },
+                .ticks_left = 15,
+                .frame_ticks = 3,
+                .start_frame = 0, .end_frame = 5
+            };
+            ARR_PUSH(d->particles, new_part);
+            break;
+        } case 6: {
+            struct bork_particle new_part = {
+                .flags = BORK_PARTICLE_LIGHT,
+                .light = { 1.5, 0.5, 0.5, 2 },
+                .pos = { blt->pos[0], blt->pos[1], blt->pos[2] },
+                .vel = { 0, 0, 0 },
+                .ticks_left = 30,
+                .lifetime = 30
+            };
+            ARR_PUSH(d->particles, new_part);
+            red_sparks(d, blt->pos, 0.25, rand() % 4 + 4);
+            break;
+        } case 7: {
+            ARR_TRUNCATE(surr, 0);
+            vec3 surr_start, surr_end;
+            vec3 surr_center;
+            vec3_sub(surr_start, blt->pos, (vec3){ 3, 3, 3 });
+            vec3_add(surr_end, blt->pos, (vec3){ 3, 3, 3 });
+            bork_map_query_enemies(&d->map, &surr, surr_start, surr_end);
+            bork_map_query_entities(&d->map, &surr, surr_start, surr_end);
+            int i;
+            bork_entity_t ent_id;
+            struct bork_entity* surr_ent;
+            ARR_FOREACH(surr, ent_id, i) {
+                surr_ent = bork_entity_get(ent_id);
+                if(!surr_ent) continue;
+                vec3 push;
+                vec3_sub(push, surr_ent->pos, blt->pos);
+                float dist = vec3_len(push);
+                float dist_f = MAX(1 - (dist / 3.0f), 0);
+                surr_ent->HP -= dist_f * 30;
+                vec3_set_len(push, push, 0.2 * dist_f);
+                push[2] += 0.025;
+                vec3_add(surr_ent->vel, surr_ent->vel, push);
+            }
+            struct bork_particle new_part = {
+                .flags = BORK_PARTICLE_LIGHT,
+                .light = { 1.5, 0.5, 0.5, 4 },
+                .pos = { blt->pos[0], blt->pos[1], blt->pos[2] },
+                .vel = { 0, 0, 0 },
+                .ticks_left = 45,
+                .lifetime = 45
+            };
+            ARR_PUSH(d->particles, new_part);
+            red_sparks(d, blt->pos, 0.45, rand() % 4 + 12);
+            break;
+        } case 8: {
+            struct bork_particle new_part = {
+                .flags = BORK_PARTICLE_LIGHT,
+                .light = { 0.5, 0.5, 1.5, 2 },
+                .pos = { blt->pos[0], blt->pos[1], blt->pos[2] },
+                .vel = { 0, 0, 0 },
+                .ticks_left = 30,
+                .lifetime = 30
+            };
+            ARR_PUSH(d->particles, new_part);
+            blue_sparks(d, blt->pos, 0.05, rand() % 4 + 4);
+            break;
+        } default: break;
+    }
+}
+
+void bork_bullet_move(struct bork_bullet* blt, struct bork_play_data* d)
+{
+    struct bork_map* map = &d->map;
     static bork_entity_arr_t surr = {};
     ARR_TRUNCATE(surr, 0);
     vec3 surr_start, surr_end;
@@ -34,11 +116,16 @@ void bork_bullet_move(struct bork_bullet* blt, struct bork_map* map)
     vec3_set_len(max_move_dir, blt->dir, max_move);
     vec3 new_pos = { blt->pos[0], blt->pos[1], blt->pos[2] };
     while(curr_move < full_dist) {
+        if(blt->dist_moved > blt->range) {
+            blt->flags |= BORK_BULLET_DEAD;
+        }
         if(curr_move + max_move >= full_dist) {
             vec3_set_len(max_move_dir, blt->dir, full_dist - curr_move);
             curr_move = full_dist;
+            blt->dist_moved += (full_dist - curr_move);
         } else {
             curr_move += max_move;
+            blt->dist_moved += max_move;
         }
         vec3_add(new_pos, new_pos, max_move_dir);
         if(blt->flags & BORK_BULLET_HURTS_ENEMY) {
@@ -64,8 +151,7 @@ void bork_bullet_move(struct bork_bullet* blt, struct bork_map* map)
             if(closest_ent) {
                 closest_ent->HP -= blt->damage;
                 blt->flags |= BORK_BULLET_DEAD;
-                blt->dead_ticks = 10;
-                if(!(closest_ent->flags & BORK_ENTFLAG_STATIONARY)) {
+                if(!(closest_ent->flags & BORK_ENTFLAG_STATIONARY) && blt->type != 8) {
                     vec3 knockback;
                     vec3_set_len(knockback, blt->dir, 0.1);
                     vec3_add(closest_ent->vel, closest_ent->vel, knockback);
@@ -76,7 +162,10 @@ void bork_bullet_move(struct bork_bullet* blt, struct bork_map* map)
                 || blt->type == BORK_ITEM_SHELLS_INC - BORK_ITEM_BULLETS) {
                     closest_ent->flags |= BORK_ENTFLAG_ON_FIRE;
                     closest_ent->fire_ticks = 360;
+                } else if(blt->type == 8) {
+                    closest_ent->freeze_ticks = MIN(closest_ent->freeze_ticks + 240, PLAY_SECONDS(10));
                 }
+                bullet_die(blt, d);
                 return;
             }
         }
@@ -86,28 +175,25 @@ void bork_bullet_move(struct bork_bullet* blt, struct bork_map* map)
             float dist = vec3_len(blt_to_plr);
             if(dist < 0.8) {
                 blt->flags |= BORK_BULLET_DEAD;
-                blt->dead_ticks = 10;
                 map->plr->pain_ticks = 120;
                 map->plr->HP -= blt->damage;
                 vec3_sub(blt->pos, new_pos, blt->dir);
                 vec3_set(blt->dir, 0, 0, 0);
                 vec3_set(blt->light_color, 2, 0.8, 0.8);
+                bullet_die(blt, d);
                 return;
             }
         }
         struct bork_map_object* hit_obj = NULL;
         if(bork_map_check_sphere(map, &hit_obj, new_pos, 0.1)) {
             blt->flags |= BORK_BULLET_DEAD;
-            blt->dead_ticks = 10;
-            vec3_set(blt->dir, 0, 0, 0);
-            vec3_sub(blt->pos, new_pos, blt->dir);
-            vec3_set(blt->light_color, 1, 1, 0.6);
             if(!hit_obj && (blt->type == BORK_ITEM_BULLETS_INC - BORK_ITEM_BULLETS
             || blt->type == BORK_ITEM_SHELLS_INC - BORK_ITEM_BULLETS)) {
                 bork_map_create_fire(map, blt->pos, 360);
             } else if(hit_obj && hit_obj->type == BORK_MAP_GRATE) {
                 hit_obj->dead = 1;
             }
+            bullet_die(blt, d);
             return;
         }
     }

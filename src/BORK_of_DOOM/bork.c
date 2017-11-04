@@ -229,6 +229,15 @@ void bork_read_saves(struct bork_game_core* core)
     tfTraverse(filename, list_save, core);
 }
 
+void bork_delete_save(struct bork_game_core* core, int save_idx)
+{
+    char filename[1024];
+    snprintf(filename, 1024, "%ssaves/%s", core->base_path, core->save_files.data[save_idx].name);
+    remove(filename);
+    ARR_SPLICE(core->save_files, save_idx, 1);
+    printf("%s\n", filename);
+}
+
 void bork_draw_fps(struct bork_game_core* core)
 {
     struct pg_shader_text fps_text = { .use_blocks = 1 };
@@ -251,7 +260,7 @@ void bork_draw_backdrop(struct bork_game_core* core, vec4 color_mod, float t)
     static float f[3] = { 0.01, -0.05, 0.1 };
     static float off[3] = { 2, 0.3, 0.5 };
     struct pg_shader* shader = &core->shader_2d;
-    if(!pg_shader_is_active(shader)) pg_shader_begin(shader, NULL);
+    pg_shader_begin(shader, NULL);
     pg_shader_2d_resolution(shader, (vec2){ core->aspect_ratio, 1 });
     pg_shader_2d_texture(shader, &core->backdrop_tex);
     pg_shader_2d_tex_weight(shader, 1);
@@ -272,12 +281,12 @@ void bork_draw_backdrop(struct bork_game_core* core, vec4 color_mod, float t)
 void bork_draw_linear_vignette(struct bork_game_core* core, vec4 color_mod)
 {
     struct pg_shader* shader = &core->shader_2d;
+    pg_shader_begin(shader, NULL);
     pg_shader_2d_ndc(shader, (vec2){ core->aspect_ratio, 1 });
     pg_shader_2d_transform(shader, (vec2){}, (vec2){ core->aspect_ratio, 1 }, 0);
     pg_shader_2d_texture(shader, &core->menu_vignette);
     pg_shader_2d_color_mod(shader, color_mod, (vec4){});
     pg_shader_2d_set_light(shader, (vec2){}, (vec3){}, (vec3){ 1, 1, 1 });
-    if(!pg_shader_is_active(shader)) pg_shader_begin(shader, NULL);
     pg_model_begin(&core->quad_2d_ctr, shader);
     pg_model_draw(&core->quad_2d_ctr, NULL);
 }

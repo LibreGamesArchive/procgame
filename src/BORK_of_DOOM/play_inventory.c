@@ -25,8 +25,70 @@ void tick_control_inv_menu(struct bork_play_data* d)
         return;
     }
     if(d->inventory.len == 0) return;
+    float ar = d->core->aspect_ratio;
+    vec2 mouse_pos;
+    int click;
+    pg_mouse_pos(mouse_pos);
+    vec2_mul(mouse_pos, mouse_pos, (vec2){ ar / d->core->screen_size[0],
+                                           1 / d->core->screen_size[1] });
+    click = pg_check_input(PG_LEFT_MOUSE, PG_CONTROL_HIT);
+    int inv_len = MIN(10, d->inventory.len);
+    int inv_start = d->menu.inv.scroll_idx;
     struct bork_entity* item = bork_entity_get(d->inventory.data[d->menu.inv.selection_idx]);
     const struct bork_entity_profile* prof = &BORK_ENT_PROFILES[item->type];
+    /*  First check for mouse inputs    */
+    if(click) {
+        /*  Clicking on the item list   */
+        int i;
+        for(i = 0; i < inv_len; ++i) {
+            if(mouse_pos[1] > 0.2 + 0.06 * i && mouse_pos[1] < 0.2 + 0.06 + 0.06 * i
+            && mouse_pos[0] > 0.1 && mouse_pos[0] < 0.5) {
+                d->menu.inv.selection_idx = i + inv_start;
+            }
+        }
+        /*  Scrolling   */
+        if(vec2_dist(mouse_pos, (vec2){ 0.05, 0.2 }) < 0.04
+        && d->menu.inv.scroll_idx > 0) {
+            --d->menu.inv.scroll_idx;
+        } else if(vec2_dist(mouse_pos, (vec2){ 0.05, 0.775 }) < 0.04
+               && d->menu.inv.scroll_idx < d->inventory.len - 10) {
+            ++d->menu.inv.scroll_idx;
+        }
+        /*  Clicking on ammo types  */
+        if(item->flags & BORK_ENTFLAG_IS_GUN) {
+            for(i = 0; i < prof->ammo_types; ++i) {
+                if(vec2_dist(mouse_pos, (vec2){ ar * 0.75 - 0.2 + 0.15 * i, 0.6 }) < 0.05
+                && item->ammo_type != i) {
+                    int ammo_type = prof->use_ammo[i] - BORK_ITEM_BULLETS;
+                    if(d->ammo[ammo_type] == 0) continue;
+                    int used_ammo = prof->use_ammo[item->ammo_type] - BORK_ITEM_BULLETS;
+                    d->menu.inv.ammo_select = i;
+                    d->ammo[used_ammo] += item->ammo;
+                    item->ammo = 0;
+                    item->ammo_type = i;
+                    if(d->menu.inv.selection_idx == d->held_item) {
+                        d->reload_ticks = prof->reload_time;
+                        d->reload_length = prof->reload_time;
+                    }
+                }
+            }
+        }
+        /*  Clicking on quick-fetch */
+        vec2 quick_pos[4] = {
+            { ar - 0.2 + 0.015, 0.8 + 0.015 }, { ar - 0.25 + 0.015, 0.85 + 0.015 },
+            { ar - 0.15 + 0.015, 0.85 + 0.015 }, { ar - 0.2 + 0.015, 0.9 + 0.015 }, };
+        for(i = 0; i < 4; ++i) {
+            if(vec2_dist(mouse_pos, quick_pos[i]) < 0.03) {
+                set_quick_item(d, i, d->menu.inv.selection_idx);
+            }
+        }
+    }
+    if(pg_check_input(PG_MOUSEWHEEL_UP, PG_CONTROL_HIT)) {
+        d->menu.inv.scroll_idx = MAX(0, d->menu.inv.scroll_idx - 1);
+    } else if(pg_check_input(PG_MOUSEWHEEL_DOWN, PG_CONTROL_HIT)
+           && d->inventory.len > 10) {
+        d->menu.inv.scroll_idx = MIN(d->inventory.len - 10, d->menu.inv.scroll_idx + 1);
+    }
     int stick_ctrl_y = 0, stick_ctrl_x = 0;
     if(pg_check_gamepad(PG_LEFT_STICK, PG_CONTROL_HIT)) {
         vec2 stick;
@@ -37,10 +99,16 @@ void tick_control_inv_menu(struct bork_play_data* d)
     int start_select = d->menu.inv.selection_idx;
     if(pg_check_input(kmap[BORK_CTRL_DOWN], PG_CONTROL_HIT) || stick_ctrl_y == 1) {
         d->menu.inv.selection_idx = MIN(d->menu.inv.selection_idx + 1, d->inventory.len - 1);
-        if(d->menu.inv.selection_idx >= d->menu.inv.scroll_idx + 10) ++d->menu.inv.scroll_idx;
+        if(d->menu.inv.selection_idx >= d->menu.inv.scroll_idx + 10)
+            d->menu.inv.scroll_idx = d->menu.inv.selection_idx - 9;
+        else if(d->menu.inv.selection_idx < d->menu.inv.scroll_idx)
+            d->menu.inv.scroll_idx = d->menu.inv.selection_idx;
     } else if(pg_check_input(kmap[BORK_CTRL_UP], PG_CONTROL_HIT) || stick_ctrl_y == -1) {
         d->menu.inv.selection_idx = MAX(d->menu.inv.selection_idx - 1, 0);
-        if(d->menu.inv.selection_idx < d->menu.inv.scroll_idx) --d->menu.inv.scroll_idx;
+        if(d->menu.inv.selection_idx >= d->menu.inv.scroll_idx + 10)
+            d->menu.inv.scroll_idx = d->menu.inv.selection_idx - 9;
+        else if(d->menu.inv.selection_idx < d->menu.inv.scroll_idx)
+            d->menu.inv.scroll_idx = d->menu.inv.selection_idx;
     }
     if(d->menu.inv.selection_idx != start_select) {
         item = bork_entity_get(d->inventory.data[d->menu.inv.selection_idx]);

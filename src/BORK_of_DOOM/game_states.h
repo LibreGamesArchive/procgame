@@ -15,6 +15,7 @@ struct bork_editor_data {
             uint8_t x, y, z;
             union {
                 struct { uint8_t flags; uint8_t code[4]; } door;
+                struct { int id; } teleport;
                 struct { uint8_t pos; uint8_t scale; char text[16];
                          char text_len; uint8_t color[4]; } text;
             };

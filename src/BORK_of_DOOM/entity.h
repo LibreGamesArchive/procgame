@@ -35,6 +35,7 @@ struct bork_entity {
     vec2 dir;
     vec3 dst_pos;
     uint32_t flags;
+    int freeze_ticks;
     int path_ticks;
     int dead_ticks;
     int still_ticks;
@@ -42,6 +43,7 @@ struct bork_entity {
     int aware_ticks;
     int emp_ticks;
     int fire_ticks;
+    int last_fire_tick;
     int HP;
     int ammo;
     int ammo_type;
@@ -175,7 +177,7 @@ static const struct bork_entity_profile {
     [BORK_ENEMY_TIN_CANINE] = { .name = "TIN CANINE",
         .base_flags = BORK_ENTFLAG_ENEMY,
         .base_hp = 100,
-        .size = { 1, 1, 1 },
+        .size = { 0.9, 0.9, 0.9 },
         .sprite_tx = { 1, 1, 0, 0 },
         .front_frame = 0,
         .dir_frames = 8,
@@ -302,7 +304,7 @@ static const struct bork_entity_profile {
     [BORK_ITEM_PLAZMA_ICE] = { .name = "FREEZE PLAZMA",
         .base_flags = BORK_ENTFLAG_ITEM | BORK_ENTFLAG_IS_AMMO,
         .ammo_capacity = 20,
-        .damage = -10,
+        .damage = -15,
         .armor_pierce = -10,
         .size = { 0.3, 0.3, 0.3 },
         .sprite_tx = { 1, 1, 0, 0 },

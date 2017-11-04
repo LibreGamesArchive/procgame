@@ -38,7 +38,6 @@ size_t bork_entpool_read_from_file(FILE* f)
     ARR_TRUNCATE_CLEAR(ent_pool, 0);
     ARR_RESERVE_CLEAR(ent_pool, len);
     r += fread(ent_pool.data, sizeof(struct bork_entity), len, f);
-    printf("len %u r %zu\n", len, r);
     ent_pool.cap = len;
     return r;
 }

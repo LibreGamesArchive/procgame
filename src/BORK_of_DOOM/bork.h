@@ -67,6 +67,7 @@ struct bork_map;
 struct bork_play_data;
 
 void bork_init(struct bork_game_core* core, char* base_path);
+void bork_delete_save(struct bork_game_core* core, int save_idx);
 void bork_deinit(struct bork_game_core* core);
 void bork_load_assets(struct bork_game_core* core);
 void bork_menu_start(struct pg_game_state* state, struct bork_game_core* core);

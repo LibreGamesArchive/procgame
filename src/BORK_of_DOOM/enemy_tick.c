@@ -118,6 +118,12 @@ void bork_tick_snout_drone(struct bork_entity* ent, struct bork_play_data* d)
         }
     }
     /*  Tick status effects */
+    float move_speed = 0.015;
+    if(ent->freeze_ticks) {
+        float freeze_amount = 1 - MIN(ent->freeze_ticks / PLAY_SECONDS(2), 1);
+        move_speed *= freeze_amount;
+        --ent->freeze_ticks;
+    }
     if(ent->flags & BORK_ENTFLAG_ON_FIRE) entity_on_fire(d, ent);
     if(ent->flags & BORK_ENTFLAG_EMP) {
         ent->flags &= ~BORK_ENTFLAG_FLIES;
@@ -143,7 +149,7 @@ void bork_tick_snout_drone(struct bork_entity* ent, struct bork_play_data* d)
             vec3_sub(ent_to_plr, plr_head, ent->pos);
             vec3_normalize(ent_to_plr, ent_to_plr);
             if(ent->counter[1] == 0) {
-                vec3_set_len(ent->vel, ent->dst_pos, 0.015);
+                vec3_set_len(ent->vel, ent->dst_pos, move_speed);
                 if(ent->counter[0] - d->ticks <= 0) {
                     bork_entity_look_dir(ent, ent_to_plr);
                     ent->counter[1] = 1;
@@ -158,7 +164,8 @@ void bork_tick_snout_drone(struct bork_entity* ent, struct bork_play_data* d)
                 } else if(ent->counter[0] - d->ticks == 30) {
                     struct bork_bullet new_bullet = { .type = 6,
                         .flags = BORK_BULLET_HURTS_PLAYER,
-                        .damage = 10 };
+                        .damage = 10,
+                        .range = 120 };
                     vec3_set_len(new_bullet.dir, ent_to_plr, 0.4);
                     vec3_add(new_bullet.pos, ent->pos, new_bullet.dir);
                     new_bullet.pos[2] -= 0.3;
@@ -211,6 +218,12 @@ void bork_tick_fang_banger(struct bork_entity* ent, struct bork_play_data* d)
         }
     }
     /*  Tick status effects */
+    float move_speed = 0.0125;
+    if(ent->freeze_ticks) {
+        float freeze_amount = 1 - MIN(ent->freeze_ticks / PLAY_SECONDS(2), 1);
+        move_speed *= freeze_amount;
+        --ent->freeze_ticks;
+    }
     if(ent->flags & BORK_ENTFLAG_ON_FIRE) entity_on_fire(d, ent);
     if(ent->flags & BORK_ENTFLAG_EMP) {
         entity_emp(d, ent);
@@ -244,7 +257,7 @@ void bork_tick_fang_banger(struct bork_entity* ent, struct bork_play_data* d)
                 if(ent->path_ticks && vec2_len(diff) > 0.5 && vec2_len(diff) < 16) {
                     /*  Just move to the last calculated destination    */
                     bork_entity_look_dir(ent, diff);
-                    vec2_set_len(diff, diff, 0.0125);
+                    vec2_set_len(diff, diff, move_speed);
                     vec3_add(ent->vel, ent->vel, diff);
                     --ent->path_ticks;
                 } else {
@@ -291,6 +304,12 @@ void bork_tick_tin_canine(struct bork_entity* ent, struct bork_play_data* d)
             vec3_add(ent->vel, ent->vel, push);
         }
     }
+    float move_speed = 0.005;
+    if(ent->freeze_ticks) {
+        float freeze_amount = 1 - MIN(ent->freeze_ticks / PLAY_SECONDS(2), 1);
+        move_speed *= freeze_amount;
+        --ent->freeze_ticks;
+    }
     /*  Tick status effects */
     if(ent->flags & BORK_ENTFLAG_ON_FIRE) entity_on_fire(d, ent);
     if(ent->flags & BORK_ENTFLAG_EMP) {
@@ -326,7 +345,7 @@ void bork_tick_tin_canine(struct bork_entity* ent, struct bork_play_data* d)
                     if(ent->path_ticks && vec2_len(diff) > 0.5 && vec2_len(diff) < 16) {
                         /*  Just move to the last calculated destination    */
                         bork_entity_look_dir(ent, diff);
-                        vec2_set_len(diff, diff, 0.005);
+                        vec2_set_len(diff, diff, move_speed);
                         vec3_add(ent->vel, ent->vel, diff);
                         --ent->path_ticks;
                     } else {
@@ -341,14 +360,15 @@ void bork_tick_tin_canine(struct bork_entity* ent, struct bork_play_data* d)
                         }
                     }
                 }
-            } else if(vis) {
+            } else if(vis && !ent->freeze_ticks) {
                 vec3 ent_to_plr;
                 vec3_sub(ent_to_plr, plr_head, ent->pos);
                 bork_entity_look_dir(ent, ent_to_plr);
                 if(ent->counter[0] - d->ticks == 30) {
                     struct bork_bullet new_bullet = { .type = 6,
                         .flags = BORK_BULLET_HURTS_PLAYER,
-                        .damage = 10 };
+                        .damage = 10,
+                        .range = 120 };
                     vec3_set_len(new_bullet.dir, ent_to_plr, 0.4);
                     vec3_add(new_bullet.pos, ent->pos, new_bullet.dir);
                     new_bullet.pos[2] -= 0.1;
@@ -388,6 +408,12 @@ void bork_tick_bottweiler(struct bork_entity* ent, struct bork_play_data* d)
         }
     }
     /*  Tick status effects */
+    float move_speed = 0.01;
+    if(ent->freeze_ticks) {
+        float freeze_amount = 1 - MIN(ent->freeze_ticks / PLAY_SECONDS(2), 1);
+        move_speed *= freeze_amount;
+        --ent->freeze_ticks;
+    }
     if(ent->flags & BORK_ENTFLAG_ON_FIRE) entity_on_fire(d, ent);
     if(ent->flags & BORK_ENTFLAG_EMP) {
         entity_emp(d, ent);
@@ -429,7 +455,7 @@ void bork_tick_bottweiler(struct bork_entity* ent, struct bork_play_data* d)
                 if(ent->path_ticks && vec2_len(diff) > 0.5 && vec2_len(diff) < 16) {
                     /*  Just move to the last calculated destination    */
                     bork_entity_look_dir(ent, diff);
-                    vec2_set_len(diff, diff, 0.01);
+                    vec2_set_len(diff, diff, move_speed);
                     vec3_add(ent->vel, ent->vel, diff);
                     --ent->path_ticks;
                 } else {
@@ -481,7 +507,8 @@ void bork_tick_great_bane(struct bork_entity* ent, struct bork_play_data* d)
                 ent->counter[0] = d->ticks + PLAY_SECONDS(0.5);
                 struct bork_bullet new_bullet = { .type = 9,
                     .flags = BORK_BULLET_HURTS_PLAYER,
-                    .damage = 10 };
+                    .damage = 10,
+                    .range = 120 };
                 vec2 sph = {
                     ent->dir[0] + M_PI * 0.5,
                     M_PI - atan2f(vec2_len(ent_to_plr), ent->pos[2] - plr_head[2]) };

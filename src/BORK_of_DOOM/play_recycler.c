@@ -72,12 +72,65 @@ void tick_recycler_menu(struct bork_play_data* d)
 {
     uint8_t* kmap = d->core->ctrl_map;
     recycler_count_inv_resources(d);
-    if(pg_check_input(SDL_SCANCODE_ESCAPE, PG_CONTROL_HIT)) {
+    if(pg_check_input(SDL_SCANCODE_ESCAPE, PG_CONTROL_HIT)
+    || pg_check_gamepad(SDL_CONTROLLER_BUTTON_B, PG_CONTROL_HIT)) {
         d->menu.state = BORK_MENU_CLOSED;
         SDL_ShowCursor(SDL_DISABLE);
         pg_mouse_mode(1);
     }
+    float ar = d->core->aspect_ratio;
+    vec2 mouse_pos;
+    int click;
+    pg_mouse_pos(mouse_pos);
+    vec2_mul(mouse_pos, mouse_pos, (vec2){ ar / d->core->screen_size[0],
+                                           1 / d->core->screen_size[1] });
+    click = pg_check_input(PG_LEFT_MOUSE, PG_CONTROL_HIT);
     int stick_ctrl_y = 0, stick_ctrl_x = 0;
+    if(click) {
+        /*  Clicking on the item list   */
+        int i;
+        for(i = 0; i < 10; ++i) {
+            if(mouse_pos[1] > 0.2 + 0.06 * i && mouse_pos[1] < 0.2 + 0.06 + 0.06 * i
+            && mouse_pos[0] > 0.1 && mouse_pos[0] < 0.5) {
+                d->menu.recycler.selection_idx = i + d->menu.recycler.scroll_idx;
+            }
+        }
+        /*  Clicking the recycle button */
+        enum bork_schematic sch = d->menu.recycler.selection_idx;
+        const struct bork_schematic_detail* sch_d = &BORK_SCHEMATIC_DETAIL[sch];
+        if(d->menu.recycler.obj && (d->held_schematics & (1 << sch))
+        && fabs(mouse_pos[0] - (ar * 0.75 + 0.015)) < 0.25
+        && fabs(mouse_pos[1] - 0.8) < 0.025
+        && d->menu.recycler.resources[0] >= sch_d->resources[0]
+        && d->menu.recycler.resources[1] >= sch_d->resources[1]
+        && d->menu.recycler.resources[2] >= sch_d->resources[2]
+        && d->menu.recycler.resources[3] >= sch_d->resources[3]) {
+            recycler_consume_inv_resources(d,
+                sch_d->resources[0], sch_d->resources[1],
+                sch_d->resources[2], sch_d->resources[3]);
+            bork_entity_t new_id = bork_entity_new(1);
+            struct bork_entity* new_ent = bork_entity_get(new_id);
+            bork_entity_init(new_ent, sch_d->product);
+            vec3_set(new_ent->pos,
+                d->looked_obj->recycler.out_pos[0] + (RANDF - 0.5) * 0.5,
+                d->looked_obj->recycler.out_pos[1] + (RANDF - 0.5) * 0.5,
+                d->looked_obj->recycler.out_pos[2]);
+            bork_map_add_item(&d->map, new_id);
+        }
+        /*  Scrolling   */
+        if(vec2_dist(mouse_pos, (vec2){ 0.05, 0.2 }) < 0.04
+        && d->menu.recycler.scroll_idx > 0) {
+            --d->menu.recycler.scroll_idx;
+        } else if(vec2_dist(mouse_pos, (vec2){ 0.05, 0.775 }) < 0.04
+               && d->menu.recycler.scroll_idx < BORK_NUM_SCHEMATICS - 10) {
+            ++d->menu.recycler.scroll_idx;
+        }
+    }
+    if(pg_check_input(PG_MOUSEWHEEL_UP, PG_CONTROL_HIT)) {
+        d->menu.recycler.scroll_idx = MAX(0, d->menu.recycler.scroll_idx - 1);
+    } else if(pg_check_input(PG_MOUSEWHEEL_DOWN, PG_CONTROL_HIT)) {
+        d->menu.recycler.scroll_idx = MIN(BORK_NUM_SCHEMATICS - 10, d->menu.recycler.scroll_idx + 1);
+    }
     if(pg_check_gamepad(PG_LEFT_STICK, PG_CONTROL_HIT)) {
         vec2 stick;
         pg_gamepad_stick(0, stick);
@@ -96,8 +149,8 @@ void tick_recycler_menu(struct bork_play_data* d)
     }
     enum bork_schematic sch = d->menu.recycler.selection_idx;
     const struct bork_schematic_detail* sch_d = &BORK_SCHEMATIC_DETAIL[sch];
-    const struct bork_entity_profile* prof = &BORK_ENT_PROFILES[sch_d->product];
-    if(pg_check_input(SDL_SCANCODE_SPACE, PG_CONTROL_HIT)
+    if((pg_check_input(SDL_SCANCODE_SPACE, PG_CONTROL_HIT)
+    || pg_check_gamepad(SDL_CONTROLLER_BUTTON_A, PG_CONTROL_HIT))
     && d->held_schematics & (1 << sch)) {
         if(d->menu.recycler.resources[0] >= sch_d->resources[0]
         && d->menu.recycler.resources[1] >= sch_d->resources[1]
@@ -110,8 +163,8 @@ void tick_recycler_menu(struct bork_play_data* d)
             struct bork_entity* new_ent = bork_entity_get(new_id);
             bork_entity_init(new_ent, sch_d->product);
             vec3_set(new_ent->pos,
-                d->looked_obj->recycler.out_pos[0] + (RANDF - 0.5) * 0.5,
-                d->looked_obj->recycler.out_pos[1] + (RANDF - 0.5) * 0.5,
+                d->looked_obj->recycler.out_pos[0] + (RANDF - 0.5) * 0.75,
+                d->looked_obj->recycler.out_pos[1] + (RANDF - 0.5) * 0.75,
                 d->looked_obj->recycler.out_pos[2]);
             bork_map_add_item(&d->map, new_id);
         }
@@ -128,13 +181,20 @@ void draw_recycler_menu(struct bork_play_data* d, float t)
     enum bork_schematic sch;
     const struct bork_schematic_detail* sch_d;
     const struct bork_entity_profile* prof;
+    sch = d->menu.recycler.selection_idx;
+    sch_d = &BORK_SCHEMATIC_DETAIL[sch];
+    prof = &BORK_ENT_PROFILES[sch_d->product];
+    int held = !!(d->held_schematics & (1 << sch));
     struct pg_shader_text text;
     if(d->menu.recycler.obj) {
         text = (struct pg_shader_text){
-            .use_blocks = 1,
-            .block = { "RECYCLER" },
-            .block_style = { { 0.1, 0.1, 0.05, 1.25 } },
-            .block_color = { { 1, 1, 1, 0.7 } } };
+            .use_blocks = 2,
+            .block = { "RECYCLER", "RECYCLE!" },
+            .block_style = { { 0.1, 0.1, 0.05, 1.25 },
+                             { ar * 0.75 + 0.015 - (8 * 0.04 * 1.25 * 0.5), 0.8, 0.04, 1.25 }},
+            .block_color = { { 1, 1, 1, 0.7 },
+                             { held ? 1 : 0.2, held ? 1 : 0.2,
+                               held ? 1 : 0.2, held ? 1 : 0.9 } } };
     } else {
         text = (struct pg_shader_text){
             .use_blocks = 1,
@@ -143,7 +203,7 @@ void draw_recycler_menu(struct bork_play_data* d, float t)
             .block_color = { { 1, 1, 1, 0.7 } } };
     }
     int i;
-    int ti = 1;
+    int ti = text.use_blocks;
     for(i = 0; i < 10; ++i) {
         sch = i + d->menu.recycler.scroll_idx;
         sch_d = &BORK_SCHEMATIC_DETAIL[sch];

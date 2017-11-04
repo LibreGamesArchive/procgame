@@ -57,9 +57,14 @@ enum bork_tile_type {
     BORK_TILE_CARGO_RED, BORK_TILE_CARGO_BLUE,
     BORK_TILE_DUCT,
     BORK_TILE_RAMP_BOTTOM, BORK_TILE_RAMP_TOP,
+    BORK_TILE_PIPES,
+    BORK_TILE_EDITOR_FIRE_LOW,
+    BORK_TILE_EDITOR_FIRE_MID,
+    BORK_TILE_EDITOR_FIRE_HIGH,
     BORK_TILE_EDITOR_DOOR,
     BORK_TILE_EDITOR_RECYCLER,
     BORK_TILE_EDITOR_TEXT,
+    BORK_TILE_EDITOR_TELEPORT,
     BORK_TILE_EDITOR_LIGHT1,
     BORK_TILE_EDITOR_LIGHT_WALLMOUNT,
     BORK_TILE_EDITOR_LIGHT_SMALLMOUNT,
@@ -81,7 +86,9 @@ struct bork_map_object {
         BORK_MAP_DOORPAD,
         BORK_MAP_RECYCLER,
         BORK_MAP_TEXT,
-        BORK_MAP_GRATE
+        BORK_MAP_GRATE,
+        BORK_MAP_TELEPORT,
+        BORK_MAP_FIRE
     } type;
     int dead;
     vec3 pos;
@@ -104,6 +111,14 @@ struct bork_map_object {
             vec4 color;
             float scale;
         } text;
+        struct {
+            int id;
+            float dir;
+        } teleport;
+        struct {
+            int active;
+            vec3 dir;
+        } fire;
     };
 };
 
@@ -133,6 +148,8 @@ struct bork_map {
     ARR_T(struct bork_map_object) recyclers;
     ARR_T(struct bork_map_object) texts;
     ARR_T(struct bork_map_object) grates;
+    ARR_T(struct bork_map_object) teleports;
+    ARR_T(struct bork_map_object) fire_objs;
     ARR_T(struct bork_map_light_fixture) light_fixtures;
     ARR_T(struct bork_fire) fires;
     ARR_T(struct pg_light) lights;
@@ -143,6 +160,7 @@ struct bork_map {
     struct pg_model bed_model;
     struct pg_model small_table_model;
     struct pg_model grate_model;
+    struct pg_model pipes_model;
     struct bork_entity* plr;
 };
 
@@ -166,8 +184,8 @@ struct bork_tile* bork_map_tile_ptr(struct bork_map* map, vec3 const pos);
 struct bork_tile* bork_map_tile_ptri(struct bork_map* map, int x, int y, int z);
 void bork_map_write_to_file(struct bork_map* map, char* filename);
 void bork_map_load_from_file(struct bork_map* map, char* filename, int newgame);
-void bork_map_update(struct bork_map* map, struct bork_entity* plr);
-void bork_map_draw(struct bork_map* map, struct bork_game_core* core);
+void bork_map_update(struct bork_map* map, struct bork_play_data* d);
+void bork_map_draw(struct bork_map* map, struct bork_play_data* d);
 int bork_map_check_ellipsoid(struct bork_map* map, vec3 const pos, vec3 const r);
 int bork_map_check_sphere(struct bork_map* map, struct bork_map_object** hit_obj,
                           vec3 const pos, float r);

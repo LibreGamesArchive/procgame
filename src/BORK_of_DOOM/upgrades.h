@@ -25,5 +25,12 @@ const struct bork_upgrade_detail* bork_upgrade_detail(enum bork_upgrade u);
 
 void bork_use_upgrade(struct bork_play_data* d, enum bork_upgrade u, int l);
 void select_next_upgrade(struct bork_play_data* d);
+int get_upgrade_level(struct bork_play_data* d, enum bork_upgrade up);
+
+
+
+
+
+
 
 
