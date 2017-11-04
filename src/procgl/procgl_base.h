@@ -56,6 +56,8 @@ void pg_screen_dst(void);
 #define PG_CONTROL_HIT          (1 << 2)
 #define PG_CONTROL_HELD         (1 << 3)
 /*  Special mouse control codes, mapped to unused SDL scancodes */
+#define PG_MOUSEWHEEL_UP        251
+#define PG_MOUSEWHEEL_DOWN      252
 #define PG_LEFT_MOUSE           253
 #define PG_RIGHT_MOUSE          254
 #define PG_MIDDLE_MOUSE         255

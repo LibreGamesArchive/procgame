@@ -142,6 +142,14 @@ void pg_poll_input(void)
                 ctrl_changes[ctrl_changed++] = PG_MIDDLE_MOUSE;
                 break;
             }
+        } else if(e.type == SDL_MOUSEWHEEL) {
+            if(e.wheel.y == 1) {
+                ctrl_state[PG_MOUSEWHEEL_UP] = PG_CONTROL_HIT;
+                ctrl_changes[ctrl_changed++] = PG_MOUSEWHEEL_UP;
+            } else if(e.wheel.y == -1) {
+                ctrl_state[PG_MOUSEWHEEL_DOWN] = PG_CONTROL_HIT;
+                ctrl_changes[ctrl_changed++] = PG_MOUSEWHEEL_DOWN;
+            }
         } else if(e.type == SDL_TEXTINPUT && text_mode && text_len < 16) {
             int len = strnlen(e.text.text, 32);
             int buf_left = 16 - text_len;
@@ -183,6 +191,7 @@ void pg_poll_input(void)
         SDL_GetMouseState(&mx, &my);
         mx = ((float)mx / screen_w) * render_w;
         my = ((float)my / screen_h) * render_h;
+        vec2_set(mouse_motion, mouse_pos[0] - mx, mouse_pos[1] - my);
         vec2_set(mouse_pos, mx, my);
     }
     if(pg_gamepad) {
