@@ -503,29 +503,28 @@ void bork_tick_great_bane(struct bork_entity* ent, struct bork_play_data* d)
         if(vis) {
             vec3 ent_to_plr;
             vec3_sub(ent_to_plr, plr_head, ent->pos);
-            if(ent->counter[0] - d->ticks <= 0) {
-                ent->counter[0] = d->ticks + PLAY_SECONDS(0.5);
+            if(ent->counter[0] - d->ticks <= 60 && ((ent->counter[0] - d->ticks) % 15 == 0)) {
+                if(ent->counter[0] - d->ticks <= 0)
+                    ent->counter[0] = d->ticks + PLAY_SECONDS(2) + rand() % 60;
                 struct bork_bullet new_bullet = { .type = 9,
                     .flags = BORK_BULLET_HURTS_PLAYER,
-                    .damage = 10,
+                    .damage = 30,
                     .range = 120 };
                 vec2 sph = {
-                    ent->dir[0] + M_PI * 0.5,
+                    ent->dir[0] + M_PI * 0.5 + (RANDF * 0.2 - 0.1),
                     M_PI - atan2f(vec2_len(ent_to_plr), ent->pos[2] - plr_head[2]) };
                 spherical_to_cartesian(new_bullet.dir, sph);
                 vec3_add(new_bullet.pos, ent->pos, new_bullet.dir);
-                vec3_set_len(new_bullet.dir, new_bullet.dir, 0.1);
+                vec3_set_len(new_bullet.dir, new_bullet.dir, 0.25);
                 ARR_PUSH(d->bullets, new_bullet);
-                sph[0] -= M_PI * 0.2;
-                spherical_to_cartesian(new_bullet.dir, sph);
-                vec3_add(new_bullet.pos, ent->pos, new_bullet.dir);
-                vec3_set_len(new_bullet.dir, new_bullet.dir, 0.1);
-                ARR_PUSH(d->bullets, new_bullet);
-                sph[0] += M_PI * 0.4;
-                spherical_to_cartesian(new_bullet.dir, sph);
-                vec3_add(new_bullet.pos, ent->pos, new_bullet.dir);
-                vec3_set_len(new_bullet.dir, new_bullet.dir, 0.1);
-                ARR_PUSH(d->bullets, new_bullet);
+                struct bork_particle new_part = {
+                    .flags = BORK_PARTICLE_LIGHT | BORK_PARTICLE_LIGHT_DECAY,
+                    .pos = { new_bullet.pos[0], new_bullet.pos[1], new_bullet.pos[2] },
+                    .light = { 1.5, 0.5, 0.5, 6.0f },
+                    .vel = { 0, 0, 0 },
+                    .lifetime = 16,
+                    .ticks_left = 16 };
+                ARR_PUSH(d->particles, new_part);
             } else {
                 bork_entity_turn_toward(ent, plr_head, 0.004);
                 //bork_entity_look_dir(ent, ent_to_plr);

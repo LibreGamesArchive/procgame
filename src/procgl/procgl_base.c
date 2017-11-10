@@ -72,6 +72,18 @@ void pg_deinit(void)
     SDL_Quit();
 }
 
+void pg_window_resize(int w, int h, int fullscreen)
+{
+    SDL_DisplayMode display;
+    SDL_GetDesktopDisplayMode(0, &display);
+    screen_w = fullscreen ? display.w : w;
+    screen_h = fullscreen ? display.h : h;
+    render_w = w;
+    render_h = h;
+    SDL_SetWindowSize(pg_window, screen_w, screen_h);
+    SDL_SetWindowFullscreen(pg_window, fullscreen ? SDL_WINDOW_FULLSCREEN : 0);
+}
+
 void pg_screen_size(int* w, int* h)
 {
     if(w) *w = render_w;
@@ -264,6 +276,15 @@ int pg_check_input(uint8_t ctrl, uint8_t event)
     return 0;
 }
 
+uint8_t pg_first_input(void)
+{
+    if(!ctrl_changed) return 0;
+    int i = 0;
+    while(i < ctrl_changed && ctrl_state[ctrl_changes[i]] == PG_CONTROL_RELEASED) ++i;
+    if(i == ctrl_changed) return 0;
+    return ctrl_changes[i];
+}
+
 int pg_check_keycode(int key, uint8_t event)
 {
     uint8_t ctrl = SDL_GetScancodeFromKey(key);
@@ -324,6 +345,17 @@ void pg_text_mode(int mode)
     text_mode = mode;
 }
 
+const char* pg_input_name(uint8_t ctrl)
+{
+    static const char* mouse_input_names[] = {
+        "WHEEL UP", "WHEEL DOWN",
+        "LEFT MOUSE", "RIGHT MOUSE", "MIDDLE MOUSE" };
+    if(ctrl >= PG_MOUSEWHEEL_UP && ctrl <= PG_MIDDLE_MOUSE) {
+        return mouse_input_names[ctrl - PG_MOUSEWHEEL_UP];
+    } else {
+        return SDL_GetKeyName(SDL_GetKeyFromScancode(ctrl));
+    }
+}
 void pg_mouse_mode(int grab)
 {
     if(grab) {

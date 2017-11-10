@@ -97,7 +97,8 @@ void create_elec_sparks(struct bork_play_data* d, vec3 pos, float expand, int sp
             (float)rand() / RAND_MAX - 0.5,
             (float)rand() / RAND_MAX - 0.5 };
         struct bork_particle new_part = {
-            .pos = { pos[0] + off[0], pos[1] + off[1], pos[2] + off[2] },
+            .flags = BORK_PARTICLE_SPRITE | BORK_PARTICLE_GRAVITY,
+            .pos = { pos[0] + off[0] * 0.5, pos[1] + off[1] * 0.5, pos[2] + off[2] * 0.5 },
             .vel = { off[0] * expand, off[1] * expand, off[2] * expand },
             .ticks_left = 30,
             .frame_ticks = 6,

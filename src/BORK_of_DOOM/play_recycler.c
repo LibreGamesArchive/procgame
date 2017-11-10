@@ -72,7 +72,7 @@ void tick_recycler_menu(struct bork_play_data* d)
 {
     uint8_t* kmap = d->core->ctrl_map;
     recycler_count_inv_resources(d);
-    if(pg_check_input(SDL_SCANCODE_ESCAPE, PG_CONTROL_HIT)
+    if(pg_check_input(kmap[BORK_CTRL_MENU_BACK], PG_CONTROL_HIT)
     || pg_check_gamepad(SDL_CONTROLLER_BUTTON_B, PG_CONTROL_HIT)) {
         d->menu.state = BORK_MENU_CLOSED;
         SDL_ShowCursor(SDL_DISABLE);
@@ -149,7 +149,7 @@ void tick_recycler_menu(struct bork_play_data* d)
     }
     enum bork_schematic sch = d->menu.recycler.selection_idx;
     const struct bork_schematic_detail* sch_d = &BORK_SCHEMATIC_DETAIL[sch];
-    if((pg_check_input(SDL_SCANCODE_SPACE, PG_CONTROL_HIT)
+    if((pg_check_input(kmap[BORK_CTRL_SELECT], PG_CONTROL_HIT)
     || pg_check_gamepad(SDL_CONTROLLER_BUTTON_A, PG_CONTROL_HIT))
     && d->held_schematics & (1 << sch)) {
         if(d->menu.recycler.resources[0] >= sch_d->resources[0]

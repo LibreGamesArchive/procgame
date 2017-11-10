@@ -256,6 +256,7 @@ static void tick_menu_base(struct bork_play_data* d)
 static void tick_control_play(struct bork_play_data* d)
 {
     uint8_t* kmap = d->core->ctrl_map;
+    /*
     if(pg_check_input(SDL_SCANCODE_M, PG_CONTROL_HIT)) {
         if(pg_check_input(SDL_SCANCODE_LSHIFT, PG_CONTROL_HELD)) {
             pg_mouse_mode(0);
@@ -264,19 +265,19 @@ static void tick_control_play(struct bork_play_data* d)
             pg_mouse_mode(1);
             SDL_ShowCursor(SDL_DISABLE);
         }
-    }
-    if(pg_check_input(SDL_SCANCODE_TAB, PG_CONTROL_HIT)
+    }*/
+    if(pg_check_input(kmap[BORK_CTRL_MENU], PG_CONTROL_HIT)
     || pg_check_gamepad(SDL_CONTROLLER_BUTTON_START, PG_CONTROL_HIT)) {
         d->menu.state = BORK_MENU_INVENTORY;
         reset_menus(d);
         SDL_ShowCursor(SDL_ENABLE);
         pg_mouse_mode(0);
     }
-    if(pg_check_input(SDL_SCANCODE_C, PG_CONTROL_HIT)
+    if(pg_check_input(kmap[BORK_CTRL_NEXT_TECH], PG_CONTROL_HIT)
     || pg_check_gamepad(SDL_CONTROLLER_BUTTON_LEFTSHOULDER, PG_CONTROL_HIT)) {
         select_next_upgrade(d);
     }
-    if(pg_check_input(kmap[BORK_CTRL_SELECT], PG_CONTROL_HIT)
+    if(pg_check_input(kmap[BORK_CTRL_INTERACT], PG_CONTROL_HIT)
     || pg_check_gamepad(SDL_CONTROLLER_BUTTON_X, PG_CONTROL_HIT)) {
         struct bork_entity* item = bork_entity_get(d->looked_item);
         vec3 eye_pos = { d->plr.pos[0], d->plr.pos[1], d->plr.pos[2] };
@@ -330,7 +331,7 @@ static void tick_control_play(struct bork_play_data* d)
         }
     }
     if(d->held_item >= 0
-    && (pg_check_input(SDL_SCANCODE_R, PG_CONTROL_HIT)
+    && (pg_check_input(kmap[BORK_CTRL_RELOAD], PG_CONTROL_HIT)
         || pg_check_gamepad(SDL_CONTROLLER_BUTTON_RIGHTSHOULDER, PG_CONTROL_HIT))) {
         struct bork_entity* ent = bork_entity_get(d->inventory.data[d->held_item]);
         const struct bork_entity_profile* prof = &BORK_ENT_PROFILES[ent->type];
@@ -354,7 +355,7 @@ static void tick_control_play(struct bork_play_data* d)
     if(pg_check_input(kmap[BORK_CTRL_JUMP], PG_CONTROL_RELEASED)) {
         d->jump_released = 1;
     }
-    if(pg_check_input(SDL_SCANCODE_LCTRL, PG_CONTROL_HELD)
+    if(pg_check_input(kmap[BORK_CTRL_CROUCH], PG_CONTROL_HELD)
     || pg_check_gamepad(SDL_CONTROLLER_BUTTON_LEFTSTICK, PG_CONTROL_HELD)) {
         d->plr.flags |= BORK_ENTFLAG_CROUCH;
     } else if(d->plr.flags & BORK_ENTFLAG_CROUCH) {
@@ -400,7 +401,7 @@ static void tick_control_play(struct bork_play_data* d)
         d->plr.vel[0] += move_speed * stick_rot[0];
         d->plr.vel[1] -= move_speed * stick_rot[1];
     }
-    if(pg_check_input(SDL_SCANCODE_F, PG_CONTROL_HIT)
+    if(pg_check_input(kmap[BORK_CTRL_FLASHLIGHT], PG_CONTROL_HIT)
     || pg_check_gamepad(SDL_CONTROLLER_BUTTON_Y, PG_CONTROL_HIT)) {
         d->flashlight_on = 1 - d->flashlight_on;
     }
@@ -409,7 +410,8 @@ static void tick_control_play(struct bork_play_data* d)
         struct bork_entity* held_ent = bork_entity_get(held_id);
         if(held_ent) {
             const struct bork_entity_profile* prof = &BORK_ENT_PROFILES[held_ent->type];
-            if(!d->reload_ticks && prof->use_ctrl && (pg_check_input(kmap[BORK_CTRL_FIRE], prof->use_ctrl)
+            if(!d->reload_ticks && prof->use_ctrl
+            && (pg_check_input(kmap[BORK_CTRL_FIRE], prof->use_ctrl)
             || pg_check_gamepad(PG_RIGHT_TRIGGER, prof->use_ctrl))) {
                 prof->use_func(held_ent, d);
             }

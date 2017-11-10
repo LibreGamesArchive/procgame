@@ -14,6 +14,41 @@
 
 #define RANDF   ((float)rand() / RAND_MAX)
 
+void bork_use_door_override(struct bork_entity* ent, struct bork_play_data* d)
+{
+    struct bork_map_object* obj = d->looked_obj;
+    if(!obj) return;
+    if(obj->type == BORK_MAP_DOORPAD) {
+        struct bork_map_object* door = &d->map.doors.data[d->looked_obj->doorpad.door_idx];
+        if(door->door.locked != 1) return;
+        door->door.locked = 0;
+        vec3 pos;
+        vec3_sub(pos, d->plr.pos, obj->pos);
+        vec3_set_len(pos, pos, 0.2);
+        vec3_add(pos, obj->pos, pos);
+        struct bork_particle new_part = {
+            .flags = BORK_PARTICLE_SPRITE | BORK_PARTICLE_LIGHT | BORK_PARTICLE_LIGHT_DECAY,
+            .pos = { pos[0], pos[1], pos[2] },
+            .light = { 1.0, 1.0, 1.5, 2 },
+            .vel = { 0, 0, 0 },
+            .lifetime = 40,
+            .ticks_left = 40,
+            .frame_ticks = 8,
+            .current_frame = 40,
+            .start_frame = 40, .end_frame = 44,
+        };
+        ARR_PUSH(d->particles, new_part);
+        vec3_set(d->hud_anim[1], -0.3, 0, 0);
+        vec3_set(d->hud_anim[2], 0, 0, 0);
+        vec3_set(d->hud_anim[3], 0, 0, 0);
+        d->hud_anim_speed = 0.01;
+        d->hud_anim_active = 2;
+        if(--ent->item_quantity == 0) {
+            d->hud_anim_destroy_when_finished = 1;
+        }
+    }
+}
+
 /*  Item use functions  */
 void bork_use_pistol(struct bork_entity* ent, struct bork_play_data* d)
 {
@@ -256,6 +291,7 @@ void bork_use_plazgun(struct bork_entity* ent, struct bork_play_data* d)
         .lifetime = 30,
         .ticks_left = 30,
     };
+    if(ent->ammo_type == 2) vec4_set(new_part.light, 0.5, 0.5, 1.5, 8.0);
     ARR_PUSH(d->particles, new_part);
 }
 

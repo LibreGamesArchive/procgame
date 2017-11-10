@@ -15,6 +15,7 @@
 
 void tick_doorpad(struct bork_play_data* d)
 {
+    uint8_t* kmap = d->core->ctrl_map;
     if(d->menu.doorpad.unlocked_ticks > 0) {
         --d->menu.doorpad.unlocked_ticks;
         if(d->menu.doorpad.unlocked_ticks == 0) {
@@ -23,9 +24,8 @@ void tick_doorpad(struct bork_play_data* d)
         }
         return;
     }
-    if(pg_check_input(SDL_SCANCODE_ESCAPE, PG_CONTROL_HIT)
-    || pg_check_gamepad(SDL_CONTROLLER_BUTTON_B, PG_CONTROL_HIT)
-    || pg_check_gamepad(SDL_CONTROLLER_BUTTON_LEFTSHOULDER, PG_CONTROL_HIT)) {
+    if(pg_check_input(kmap[BORK_CTRL_MENU_BACK], PG_CONTROL_HIT)
+    || pg_check_gamepad(SDL_CONTROLLER_BUTTON_B, PG_CONTROL_HIT)) {
         d->menu.state = BORK_MENU_CLOSED;
         pg_mouse_mode(1);
     }

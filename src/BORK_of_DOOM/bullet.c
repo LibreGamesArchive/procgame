@@ -151,7 +151,8 @@ void bork_bullet_move(struct bork_bullet* blt, struct bork_play_data* d)
             if(closest_ent) {
                 closest_ent->HP -= blt->damage;
                 blt->flags |= BORK_BULLET_DEAD;
-                if(!(closest_ent->flags & BORK_ENTFLAG_STATIONARY) && blt->type != 8) {
+                if(!(closest_ent->flags & BORK_ENTFLAG_STATIONARY)
+                && closest_ent->freeze_ticks < 60 && blt->type != 8) {
                     vec3 knockback;
                     vec3_set_len(knockback, blt->dir, 0.1);
                     vec3_add(closest_ent->vel, closest_ent->vel, knockback);

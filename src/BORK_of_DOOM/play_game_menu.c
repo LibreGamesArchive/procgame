@@ -97,23 +97,22 @@ void tick_game_menu(struct bork_play_data* d, struct pg_game_state* state)
         else if(fabsf(stick[0]) > 0.6) stick_ctrl_x = SGN(stick[0]);
     }
     if(d->menu.game.mode == GAME_MENU_BASE) {
-        if(pg_check_input(SDL_SCANCODE_ESCAPE, PG_CONTROL_HIT)) {
+        if(pg_check_input(kmap[BORK_CTRL_MENU_BACK], PG_CONTROL_HIT)) {
             d->menu.state = BORK_MENU_CLOSED;
             SDL_ShowCursor(SDL_DISABLE);
             pg_mouse_mode(1);
         }
-        if(pg_check_input(SDL_SCANCODE_S, PG_CONTROL_HIT)
+        if(pg_check_input(kmap[BORK_CTRL_DOWN], PG_CONTROL_HIT)
         || pg_check_input(SDL_SCANCODE_DOWN, PG_CONTROL_HIT)
         || stick_ctrl_y == -1) {
             d->menu.game.selection_idx = MIN(d->menu.game.selection_idx + 1, 4);
-        } else if(pg_check_input(SDL_SCANCODE_W, PG_CONTROL_HIT)
+        } else if(pg_check_input(kmap[BORK_CTRL_UP], PG_CONTROL_HIT)
         || pg_check_input(SDL_SCANCODE_UP, PG_CONTROL_HIT)
         || stick_ctrl_y == 1) {
             d->menu.game.selection_idx = MAX(d->menu.game.selection_idx - 1, 0);
         }
         if((click && mouse_over_option)
-        || pg_check_input(SDL_SCANCODE_SPACE, PG_CONTROL_HIT)
-        || pg_check_input(SDL_SCANCODE_RETURN, PG_CONTROL_HIT)
+        || pg_check_input(kmap[BORK_CTRL_SELECT], PG_CONTROL_HIT)
         || pg_check_gamepad(SDL_CONTROLLER_BUTTON_A, PG_CONTROL_HIT)) {
             switch(d->menu.game.selection_idx) {
                 case 0:
@@ -143,18 +142,18 @@ void tick_game_menu(struct bork_play_data* d, struct pg_game_state* state)
             }
         }
     } else if(d->menu.game.mode == GAME_MENU_LOAD) {
-        if(pg_check_input(SDL_SCANCODE_ESCAPE, PG_CONTROL_HIT)) {
+        if(pg_check_input(kmap[BORK_CTRL_MENU_BACK], PG_CONTROL_HIT)) {
             d->menu.game.mode = GAME_MENU_BASE;
             d->menu.game.save_idx = 0;
         }
-        if(pg_check_input(SDL_SCANCODE_S, PG_CONTROL_HIT)
+        if(pg_check_input(kmap[BORK_CTRL_DOWN], PG_CONTROL_HIT)
         || pg_check_input(SDL_SCANCODE_DOWN, PG_CONTROL_HIT)
         || stick_ctrl_y == -1) {
             d->menu.game.save_idx = MIN(d->menu.game.save_idx + 1, d->core->save_files.len - 1);
             if(d->menu.game.save_idx >= d->menu.game.save_scroll + 6) {
                 ++d->menu.game.save_scroll;
             }
-        } else if(pg_check_input(SDL_SCANCODE_W, PG_CONTROL_HIT)
+        } else if(pg_check_input(kmap[BORK_CTRL_UP], PG_CONTROL_HIT)
         || pg_check_input(SDL_SCANCODE_UP, PG_CONTROL_HIT)
         || stick_ctrl_y == 1) {
             d->menu.game.save_idx = MAX(d->menu.game.save_idx - 1, 0);
@@ -162,29 +161,28 @@ void tick_game_menu(struct bork_play_data* d, struct pg_game_state* state)
                 --d->menu.game.save_scroll;
             }
         }
-        if(pg_check_input(SDL_SCANCODE_SPACE, PG_CONTROL_HIT)
-        || pg_check_input(SDL_SCANCODE_RETURN, PG_CONTROL_HIT)
+        if(pg_check_input(kmap[BORK_CTRL_SELECT], PG_CONTROL_HIT)
         || pg_check_gamepad(SDL_CONTROLLER_BUTTON_A, PG_CONTROL_HIT)) {
             struct bork_save* save = &d->core->save_files.data[d->menu.game.save_idx];
             load_game(d, save->name);
             d->menu.game.mode = GAME_MENU_BASE;
         }
     } else if(d->menu.game.mode == GAME_MENU_SELECT_SAVE) {
-        if(pg_check_input(SDL_SCANCODE_ESCAPE, PG_CONTROL_HIT)
+        if(pg_check_input(kmap[BORK_CTRL_MENU_BACK], PG_CONTROL_HIT)
         || pg_check_gamepad(SDL_CONTROLLER_BUTTON_B, PG_CONTROL_HIT)) {
             d->menu.game.mode = GAME_MENU_BASE;
             d->menu.game.save_idx = 0;
             d->menu.game.save_name_len = 0;
             d->menu.game.save_scroll = 0;
         }
-        if(pg_check_input(SDL_SCANCODE_S, PG_CONTROL_HIT)
+        if(pg_check_input(kmap[BORK_CTRL_DOWN], PG_CONTROL_HIT)
         || pg_check_input(SDL_SCANCODE_DOWN, PG_CONTROL_HIT)
         || stick_ctrl_y == -1) {
             d->menu.game.save_idx = MIN(d->menu.game.save_idx + 1, d->core->save_files.len - 1);
             if(d->menu.game.save_idx >= d->menu.game.save_scroll + 6) {
                 ++d->menu.game.save_scroll;
             }
-        } else if(pg_check_input(SDL_SCANCODE_W, PG_CONTROL_HIT)
+        } else if(pg_check_input(kmap[BORK_CTRL_UP], PG_CONTROL_HIT)
         || pg_check_input(SDL_SCANCODE_UP, PG_CONTROL_HIT)
         || stick_ctrl_y == 1) {
             d->menu.game.save_idx = MAX(d->menu.game.save_idx - 1, -1);
@@ -192,8 +190,7 @@ void tick_game_menu(struct bork_play_data* d, struct pg_game_state* state)
                 --d->menu.game.save_scroll;
             }
         }
-        if(pg_check_input(SDL_SCANCODE_SPACE, PG_CONTROL_HIT)
-        || pg_check_input(SDL_SCANCODE_RETURN, PG_CONTROL_HIT)) {
+        if(pg_check_input(kmap[BORK_CTRL_SELECT], PG_CONTROL_HIT)) {
             if(d->menu.game.save_idx == -1) {
                 d->menu.game.mode = GAME_MENU_EDIT_SAVE;
                 pg_text_mode(1);
@@ -214,7 +211,7 @@ void tick_game_menu(struct bork_play_data* d, struct pg_game_state* state)
         int len = pg_copy_text_input(d->menu.game.save_name + d->menu.game.save_name_len,
                                      32 - d->menu.game.save_name_len);
         d->menu.game.save_name_len += len;
-        if(pg_check_input(SDL_SCANCODE_ESCAPE, PG_CONTROL_HIT)
+        if(pg_check_input(kmap[BORK_CTRL_MENU_BACK], PG_CONTROL_HIT)
         || pg_check_gamepad(SDL_CONTROLLER_BUTTON_B, PG_CONTROL_HIT)) {
             d->menu.game.mode = GAME_MENU_SELECT_SAVE;
             pg_text_mode(0);
@@ -222,7 +219,7 @@ void tick_game_menu(struct bork_play_data* d, struct pg_game_state* state)
             if(d->menu.game.save_name_len > 0) {
                 d->menu.game.save_name[--d->menu.game.save_name_len] = '\0';
             }
-        } else if(pg_check_input(SDL_SCANCODE_RETURN, PG_CONTROL_HIT)
+        } else if(pg_check_input(kmap[BORK_CTRL_SELECT], PG_CONTROL_HIT)
                || pg_check_gamepad(SDL_CONTROLLER_BUTTON_A, PG_CONTROL_HIT)) {
             int i;
             struct bork_save* save;
@@ -242,7 +239,7 @@ void tick_game_menu(struct bork_play_data* d, struct pg_game_state* state)
             d->menu.game.mode = GAME_MENU_BASE;
         }
     } else if(d->menu.game.mode == GAME_MENU_CONFIRM_OVERWRITE) {
-        if(pg_check_input(SDL_SCANCODE_ESCAPE, PG_CONTROL_HIT)
+        if(pg_check_input(kmap[BORK_CTRL_MENU_BACK], PG_CONTROL_HIT)
         || pg_check_gamepad(SDL_CONTROLLER_BUTTON_B, PG_CONTROL_HIT)) {
             if(d->menu.game.save_idx == -1) {
                 d->menu.game.mode = GAME_MENU_EDIT_SAVE;
@@ -250,17 +247,17 @@ void tick_game_menu(struct bork_play_data* d, struct pg_game_state* state)
             }
             d->menu.game.mode = GAME_MENU_SELECT_SAVE;
         }
-        if(pg_check_input(SDL_SCANCODE_A, PG_CONTROL_HIT)
+        if(pg_check_input(kmap[BORK_CTRL_LEFT], PG_CONTROL_HIT)
         || pg_check_input(SDL_SCANCODE_LEFT, PG_CONTROL_HIT)
         || stick_ctrl_x == -1) {
             d->menu.game.confirm_opt = 0;
-        } else if(pg_check_input(SDL_SCANCODE_D, PG_CONTROL_HIT)
+        } else if(pg_check_input(kmap[BORK_CTRL_RIGHT], PG_CONTROL_HIT)
         || pg_check_input(SDL_SCANCODE_RIGHT, PG_CONTROL_HIT)
         || stick_ctrl_x == 1) {
             d->menu.game.confirm_opt = 1;
         } 
-        if(pg_check_input(SDL_SCANCODE_SPACE, PG_CONTROL_HIT)
-        || pg_check_input(SDL_SCANCODE_RETURN, PG_CONTROL_HIT)
+        if(pg_check_input(kmap[BORK_CTRL_SELECT], PG_CONTROL_HIT)
+        || pg_check_input(kmap[BORK_CTRL_SELECT], PG_CONTROL_HIT)
         || pg_check_gamepad(SDL_CONTROLLER_BUTTON_A, PG_CONTROL_HIT)) {
             if(d->menu.game.confirm_opt == 1) {
                 if(d->menu.game.save_idx == -1) {

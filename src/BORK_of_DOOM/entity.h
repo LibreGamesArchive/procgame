@@ -117,6 +117,7 @@ struct bork_entity {
 };
 #define BORK_AMMO_TYPES 9
 
+void bork_use_door_override(struct bork_entity* ent, struct bork_play_data* d);
 void bork_use_pistol(struct bork_entity* ent, struct bork_play_data* d);
 void bork_hud_pistol(struct bork_entity* ent, struct bork_play_data* d);
 void bork_use_shotgun(struct bork_entity* ent, struct bork_play_data* d);
@@ -470,7 +471,9 @@ static const struct bork_entity_profile {
         .sprite_tx = { 1, 1, 0, 0 },
         .inv_angle = 0.3,
         .inv_height = 0.4,
-        .front_frame = 68 },
+        .front_frame = 68,
+        .use_ctrl = PG_CONTROL_HIT,
+        .use_func = bork_use_door_override },
     [BORK_ITEM_FIRE_EXTINGUISHER] = { .name = "FIRE EXTINGUISHER",
         .base_flags = BORK_ENTFLAG_ITEM,
         .size = { 0.4, 0.4, 0.6 },

@@ -18,7 +18,7 @@
 void tick_datapad_menu(struct bork_play_data* d)
 {
     uint8_t* kmap = d->core->ctrl_map;
-    if(pg_check_input(SDL_SCANCODE_ESCAPE, PG_CONTROL_HIT)) {
+    if(pg_check_input(kmap[BORK_CTRL_MENU_BACK], PG_CONTROL_HIT)) {
         d->menu.state = BORK_MENU_CLOSED;
         SDL_ShowCursor(SDL_DISABLE);
         pg_mouse_mode(1);

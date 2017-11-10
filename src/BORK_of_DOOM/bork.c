@@ -10,6 +10,33 @@
 #define TINYFILES_IMPL
 #include "tinyfiles.h"
 
+static const uint8_t control_defaults[BORK_CTRL_COUNT] = {
+    [BORK_CTRL_UP] =            SDL_SCANCODE_W,
+    [BORK_CTRL_DOWN] =          SDL_SCANCODE_S,
+    [BORK_CTRL_LEFT] =          SDL_SCANCODE_A,
+    [BORK_CTRL_RIGHT] =         SDL_SCANCODE_D,
+    [BORK_CTRL_JUMP] =          SDL_SCANCODE_SPACE,
+    [BORK_CTRL_CROUCH] =        SDL_SCANCODE_LCTRL,
+    [BORK_CTRL_FLASHLIGHT] =    SDL_SCANCODE_F,
+    [BORK_CTRL_FIRE] =          PG_LEFT_MOUSE,
+    [BORK_CTRL_RELOAD] =        SDL_SCANCODE_R,
+    [BORK_CTRL_DROP] =          SDL_SCANCODE_G,
+    [BORK_CTRL_INTERACT] =      SDL_SCANCODE_E,
+    [BORK_CTRL_USE_TECH] =      PG_RIGHT_MOUSE,
+    [BORK_CTRL_NEXT_TECH] =     SDL_SCANCODE_C,
+    [BORK_CTRL_PREV_TECH] =     SDL_SCANCODE_V,
+    [BORK_CTRL_NEXT_ITEM] =     PG_MOUSEWHEEL_DOWN,
+    [BORK_CTRL_PREV_ITEM] =     PG_MOUSEWHEEL_UP,
+    [BORK_CTRL_BIND1] =         SDL_SCANCODE_1,
+    [BORK_CTRL_BIND2] =         SDL_SCANCODE_2,
+    [BORK_CTRL_BIND3] =         SDL_SCANCODE_3,
+    [BORK_CTRL_BIND4] =         SDL_SCANCODE_4,
+    [BORK_CTRL_MENU] =          SDL_SCANCODE_ESCAPE,
+    [BORK_CTRL_MENU_BACK] =     SDL_SCANCODE_ESCAPE,
+    [BORK_CTRL_SELECT] =        SDL_SCANCODE_SPACE,
+};
+
+
 void bork_read_saves(struct bork_game_core* core);
 
 void bork_init(struct bork_game_core* core, char* base_path)
@@ -19,22 +46,7 @@ void bork_init(struct bork_game_core* core, char* base_path)
     pg_screen_size(&sw, &sh);
     *core = (struct bork_game_core) {
         .screen_size = { sw, sh },
-        .aspect_ratio = (float)sw / (float)sh,
-        .ctrl_map = {
-            [BORK_CTRL_UP] = SDL_SCANCODE_W,
-            [BORK_CTRL_DOWN] = SDL_SCANCODE_S,
-            [BORK_CTRL_LEFT] = SDL_SCANCODE_A,
-            [BORK_CTRL_RIGHT] = SDL_SCANCODE_D,
-            [BORK_CTRL_JUMP] = SDL_SCANCODE_SPACE,
-            [BORK_CTRL_FIRE] = PG_LEFT_MOUSE,
-            [BORK_CTRL_SELECT] = SDL_SCANCODE_E,
-            [BORK_CTRL_ESCAPE] = SDL_SCANCODE_ESCAPE,
-            [BORK_CTRL_BIND1] = SDL_SCANCODE_1,
-            [BORK_CTRL_BIND2] = SDL_SCANCODE_2,
-            [BORK_CTRL_BIND3] = SDL_SCANCODE_3,
-            [BORK_CTRL_BIND4] = SDL_SCANCODE_4,
-        },
-    };
+        .aspect_ratio = (float)sw / (float)sh };
     if(base_path) {
         core->base_path = base_path;
         core->base_path_len = strlen(core->base_path);
@@ -44,6 +56,7 @@ void bork_init(struct bork_game_core* core, char* base_path)
         core->base_path_len = 2;
         core->free_base_path = 0;
     }
+    bork_load_options(core);
     /*  Set up the gbuffer for deferred shading */
     pg_gbuffer_init(&core->gbuf, sw, sh);
     pg_gbuffer_bind(&core->gbuf, 21, 22, 23, 24);
@@ -68,6 +81,22 @@ void bork_init(struct bork_game_core* core, char* base_path)
     pg_gamepad_config(0.125, 0.6, 0.125, 0.75);
     if(SDL_NumJoysticks()) pg_use_gamepad(0);
     bork_read_saves(core);
+}
+
+void bork_reinit_gfx(struct bork_game_core* core, int sw, int sh, int fullscreen)
+{
+    core->fullscreen = fullscreen;
+    core->screen_size[0] = sw;
+    core->screen_size[1] = sh;
+    core->aspect_ratio = (float)sw / (float)sh;
+    pg_gbuffer_deinit(&core->gbuf);
+    pg_ppbuffer_deinit(&core->ppbuf);
+    pg_gbuffer_init(&core->gbuf, sw, sh);
+    pg_gbuffer_bind(&core->gbuf, 21, 22, 23, 24);
+    pg_viewer_init(&core->view, (vec3){ 0, 0, 0 }, (vec2){ 0, 0 },
+        core->screen_size, (vec2){ 0.01, 200 });
+    pg_ppbuffer_init(&core->ppbuf, sw, sh, 26, 27);
+    pg_window_resize(sw, sh, fullscreen);
 }
 
 static void backdrop_color_func(vec4 out, vec2 p, struct pg_wave* wave)
@@ -236,6 +265,41 @@ void bork_delete_save(struct bork_game_core* core, int save_idx)
     remove(filename);
     ARR_SPLICE(core->save_files, save_idx, 1);
     printf("%s\n", filename);
+}
+
+void bork_reset_keymap(struct bork_game_core* core)
+{
+    memcpy(core->ctrl_map, control_defaults, BORK_CTRL_COUNT);
+}
+
+void bork_load_options(struct bork_game_core* core)
+{
+    char filename[1024];
+    snprintf(filename, 1024, "%sbork_keymap", core->base_path);
+    FILE* f = fopen(filename, "rb");
+    if(!f) {
+        printf("Could not find keymap file, using defaults.\n");
+        memcpy(core->ctrl_map, control_defaults, BORK_CTRL_COUNT);
+        return;
+    }
+    fread(&core->ctrl_map, sizeof(core->ctrl_map), 1, f);
+    fclose(f);
+}
+
+void bork_save_options(struct bork_game_core* core)
+{
+    char filename[1024];
+    snprintf(filename, 1024, "%sbork_keymap", core->base_path);
+    FILE* f = fopen(filename, "wb");
+    fwrite(&core->ctrl_map, sizeof(core->ctrl_map), 1, f);
+    fclose(f);
+    snprintf(filename, 1024, "%soptions.txt", core->base_path);
+    f = fopen(filename, "wb");
+    fprintf(f, "x:%d\ny:%d\nfullscreen:%d\nmouse:%f",
+        (int)core->screen_size[0], (int)core->screen_size[1],
+        core->fullscreen, core->mouse_sensitivity);
+    fclose(f);
+
 }
 
 void bork_draw_fps(struct bork_game_core* core)

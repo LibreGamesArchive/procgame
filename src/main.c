@@ -29,6 +29,7 @@ int main(int argc, char *argv[])
     struct bork_game_core bork;
     struct pg_game_state game;
     bork_init(&bork, base_path);
+    bork.fullscreen = fullscreen;
     bork.mouse_sensitivity = mouse_sens;
     bork_menu_start(&game, &bork);
     /*  Main loop   */

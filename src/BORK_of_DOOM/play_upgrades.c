@@ -34,8 +34,9 @@ static void tick_jetpack(struct bork_play_data* d, int l, int idx)
 
 static void tick_doorhack(struct bork_play_data* d, int l, int idx)
 {
+    uint8_t* kmap = d->core->ctrl_map;
     static int mouse_released = 1;
-    int pressed = (pg_check_input(PG_RIGHT_MOUSE, PG_CONTROL_HELD)
+    int pressed = (pg_check_input(kmap[BORK_CTRL_USE_TECH], PG_CONTROL_HELD)
                     || pg_check_gamepad(PG_LEFT_TRIGGER, PG_CONTROL_HELD));
     if(d->upgrade_selected != idx) return;
     if(!mouse_released && !pressed) mouse_released = 1;
@@ -71,9 +72,10 @@ static void tick_doorhack(struct bork_play_data* d, int l, int idx)
 
 static void tick_bothack(struct bork_play_data* d, int l, int idx)
 {
+    uint8_t* kmap = d->core->ctrl_map;
     static int mouse_released = 1;
     static bork_entity_t curr_enemy = -1;
-    int pressed = (pg_check_input(PG_RIGHT_MOUSE, PG_CONTROL_HELD)
+    int pressed = (pg_check_input(kmap[BORK_CTRL_USE_TECH], PG_CONTROL_HELD)
                     || pg_check_gamepad(PG_LEFT_TRIGGER, PG_CONTROL_HELD));
     if(d->upgrade_selected != idx) return;
     if(!mouse_released && !pressed) mouse_released = 1;
@@ -121,7 +123,8 @@ static void tick_bothack(struct bork_play_data* d, int l, int idx)
 
 static void tick_decoy(struct bork_play_data* d, int l, int idx)
 {
-    int pressed = (pg_check_input(PG_RIGHT_MOUSE, PG_CONTROL_HIT)
+    uint8_t* kmap = d->core->ctrl_map;
+    int pressed = (pg_check_input(kmap[BORK_CTRL_USE_TECH], PG_CONTROL_HIT)
                     || pg_check_gamepad(PG_LEFT_TRIGGER, PG_CONTROL_HIT));
     if(d->upgrade_counters[idx] <= 0) {
         if(d->upgrade_selected == idx && pressed) {
@@ -158,7 +161,8 @@ static void tick_decoy(struct bork_play_data* d, int l, int idx)
 
 static void tick_healing(struct bork_play_data* d, int l, int idx)
 {
-    int pressed = (pg_check_input(PG_RIGHT_MOUSE, PG_CONTROL_HIT)
+    uint8_t* kmap = d->core->ctrl_map;
+    int pressed = (pg_check_input(kmap[BORK_CTRL_USE_TECH], PG_CONTROL_HIT)
                     || pg_check_gamepad(PG_LEFT_TRIGGER, PG_CONTROL_HIT));
     if(l == 1) {
         ++d->upgrade_counters[idx];
@@ -178,7 +182,8 @@ static void tick_healing(struct bork_play_data* d, int l, int idx)
 
 static void tick_defense(struct bork_play_data* d, int l, int idx)
 {
-    int pressed = (pg_check_input(PG_RIGHT_MOUSE, PG_CONTROL_HIT)
+    uint8_t* kmap = d->core->ctrl_map;
+    int pressed = (pg_check_input(kmap[BORK_CTRL_USE_TECH], PG_CONTROL_HIT)
                     || pg_check_gamepad(PG_LEFT_TRIGGER, PG_CONTROL_HIT));
     int i;
     bork_entity_t ent_id;
@@ -221,7 +226,8 @@ static void tick_defense(struct bork_play_data* d, int l, int idx)
 
 static void tick_scanning(struct bork_play_data* d, int l, int idx)
 {
-    int pressed = (pg_check_input(PG_RIGHT_MOUSE, PG_CONTROL_HIT)
+    uint8_t* kmap = d->core->ctrl_map;
+    int pressed = (pg_check_input(kmap[BORK_CTRL_USE_TECH], PG_CONTROL_HIT)
                     || pg_check_gamepad(PG_LEFT_TRIGGER, PG_CONTROL_HIT));
     if(d->upgrade_selected == idx && pressed) {
         struct bork_entity* looked[2] = { bork_entity_get(d->looked_enemy),

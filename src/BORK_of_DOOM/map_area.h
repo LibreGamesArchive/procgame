@@ -125,6 +125,8 @@ struct bork_map_object {
 struct bork_map_light_fixture {
     vec3 pos;
     int type;
+    int flicker;
+    struct pg_light light;
 };
 
 #define BORK_FIRE_MOVES     (1 << 0)

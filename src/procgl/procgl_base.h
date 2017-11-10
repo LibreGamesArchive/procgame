@@ -67,11 +67,13 @@ void pg_text_mode(int mode);
 int pg_copy_text_input(char* out, int n);
 void pg_flush_input(void);
 int pg_check_input(uint8_t ctrl, uint8_t state);
+uint8_t pg_first_input(void);
 int pg_check_keycode(int key, uint8_t event);
 int pg_user_exit(void);
 void pg_mouse_mode(int grab);
 void pg_mouse_pos(vec2 out);
 void pg_mouse_motion(vec2 out);
+const char* pg_input_name(uint8_t ctrl);
 
 #define PG_LEFT_STICK       (SDL_CONTROLLER_BUTTON_MAX + 1)
 #define PG_RIGHT_STICK      (SDL_CONTROLLER_BUTTON_MAX + 2)

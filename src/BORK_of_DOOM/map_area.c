@@ -522,13 +522,15 @@ void bork_map_update(struct bork_map* map, struct bork_play_data* d)
                     }
                 }
             }
+        }
+        if(d->play_ticks % 20 == 0) {
             vec3 fire_ctr = {
                 obj->pos[0] + obj->fire.dir[0] * 2,
                 obj->pos[1] + obj->fire.dir[1] * 2,
                 obj->pos[2] + 0.75 };
             vec3 fire_box = {
                 MAX(obj->fire.dir[0] * 2, 0.75),
-                MAX(obj->fire.dir[1] * 2, 0.75), 1.75 };
+                MAX(obj->fire.dir[1] * 2, 0.75), 1.5 };
             if(fabs(fire_ctr[0] - plr->pos[0]) < fire_box[0]
             && fabs(fire_ctr[1] - plr->pos[1]) < fire_box[1]
             && fabs(fire_ctr[2] - plr->pos[2]) < fire_box[2]) {
@@ -539,8 +541,6 @@ void bork_map_update(struct bork_map* map, struct bork_play_data* d)
                     plr->fire_ticks = PLAY_SECONDS(5);
                 }
             }
-        }
-        if(d->play_ticks % 20 == 0) {
             vec3 dir;
             vec3_dup(dir, obj->fire.dir);
             vec3_add(dir, dir,
@@ -548,13 +548,14 @@ void bork_map_update(struct bork_map* map, struct bork_play_data* d)
                         (RANDF * 0.4 - 0.2),
                         (RANDF * 0.4 - 0.2) });
             vec3_normalize(dir, dir);
+            vec3_scale(dir, dir, RANDF * 0.75 + 0.25);
             struct bork_particle new_part = {
                 .flags = BORK_PARTICLE_SPRITE | BORK_PARTICLE_BOUYANT | BORK_PARTICLE_DECELERATE,
                 .pos = { obj->pos[0] + (RANDF * 0.25 - 0.125),
                          obj->pos[1] + (RANDF * 0.25 - 0.125),
                          obj->pos[2] + (RANDF * 0.25 - 0.125) },
                 .vel = { dir[0] * 0.15, dir[1] * 0.15, dir[2] * 0.15 },
-                .ticks_left = 50 + (RANDF * 20),
+                .ticks_left = 100 + (RANDF * 20),
                 .frame_ticks = 0,
                 .current_frame = 24 + rand() % 4,
             };

@@ -17,7 +17,7 @@
 void tick_control_inv_menu(struct bork_play_data* d)
 {
     uint8_t* kmap = d->core->ctrl_map;
-    if(pg_check_input(SDL_SCANCODE_ESCAPE, PG_CONTROL_HIT)
+    if(pg_check_input(kmap[BORK_CTRL_MENU_BACK], PG_CONTROL_HIT)
     || pg_check_gamepad(SDL_CONTROLLER_BUTTON_B, PG_CONTROL_HIT)) {
         d->menu.state = BORK_MENU_CLOSED;
         SDL_ShowCursor(SDL_DISABLE);
@@ -135,7 +135,7 @@ void tick_control_inv_menu(struct bork_play_data* d)
         d->menu.inv.ammo_select = ammo_iter;
         int ammo_type = prof->use_ammo[ammo_iter] - BORK_ITEM_BULLETS;
         int used_ammo = prof->use_ammo[item->ammo_type] - BORK_ITEM_BULLETS;
-        if(pg_check_input(SDL_SCANCODE_E, PG_CONTROL_HIT)
+        if(pg_check_input(kmap[BORK_CTRL_SELECT], PG_CONTROL_HIT)
         || pg_check_gamepad(SDL_CONTROLLER_BUTTON_X, PG_CONTROL_HIT)) {
             if(d->menu.inv.ammo_select == item->ammo_type) {
                 d->ammo[ammo_type] += item->ammo;
