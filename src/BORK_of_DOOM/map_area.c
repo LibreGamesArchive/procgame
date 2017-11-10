@@ -282,6 +282,23 @@ struct bork_tile_detail BORK_TILE_DETAILS[] = {
         .face_flags = { BORK_FACE_TRAVEL, BORK_FACE_TRAVEL, BORK_FACE_TRAVEL,
                         BORK_FACE_TRAVEL, BORK_FACE_TRAVEL, BORK_FACE_TRAVEL },
         .add_model = tile_model_pipes },
+    [BORK_TILE_WINDOW] = { .name = "WINDOW",
+        .tile_flags = BORK_TILE_HAS_ORIENTATION | BORK_TILE_FACE_ORIENTED,
+        .face_flags = { BORK_FACE_HAS_SURFACE | BORK_FACE_FLUSH_SURFACE |
+                            BORK_FACE_HAS_BACKFACE | BORK_FACE_SEETHRU_SURFACE |
+                            BORK_FACE_TRAVEL_ORIENT_OPP,
+                        BORK_FACE_HAS_SURFACE | BORK_FACE_FLUSH_SURFACE |
+                            BORK_FACE_HAS_BACKFACE | BORK_FACE_SEETHRU_SURFACE |
+                            BORK_FACE_TRAVEL_ORIENT_OPP,
+                        BORK_FACE_HAS_SURFACE | BORK_FACE_FLUSH_SURFACE |
+                            BORK_FACE_HAS_BACKFACE | BORK_FACE_SEETHRU_SURFACE |
+                            BORK_FACE_TRAVEL_ORIENT_OPP,
+                        BORK_FACE_HAS_SURFACE | BORK_FACE_FLUSH_SURFACE |
+                            BORK_FACE_HAS_BACKFACE | BORK_FACE_SEETHRU_SURFACE |
+                            BORK_FACE_TRAVEL_ORIENT_OPP, 0, 0 },
+        .tex_tile = { [PG_LEFT] = 48, [PG_RIGHT] = 48,
+                      [PG_FRONT] = 48, [PG_BACK] = 48 },
+        .add_model = tile_model_basic },
     [BORK_TILE_EDITOR_DOOR] = { .name = "DOOR",
         .tile_flags = BORK_TILE_HAS_ORIENTATION },
     [BORK_TILE_EDITOR_RECYCLER] = { .name = "RECYCLER",
@@ -344,6 +361,21 @@ void bork_map_init_model(struct bork_map* map, struct bork_editor_map* ed_map,
     pg_model_rect_prism(&map->door_model, (vec3){ 1, 0.125, 1 }, face_uv);
     pg_model_precalc_ntb(&map->door_model);
     pg_shader_buffer_model(&core->shader_3d, &map->door_model);
+    /*  And the window model  */
+    pg_model_init(&map->window_model);
+    pg_texture_get_frame(&core->env_atlas, 48, face_uv[PG_FRONT]);
+    pg_texture_frame_flip(face_uv[PG_BACK], face_uv[PG_FRONT], 0, 1);
+    pg_texture_get_frame(&core->env_atlas, 48, face_uv[PG_TOP]);
+    pg_texture_frame_tx(face_uv[PG_TOP], face_uv[PG_TOP],
+                        (vec2){ 1, 0.125 }, (vec2){ 0, 32.0f / 512.0f });
+    pg_texture_frame_flip(face_uv[PG_BOTTOM], face_uv[PG_TOP], 0, 1);
+    pg_texture_get_frame(&core->env_atlas, 48, face_uv[PG_LEFT]);
+    pg_texture_frame_tx(face_uv[PG_LEFT], face_uv[PG_LEFT],
+                        (vec2){ 0.125, 1 }, (vec2){ 32.0f / 512.0f, 0 });
+    pg_texture_frame_flip(face_uv[PG_RIGHT], face_uv[PG_LEFT], 0, 1);
+    pg_model_rect_prism(&map->window_model, (vec3){ 1, 0.125, 1 }, face_uv);
+    pg_model_precalc_ntb(&map->window_model);
+    pg_shader_buffer_model(&core->shader_3d, &map->window_model);
     /*  And the recombobulator model  */
     pg_model_init(&map->recycler_model);
     pg_texture_get_frame(&core->env_atlas, 51, face_uv[PG_FRONT]);
@@ -1682,4 +1714,3 @@ static int tile_model_pipes(struct bork_map* map, struct bork_editor_map* ed_map
     pg_model_append(&map->model, &map->pipes_model, model_transform);
     return 24;
 }
-
