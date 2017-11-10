@@ -162,7 +162,7 @@ void bork_entity_move(struct bork_entity* ent, struct bork_map* map)
     vec3_dup(ent->pos, new_pos);
     int friction = 0;
     if(ladder) {
-        if(ent->dir[1] >= 0) ent->vel[2] = 0.1;
+        if(ent->dir[1] >= -0.75) ent->vel[2] = 0.05;
         else ent->vel[2] = -0.05;
         friction = 1;
     } else if(ent->flags & BORK_ENTFLAG_GROUND) {
