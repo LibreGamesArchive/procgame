@@ -929,8 +929,9 @@ static void bork_play_draw(struct pg_game_state* state)
         pg_ppbuffer_swap(&d->core->ppbuf);
         pg_screen_dst();
         pg_postproc_apply(&d->core->post_blur, &d->core->ppbuf);
-        bork_draw_backdrop(d->core, (vec4){ 0.7, 0.7, 0.7, 0.5 }, t);
-        bork_draw_linear_vignette(d->core, (vec4){ 0, 0, 0, 0.75 });
+        bork_draw_backdrop(d->core, (vec4){ 1.5, 1.5, 1.5, 0.75 },
+                           (float)state->ticks / (float)state->tick_rate);
+        bork_draw_linear_vignette(d->core, (vec4){ 0, 0, 0, 0.9 });
         pg_shader_begin(&d->core->shader_2d, NULL);
         if(d->menu.state < BORK_MENU_DOORPAD) draw_active_menu(d);
         switch(d->menu.state) {
