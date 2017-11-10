@@ -62,7 +62,7 @@ static void bork_editor_place_tile(struct bork_editor_data* d,
                                    int x, int y, int z)
 {
     struct bork_editor_tile* dst = &d->map.tiles[x][y][z];
-    if(tile->type >= BORK_TILE_EDITOR_LIGHT1 && tile->type <= BORK_TILE_EDITOR_LIGHT2) {
+    if(tile->type >= BORK_TILE_EDITOR_LIGHT1 && tile->type <= BORK_TILE_EDITOR_EMER_LIGHT) {
         dst->alt_type = tile->type;
         dst->alt_dir = tile->dir;
         return;
@@ -881,37 +881,23 @@ void bork_editor_complete_map(struct bork_map* map, struct bork_editor_map* ed_m
                     bork_editor_complete_teleport(map, ed_map, i, j, k);
                 }
                 if(ed_tile->alt_type == BORK_TILE_EDITOR_LIGHT1) {
-                    struct pg_light new_light;
-                    pg_light_spotlight(&new_light,
+                    struct bork_map_light_fixture new_lfix = {
+                        .pos = { i * 2 + 1, j * 2 + 1, k * 2 + 1.75 },
+                        .type = 0, .flags = (1 << 1), };
+                    pg_light_spotlight(&new_lfix.light,
                         (vec3){ i * 2 + 1, j * 2 + 1, k * 2 + 1.75 }, 5.5,
                         (vec3){ 1.5, 1.5, 1.3 }, (vec3){ 0, 0, -1 }, 1.7);
-                    int push = 0;
-                    if(ed_tile->alt_dir & (1 << 7)) {
-                        push = 1;
-                        new_light.pos[2] += 1.3;
-                    }
-                    ARR_PUSH(map->spotlights, new_light);
-                    struct bork_map_light_fixture new_lfix = {
-                        .pos = { new_light.pos[0], new_light.pos[1], new_light.pos[2] - 0.2 },
-                        .type = 0 + (push ? 2 : 0),
-                    };
+                    if(ed_tile->alt_dir & (1 << 7)) new_lfix.flags |= 1;
                     ARR_PUSH(map->light_fixtures, new_lfix);
                     tile->type = BORK_TILE_ATMO;
                 } else if(ed_tile->alt_type == BORK_TILE_EDITOR_LIGHT2) {
-                    struct pg_light new_light;
-                    pg_light_spotlight(&new_light,
+                    struct bork_map_light_fixture new_lfix = {
+                        .pos = { i * 2 + 1, j * 2 + 1, k * 2 + 1.75 },
+                        .type = 0, .flags = (1 << 1), };
+                    pg_light_spotlight(&new_lfix.light,
                         (vec3){ i * 2 + 1, j * 2 + 1, k * 2 + 1.75 }, 9,
                         (vec3){ 1.5, 1.5, 1.3 }, (vec3){ 0, 0, -1 }, 1.7);
-                    int push = 0;
-                    if(ed_tile->alt_dir & (1 << 7)) {
-                        push = 1;
-                        new_light.pos[2] += 1.3;
-                    }
-                    ARR_PUSH(map->spotlights, new_light);
-                    struct bork_map_light_fixture new_lfix = {
-                        .pos = { new_light.pos[0], new_light.pos[1], new_light.pos[2] - 0.2 },
-                        .type = 0 + (push ? 2 : 0),
-                    };
+                    if(ed_tile->alt_dir & (1 << 7)) new_lfix.flags |= 1;
                     ARR_PUSH(map->light_fixtures, new_lfix);
                     tile->type = BORK_TILE_ATMO;
                 } else if(ed_tile->alt_type == BORK_TILE_EDITOR_LIGHT_WALLMOUNT) {
@@ -933,20 +919,14 @@ void bork_editor_complete_map(struct bork_map* map, struct bork_editor_map* ed_m
                         dir_angle[0] = -1;
                         pos[0] += 0.8;
                     }
-                    int push = 0;
-                    if(ed_tile->alt_dir & (1 << 7)) {
-                        push = 1;
-                        pos[2] += 1.3;
-                    }
                     vec3_normalize(dir_angle, dir_angle);
-                    struct pg_light new_light;
-                    pg_light_spotlight(&new_light,
-                        pos, 7, (vec3){ 1.5, 1.5, 1.3 }, dir_angle, 1.15);
-                    ARR_PUSH(map->spotlights, new_light);
                     struct bork_map_light_fixture new_lfix = {
-                        .pos = { new_light.pos[0], new_light.pos[1], new_light.pos[2] - 0.1 },
-                        .type = 1 + (push ? 2 : 0),
+                        .pos = { pos[0], pos[1], pos[2] - 0.1 },
+                        .type = 1, .flags = (1 << 1),
                     };
+                    if(ed_tile->alt_dir & (1 << 7)) new_lfix.flags |= 1;
+                    pg_light_spotlight(&new_lfix.light,
+                        pos, 7, (vec3){ 1.5, 1.5, 1.3 }, dir_angle, 1.15);
                     ARR_PUSH(map->light_fixtures, new_lfix);
                     tile->type = BORK_TILE_ATMO;
                 } else if(ed_tile->alt_type == BORK_TILE_EDITOR_LIGHT_SMALLMOUNT) {
@@ -968,20 +948,43 @@ void bork_editor_complete_map(struct bork_map* map, struct bork_editor_map* ed_m
                         dir_angle[0] = -0.3;
                         pos[0] += 0.8;
                     }
-                    int push = 0;
-                    if(ed_tile->alt_dir & (1 << 7)) {
-                        push = 1;
-                        pos[2] += 1.3;
+                    vec3_normalize(dir_angle, dir_angle);
+                    struct bork_map_light_fixture new_lfix = {
+                        .pos = { pos[0], pos[1], pos[2] - 0.1 },
+                        .type = 1, .flags = (1 << 1),
+                    };
+                    if(ed_tile->alt_dir & (1 << 7)) new_lfix.flags |= 1;
+                    pg_light_spotlight(&new_lfix.light,
+                        pos, 3.5, (vec3){ 1.5, 1.5, 1.3 }, dir_angle, 0.9);
+                    ARR_PUSH(map->light_fixtures, new_lfix);
+                    tile->type = BORK_TILE_ATMO;
+                } else if(ed_tile->alt_type == BORK_TILE_EDITOR_EMER_LIGHT) {
+                    vec3 dir_angle = { 0, 0, -1 };
+                    vec3 pos = { i * 2 + 1, j * 2 + 1, k * 2 + 1.75 };
+                    if(ed_tile->alt_dir & (1 << PG_FRONT)) {
+                        dir_angle[1] = 0.3;
+                        pos[1] -= 0.8;
+                    }
+                    if(ed_tile->alt_dir & (1 << PG_BACK)) {
+                        dir_angle[1] = -0.3;
+                        pos[1] += 0.8;
+                    }
+                    if(ed_tile->alt_dir & (1 << PG_LEFT)) {
+                        dir_angle[0] = 0.3;
+                        pos[0] -= 0.8;
+                    }
+                    if(ed_tile->alt_dir & (1 << PG_RIGHT)) {
+                        dir_angle[0] = -0.3;
+                        pos[0] += 0.8;
                     }
                     vec3_normalize(dir_angle, dir_angle);
-                    struct pg_light new_light;
-                    pg_light_spotlight(&new_light,
-                        pos, 3.5, (vec3){ 1.5, 1.5, 1.3 }, dir_angle, 0.9);
-                    ARR_PUSH(map->spotlights, new_light);
                     struct bork_map_light_fixture new_lfix = {
-                        .pos = { new_light.pos[0], new_light.pos[1], new_light.pos[2] - 0.1 },
-                        .type = 1 + (push ? 2 : 0),
+                        .pos = { pos[0], pos[1], pos[2] },
+                        .type = 2, .flags = (1 << 1),
                     };
+                    if(ed_tile->alt_dir & (1 << 7)) new_lfix.flags |= 1;
+                    pg_light_spotlight(&new_lfix.light,
+                        pos, 3.5, (vec3){ 1.5, 1.5, 1.3 }, dir_angle, 0.9);
                     ARR_PUSH(map->light_fixtures, new_lfix);
                     tile->type = BORK_TILE_ATMO;
                 }

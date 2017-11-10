@@ -69,6 +69,7 @@ enum bork_tile_type {
     BORK_TILE_EDITOR_LIGHT_WALLMOUNT,
     BORK_TILE_EDITOR_LIGHT_SMALLMOUNT,
     BORK_TILE_EDITOR_LIGHT2,
+    BORK_TILE_EDITOR_EMER_LIGHT,
     BORK_TILE_COUNT,
 };
 
@@ -125,7 +126,7 @@ struct bork_map_object {
 struct bork_map_light_fixture {
     vec3 pos;
     int type;
-    int flicker;
+    uint8_t flags;
     struct pg_light light;
 };
 

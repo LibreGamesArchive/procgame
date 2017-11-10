@@ -292,6 +292,8 @@ struct bork_tile_detail BORK_TILE_DETAILS[] = {
         .tile_flags = BORK_TILE_HAS_ORIENTATION },
     [BORK_TILE_EDITOR_LIGHT_SMALLMOUNT] = { .name = "SMALL LIGHT",
         .tile_flags = BORK_TILE_HAS_ORIENTATION },
+    [BORK_TILE_EDITOR_EMER_LIGHT] = { .name = "EMER. LIGHT",
+        .tile_flags = BORK_TILE_HAS_ORIENTATION },
     [BORK_TILE_EDITOR_TEXT] = { .name = "TEXT",
         .tile_flags = BORK_TILE_HAS_ORIENTATION },
     [BORK_TILE_EDITOR_TELEPORT] = { .name = "TELEPORT",
@@ -672,11 +674,44 @@ void bork_map_draw(struct bork_map* map, struct bork_play_data* d)
     int current_type = 0;
     struct bork_map_light_fixture* lfix;
     ARR_FOREACH_PTR(map->light_fixtures, lfix, i) {
-        mat4_translate(model_transform, lfix->pos[0], lfix->pos[1], lfix->pos[2]);
-        if(lfix->type != current_type) {
-            pg_shader_sprite_tex_frame(shader, lfix->type + 160);
-            current_type = lfix->type;
+        if(vec3_dist2(lfix->pos, d->plr.pos) > (32 * 32)) continue;
+        int shining = 1;
+        int frame = lfix->type + 160;
+        if(lfix->flags & 1) {
+            float flicker = perlin1((float)d->play_ticks / 40.0f) + 0.25;
+            if(flicker < 0) {
+                shining = 0;
+                if(flicker > -0.05) {
+                    float angle = RANDF * M_PI * 2;
+                    vec3 off = { cos(angle), sin(angle), RANDF * 0.1 - 0.05 };
+                    struct bork_particle new_part = {
+                        .flags = BORK_PARTICLE_SPRITE | BORK_PARTICLE_GRAVITY,
+                        .pos = { lfix->pos[0], lfix->pos[1], lfix->pos[2] },
+                        .vel = { off[0] * 0.075, off[1] * 0.075, off[2] },
+                        .ticks_left = 50,
+                        .frame_ticks = 0,
+                        .start_frame = 0, .end_frame = 0 };
+                    ARR_PUSH(d->particles, new_part);
+                }
+            }
         }
+        if(lfix->flags & (1 << 2)) shining = 0;
+        if(shining && (lfix->flags & (1 << 1))) {
+            if(lfix->type == 2) {
+                if(d->play_ticks % 60 < 30) frame += 16;
+                float angle = FMOD((float)d->play_ticks / 20.0f, M_PI * 2);
+                vec3 dir = { sin(angle), cos(angle), -0.6 };
+                vec3_normalize(dir, dir);
+                struct pg_light light;
+                pg_light_spotlight(&light, lfix->pos, 7.5, (vec3){ 1.5, 0.1, 0.1 }, dir, 0.85);
+                ARR_PUSH(d->spotlights, light);
+            } else ARR_PUSH(d->spotlights, lfix->light);
+        } else if(shining) {
+            ARR_PUSH(d->lights_buf, lfix->light);
+        }
+        if(!shining) frame += 16;
+        mat4_translate(model_transform, lfix->pos[0], lfix->pos[1], lfix->pos[2]);
+        pg_shader_sprite_tex_frame(shader, frame);
         pg_model_draw(&core->enemy_model, model_transform);
     }
 }
