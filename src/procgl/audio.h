@@ -20,4 +20,7 @@ void pg_audio_free(struct pg_audio_chunk* chunk);
 void pg_audio_generate(struct pg_audio_chunk* chunk, float len,
                        struct pg_wave* w, struct pg_audio_envelope* env);
 void pg_audio_play(struct pg_audio_chunk* chunk, float volume);
-void pg_audio_save(struct pg_audio_chunk* chunk, const char* filename);
+void pg_audio_loop(struct pg_audio_chunk* chunk, float volume,
+                   float start, float len);
+void pg_audio_save_wav(struct pg_audio_chunk* chunk, const char* filename);
+void pg_audio_load_wav(struct pg_audio_chunk* chunk, const char* filename);

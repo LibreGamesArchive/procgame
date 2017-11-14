@@ -7,12 +7,16 @@
 #include "wave.h"
 #include "audio.h"
 #include "ext/wavfile.h"
+#define DR_WAV_IMPLEMENTATION
+#include "ext/dr_wav.h"
 
 struct pg_audio_chunk_ref {
     struct pg_audio_chunk* chunk;
     float volume;
+    int start, len;
     int progress;
 };
+
 
 static SDL_AudioSpec pg_audio_spec;
 static SDL_AudioDeviceID pg_audio_dev;
@@ -29,18 +33,21 @@ static void pg_buffer_audio(void* udata, Uint8* stream, int len)
     struct pg_audio_chunk_ref* ref;
     int i;
     ARR_FOREACH_PTR_REV(pg_audio_play_queue, ref, i) {
-        int ref_i = 0;
-        int chunk_stop = ref->chunk->len - ref->progress < s_len ?
-            ref->chunk->len : ref->progress + s_len;
-        while(ref_i + ref->progress <= chunk_stop) {
-            s_stream[ref_i] += ref->chunk->samples[ref_i + ref->progress] * ref->volume;
-            ++ref_i;
+        int segment = (ref->start + ref->progress) % ref->chunk->len;
+        int segment_len = MIN(ref->len - ref->progress, s_len);
+        int pos_to_end = MIN(ref->chunk->len - segment, segment_len);
+        int pos_from_beginning = MAX(0, segment_len - pos_to_end);
+        int first_end = segment + pos_to_end;
+        int ref_i = segment;
+        int stream_i = 0;
+        ref->progress += segment_len;
+        for(ref_i = segment; ref_i < first_end; ++ref_i, ++stream_i) {
+            s_stream[stream_i] += ref->chunk->samples[ref_i] * ref->volume;
         }
-        if(chunk_stop >= ref->chunk->len) {
-            ARR_SWAPSPLICE(pg_audio_play_queue, i, 1);
-        } else {
-            ref->progress += ref_i;
+        for(ref_i = 0; ref_i < pos_from_beginning; ++ref_i, ++stream_i) {
+            s_stream[stream_i] += ref->chunk->samples[ref_i] * ref->volume;
         }
+        if(ref->progress >= ref->len) ARR_SWAPSPLICE(pg_audio_play_queue, i, 1);
     }
 }
 
@@ -111,6 +118,19 @@ void pg_audio_play(struct pg_audio_chunk* chunk, float volume)
     struct pg_audio_chunk_ref ref = {
         .chunk = chunk,
         .volume = volume,
+        .start = 0, .len = chunk->len,
+        .progress = 0 };
+    ARR_PUSH(pg_audio_play_queue, ref);
+}
+
+void pg_audio_loop(struct pg_audio_chunk* chunk, float volume,
+                   float start, float len)
+{
+    struct pg_audio_chunk_ref ref = {
+        .chunk = chunk,
+        .volume = volume,
+        .start = (int)(start * PG_AUDIO_SAMPLE_RATE) % chunk->len,
+        .len = (int)(len * PG_AUDIO_SAMPLE_RATE),
         .progress = 0 };
     ARR_PUSH(pg_audio_play_queue, ref);
 }
@@ -120,4 +140,20 @@ void pg_audio_save(struct pg_audio_chunk* chunk, const char* filename)
     FILE* f = wavfile_open(filename);
     wavfile_write(f, chunk->samples, chunk->len);
     wavfile_close(f);
+}
+
+void pg_audio_load_wav(struct pg_audio_chunk* chunk, const char* filename)
+{
+    drwav wav;
+    if(!drwav_init_file(&wav, filename)) {
+        printf("Failed to load file: %s\n", filename);
+        *chunk = (struct pg_audio_chunk){};
+        return;
+    }
+    if(wav.sampleRate != PG_AUDIO_SAMPLE_RATE) {
+        printf("Warning! Unexpected sample rate in %s\n", filename);
+    }
+    chunk->len = wav.totalSampleCount;
+    chunk->samples = malloc(wav.totalSampleCount * sizeof(int16_t));
+    drwav_read_s16(&wav, wav.totalSampleCount, chunk->samples);
 }
