@@ -296,6 +296,7 @@ struct bork_tile_detail BORK_TILE_DETAILS[] = {
                         BORK_FACE_HAS_SURFACE | BORK_FACE_FLUSH_SURFACE |
                             BORK_FACE_HAS_BACKFACE | BORK_FACE_SEETHRU_SURFACE |
                             BORK_FACE_TRAVEL_ORIENT_OPP, 0, 0 },
+        .face_inset = { 0.09375, 0.09375, 0.09375, 0.09375 },
         .tex_tile = { [PG_LEFT] = 48, [PG_RIGHT] = 48,
                       [PG_FRONT] = 48, [PG_BACK] = 48 },
         .add_model = tile_model_basic },
@@ -361,21 +362,6 @@ void bork_map_init_model(struct bork_map* map, struct bork_editor_map* ed_map,
     pg_model_rect_prism(&map->door_model, (vec3){ 1, 0.125, 1 }, face_uv);
     pg_model_precalc_ntb(&map->door_model);
     pg_shader_buffer_model(&core->shader_3d, &map->door_model);
-    /*  And the window model  */
-    pg_model_init(&map->window_model);
-    pg_texture_get_frame(&core->env_atlas, 48, face_uv[PG_FRONT]);
-    pg_texture_frame_flip(face_uv[PG_BACK], face_uv[PG_FRONT], 0, 1);
-    pg_texture_get_frame(&core->env_atlas, 48, face_uv[PG_TOP]);
-    pg_texture_frame_tx(face_uv[PG_TOP], face_uv[PG_TOP],
-                        (vec2){ 1, 0.125 }, (vec2){ 0, 32.0f / 512.0f });
-    pg_texture_frame_flip(face_uv[PG_BOTTOM], face_uv[PG_TOP], 0, 1);
-    pg_texture_get_frame(&core->env_atlas, 48, face_uv[PG_LEFT]);
-    pg_texture_frame_tx(face_uv[PG_LEFT], face_uv[PG_LEFT],
-                        (vec2){ 0.125, 1 }, (vec2){ 32.0f / 512.0f, 0 });
-    pg_texture_frame_flip(face_uv[PG_RIGHT], face_uv[PG_LEFT], 0, 1);
-    pg_model_rect_prism(&map->window_model, (vec3){ 1, 0.125, 1 }, face_uv);
-    pg_model_precalc_ntb(&map->window_model);
-    pg_shader_buffer_model(&core->shader_3d, &map->window_model);
     /*  And the recombobulator model  */
     pg_model_init(&map->recycler_model);
     pg_texture_get_frame(&core->env_atlas, 51, face_uv[PG_FRONT]);
@@ -489,6 +475,12 @@ void bork_map_init_model(struct bork_map* map, struct bork_editor_map* ed_map,
     pg_model_deinit(&tmp);
     pg_model_precalc_ntb(&map->pipes_model);
     pg_shader_buffer_model(&core->shader_3d, &map->pipes_model);
+    /*  The spacebox model  */
+    pg_model_init(&map->outside_model);
+    pg_model_cylinder(&map->outside_model, 32, (vec2){ 4, 4 });
+    pg_model_invert_tris(&map->outside_model);
+    pg_model_precalc_ntb(&map->outside_model);
+    pg_shader_buffer_model(&core->shader_3d, &map->outside_model);
     /*  Generate the map model  */
     pg_model_init(&map->model);
     bork_map_generate_model(map, ed_map, &core->env_atlas);
@@ -679,6 +671,19 @@ void bork_map_draw(struct bork_map* map, struct bork_play_data* d)
         mat4_mul_quat(model_transform, model_transform, obj->dir);
         pg_model_draw(&map->grate_model, model_transform);
     }
+    pg_model_begin(&map->outside_model, shader);
+    pg_shader_3d_texture(shader, &core->starfield_tex);
+    mat4_translate(model_transform, 32, 32, -256);
+    mat4_scale_aniso(model_transform, model_transform, 256, 256, 1025);
+    pg_model_draw(&map->outside_model, model_transform);
+    pg_model_begin(&core->gun_model, shader);
+    pg_shader_3d_texture(shader, &core->env_atlas);
+    pg_shader_3d_tex_frame(shader, 112);
+    pg_shader_3d_add_tex_tx(shader, (vec2){ 2, 2 }, (vec2){});
+    mat4_translate(model_transform, -32, -32, 32);
+    mat4_scale_aniso(model_transform, model_transform, 128, 128, 128);
+    mat4_rotate_Z(model_transform, model_transform, M_PI * 0.75);
+    pg_model_draw(&core->gun_model, model_transform);
     pg_shader_begin(&core->shader_text, NULL);
     pg_shader_text_3d(&core->shader_text, &core->view);
     ARR_FOREACH_PTR(map->texts, obj, i) {

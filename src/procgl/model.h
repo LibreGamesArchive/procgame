@@ -88,6 +88,7 @@ void pg_model_add_triangle(struct pg_model* model, unsigned v0,
 void pg_model_append(struct pg_model* dst, struct pg_model* src,
                      mat4 transform);
 void pg_model_transform(struct pg_model* model, mat4 transform);
+void pg_model_invert_tris(struct pg_model* model);
 /*  Component generation    */
 void pg_model_precalc_normals(struct pg_model* model);
 void pg_model_precalc_ntb(struct pg_model* model);

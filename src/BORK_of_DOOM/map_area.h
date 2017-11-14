@@ -59,6 +59,11 @@ enum bork_tile_type {
     BORK_TILE_RAMP_BOTTOM, BORK_TILE_RAMP_TOP,
     BORK_TILE_PIPES,
     BORK_TILE_WINDOW,
+    BORK_TILE_PLACEHOLD_1,
+    BORK_TILE_PLACEHOLD_2,
+    BORK_TILE_PLACEHOLD_3,
+    BORK_TILE_PLACEHOLD_4,
+    BORK_TILE_PLACEHOLD_5,
     BORK_TILE_EDITOR_FIRE_LOW,
     BORK_TILE_EDITOR_FIRE_MID,
     BORK_TILE_EDITOR_FIRE_HIGH,
@@ -159,13 +164,13 @@ struct bork_map {
     ARR_T(struct pg_light) lights;
     ARR_T(struct pg_light) spotlights;
     struct pg_model door_model;
-    struct pg_model window_model;
     struct pg_model recycler_model;
     struct pg_model oven_model;
     struct pg_model bed_model;
     struct pg_model small_table_model;
     struct pg_model grate_model;
     struct pg_model pipes_model;
+    struct pg_model outside_model;
     struct bork_entity* plr;
 };
 

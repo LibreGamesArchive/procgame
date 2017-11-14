@@ -389,6 +389,17 @@ void pg_model_transform(struct pg_model* model, mat4 transform)
     }
 }
 
+void pg_model_invert_tris(struct pg_model* model)
+{
+    int i;
+    struct pg_tri* tri;
+    ARR_FOREACH_PTR(model->tris, tri, i) {
+        unsigned tmp = tri->t[0];
+        tri->t[0] = tri->t[1];
+        tri->t[1] = tmp;
+    }
+}
+
 /*  Component generation    */
 void pg_model_precalc_normals(struct pg_model* model)
 {
