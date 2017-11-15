@@ -143,13 +143,14 @@ struct bork_fire {
     uint32_t flags;
     vec3 pos;
     vec3 vel;
+    int audio_handle;
 };
 
 struct bork_sound_emitter {
     int handle;
     enum bork_sound snd;
     vec3 pos;
-    float volume;
+    float volume, area;
 };
 
 struct bork_map {

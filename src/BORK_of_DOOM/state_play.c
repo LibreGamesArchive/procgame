@@ -252,7 +252,6 @@ static void tick_menu_base(struct bork_play_data* d)
         if(d->menu.state == 0) d->menu.state = 5;
         pg_flush_input();
     }
-
 }
 
 static void tick_ambient_sound(struct bork_play_data* d)
@@ -262,10 +261,10 @@ static void tick_ambient_sound(struct bork_play_data* d)
     struct bork_sound_emitter* snd;
     ARR_FOREACH_PTR(d->map.sounds, snd, i) {
         float dist = vec3_dist(snd->pos, d->plr.pos);
-        if(dist < snd->volume) {
+        if(dist < snd->area) {
             if(snd->handle >= 0) continue;
-            else snd->handle = pg_audio_emitter(&d->core->sounds[snd->snd], 1,
-                                                snd->volume, snd->pos, 1);
+            else snd->handle = pg_audio_emitter(&d->core->sounds[snd->snd], snd->volume,
+                                                snd->area, snd->pos, 1);
         } else if(snd->handle >= 0) {
             pg_audio_emitter_remove(snd->handle);
             snd->handle = -1;
@@ -289,6 +288,7 @@ static void tick_control_play(struct bork_play_data* d)
     if(pg_check_input(kmap[BORK_CTRL_MENU], PG_CONTROL_HIT)
     || pg_check_gamepad(SDL_CONTROLLER_BUTTON_START, PG_CONTROL_HIT)) {
         d->menu.state = BORK_MENU_INVENTORY;
+        pg_audio_channel_pause(1, 1);
         reset_menus(d);
         SDL_ShowCursor(SDL_ENABLE);
         pg_mouse_mode(0);
@@ -342,6 +342,7 @@ static void tick_control_play(struct bork_play_data* d)
                     d->menu.state = BORK_MENU_DOORPAD;
                     SDL_ShowCursor(SDL_ENABLE);
                     pg_mouse_mode(0);
+                    pg_audio_channel_pause(1, 1);
                 } else {
                     if(!door->door.open) {
                         pg_audio_play(&d->core->sounds[BORK_SND_DOOR_OPEN], 0.5);
@@ -356,6 +357,7 @@ static void tick_control_play(struct bork_play_data* d)
                 d->menu.recycler.obj = d->looked_obj;
                 SDL_ShowCursor(SDL_ENABLE);
                 pg_mouse_mode(0);
+                pg_audio_channel_pause(1, 1);
             }
         }
     }
@@ -838,12 +840,18 @@ static void tick_fires(struct bork_play_data* d)
         if(dist > 32) {
             continue;
         }
+        if(fire->audio_handle == -1 && !(fire->flags & BORK_FIRE_MOVES)) {
+            fire->audio_handle =
+                pg_audio_emitter(&d->core->sounds[BORK_SND_FIRE], 1, 6, fire->pos, 1);
+        }
         if(fire->flags & BORK_FIRE_MOVES) {
             vec3_add(fire->pos, fire->pos, fire->vel);
             fire->vel[2] -= 0.005;
             struct bork_collision coll;
             int hit = bork_map_collide(&d->map, &coll, fire->pos, (vec3){ 0.3, 0.3, 0.3 });
             if(hit) {
+                fire->audio_handle =
+                    pg_audio_emitter(&d->core->sounds[BORK_SND_FIRE], 1, 6, fire->pos, 2);
                 vec3_set(fire->vel, 0, 0, 0);
                 fire->flags &= ~BORK_FIRE_MOVES;
             }
@@ -867,12 +875,6 @@ static void tick_fires(struct bork_play_data* d)
                 .current_frame = 24 + rand() % 4,
             };
             ARR_PUSH(d->particles, new_part);
-        } else if(fire->lifetime % 10 == 0 && dist < 12) {
-            float vol = (1 - (dist / 12)) * 0.5;
-            if(fire->lifetime < 120) vol *= fire->lifetime / 120.0f;
-            float loop_time = 10.0f / 120.0f;
-            float loop_origin = fire->lifetime / 120.0f;
-            pg_audio_loop(&d->core->sounds[BORK_SND_FIRE], vol, loop_origin, loop_time);
         }
         if(d->play_ticks % 30 == 0) {
             ARR_TRUNCATE(surr, 0);
@@ -905,7 +907,12 @@ static void tick_fires(struct bork_play_data* d)
                 }
             }
         }
-        if(fire->lifetime == 0) ARR_SWAPSPLICE(d->map.fires, i, 1);
+        if(fire->lifetime == 0) {
+            if(fire->audio_handle >= 0) {
+                pg_audio_emitter_remove(fire->audio_handle);
+            }
+            ARR_SWAPSPLICE(d->map.fires, i, 1);
+        }
     }
 }
 

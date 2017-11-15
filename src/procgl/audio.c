@@ -175,7 +175,6 @@ void pg_audio_loop(struct pg_audio_chunk* chunk, float volume,
         .start = (int)(start * PG_AUDIO_SAMPLE_RATE) % chunk->len,
         .len = (int)(len * PG_AUDIO_SAMPLE_RATE),
         .progress = 0 };
-    printf("%d %d\n", ref.start, ref.len);
     SDL_LockAudioDevice(pg_audio_dev);
     ARR_PUSH(pg_audio_play_queue, ref);
     SDL_UnlockAudioDevice(pg_audio_dev);

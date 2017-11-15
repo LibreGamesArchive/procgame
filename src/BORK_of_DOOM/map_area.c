@@ -332,6 +332,11 @@ void bork_map_init(struct bork_map* map)
 
 void bork_map_reset(struct bork_map* map)
 {
+    int i;
+    struct bork_sound_emitter* emitter;
+    ARR_FOREACH_PTR(map->sounds, emitter, i) {
+        pg_audio_emitter_remove(emitter->handle);
+    }
     ARR_TRUNCATE_CLEAR(map->doors, 0);
     ARR_TRUNCATE_CLEAR(map->fires, 0);
     ARR_TRUNCATE_CLEAR(map->grates, 0);
@@ -491,7 +496,30 @@ void bork_map_deinit(struct bork_map* map)
 {
     pg_model_deinit(&map->model);
     pg_model_deinit(&map->door_model);
+    pg_model_deinit(&map->recycler_model);
+    pg_model_deinit(&map->oven_model);
+    pg_model_deinit(&map->bed_model);
+    pg_model_deinit(&map->small_table_model);
+    pg_model_deinit(&map->grate_model);
+    pg_model_deinit(&map->pipes_model);
+    pg_model_deinit(&map->outside_model);
+    int i, j, k;
+    struct bork_sound_emitter* emitter;
+    ARR_FOREACH_PTR(map->sounds, emitter, i) {
+        pg_audio_emitter_remove(emitter->handle);
+    }
+    for(i = 0; i < 4; ++i) for(j = 0; j < 4; ++j) for(k = 0; k < 4; ++k) {
+        ARR_DEINIT(map->enemies[i][j][k]);
+        ARR_DEINIT(map->entities[i][j][k]);
+        ARR_DEINIT(map->items[i][j][k]);
+    }
+    ARR_DEINIT(map->sounds);
     ARR_DEINIT(map->doors);
+    ARR_DEINIT(map->doorpads);
+    ARR_DEINIT(map->recyclers);
+    ARR_DEINIT(map->texts);
+    ARR_DEINIT(map->grates);
+    ARR_DEINIT(map->fire_objs);
     ARR_DEINIT(map->light_fixtures);
     ARR_DEINIT(map->lights);
     ARR_DEINIT(map->spotlights);
@@ -561,7 +589,7 @@ void bork_map_update(struct bork_map* map, struct bork_play_data* d)
             && fabs(fire_ctr[1] - plr->pos[1]) < fire_box[1]
             && fabs(fire_ctr[2] - plr->pos[2]) < fire_box[2]) {
                 plr->HP -= fire_damage;
-                if(fire_damage) plr->pain_ticks += PLAY_SECONDS(1);
+                if(fire_damage) plr->pain_ticks += 45;
                 if(plr_heatshield_lvl < 0 && rand() % 2 == 0) {
                     plr->flags |= BORK_ENTFLAG_ON_FIRE;
                     plr->fire_ticks = PLAY_SECONDS(5);
@@ -715,14 +743,15 @@ void bork_map_draw(struct bork_map* map, struct bork_play_data* d)
         int shining = 1;
         int frame = lfix->type + 160;
         if(lfix->flags & 1) {
-            float flicker = perlin1((float)d->play_ticks / 40.0f) + 0.25;
+            float flicker = perlin1(((float)d->play_ticks + (i * 21)) / 40.0f) + 0.25;
+            flicker *= -1;
             if(flicker < 0) {
                 shining = 0;
                 if(flicker > -0.05) {
                     float angle = RANDF * M_PI * 2;
                     vec3 off = { cos(angle), sin(angle), RANDF * 0.1 - 0.05 };
                     struct bork_particle new_part = {
-                        .flags = BORK_PARTICLE_SPRITE | BORK_PARTICLE_GRAVITY,
+                        .flags = BORK_PARTICLE_SPRITE | BORK_PARTICLE_GRAVITY | BORK_PARTICLE_COLLIDE_DIE,
                         .pos = { lfix->pos[0], lfix->pos[1], lfix->pos[2] },
                         .vel = { off[0] * 0.075, off[1] * 0.075, off[2] },
                         .ticks_left = 50,
@@ -740,7 +769,7 @@ void bork_map_draw(struct bork_map* map, struct bork_play_data* d)
                 vec3 dir = { sin(angle), cos(angle), -0.6 };
                 vec3_normalize(dir, dir);
                 struct pg_light light;
-                pg_light_spotlight(&light, lfix->pos, 7.5, (vec3){ 1.5, 0.1, 0.1 }, dir, 0.85);
+                pg_light_spotlight(&light, lfix->pos, 6, (vec3){ 1.5, 0.1, 0.1 }, dir, 0.85);
                 ARR_PUSH(d->spotlights, light);
             } else ARR_PUSH(d->spotlights, lfix->light);
         } else if(shining) {
@@ -1024,6 +1053,7 @@ void bork_map_calc_travel(struct bork_map* map)
 void bork_map_create_fire(struct bork_map* map, vec3 pos, int lifetime)
 {
     struct bork_fire new_fire = {
+        .audio_handle = -1,
         .pos = { pos[0], pos[1], pos[2] },
         .lifetime = lifetime
     };
@@ -1465,6 +1495,7 @@ static int tile_face_duct(struct bork_map* map, struct bork_editor_map* ed_map,
         pg_model_add_triangle(model, vert_idx + 2, vert_idx + 1, vert_idx + 3);
         pg_model_add_triangle(model, vert_idx + 5, vert_idx + 4, vert_idx + 6);
         pg_model_add_triangle(model, vert_idx + 5, vert_idx + 6, vert_idx + 7);
+        vert_idx += 8;
         tris += 4;
         if(dir == PG_TOP && !(opp_flags & BORK_FACE_HAS_SURFACE))
         {
@@ -1478,8 +1509,9 @@ static int tile_face_duct(struct bork_map* map, struct bork_editor_map* ed_map,
                 vec3_scale(new_vert.pos, new_vert.pos, 2);
                 pg_model_add_vertex(model, &new_vert);
             }
-            pg_model_add_triangle(model, vert_idx + 9, vert_idx + 8, vert_idx + 10);
-            pg_model_add_triangle(model, vert_idx + 9, vert_idx + 10, vert_idx + 11);
+            pg_model_add_triangle(model, vert_idx + 1, vert_idx + 0, vert_idx + 2);
+            pg_model_add_triangle(model, vert_idx + 1, vert_idx + 2, vert_idx + 3);
+            vert_idx += 4;
             tris += 2;
         }
     } else if(!(tile->orientation & (1 << dir))) {
@@ -1515,6 +1547,7 @@ static int tile_face_duct(struct bork_map* map, struct bork_editor_map* ed_map,
         pg_model_add_triangle(model, vert_idx + 2, vert_idx + 1, vert_idx + 3);
         pg_model_add_triangle(model, vert_idx + 5, vert_idx + 4, vert_idx + 6);
         pg_model_add_triangle(model, vert_idx + 5, vert_idx + 6, vert_idx + 7);
+        vert_idx += 8;
         tris += 4;
     }
     if(dir < 4 && ed_tile->alt_type > BORK_TILE_ATMO) {

@@ -875,6 +875,11 @@ void bork_editor_complete_fire(struct bork_map* map, struct bork_editor_map* ed_
         .fire = { .active = 1, .dir = { dir[0], dir[1], dir[2] } },
         .pos = { pos[0], pos[1], pos[2] } };
     ARR_PUSH(map->fire_objs, new_obj);
+    struct bork_sound_emitter snd = {
+        .handle = -1,
+        .pos = { pos[0], pos[1], pos[2] },
+        .snd = BORK_SND_FIRE, .volume = 0.75, .area = 20 };
+    ARR_PUSH(map->sounds, snd);
 }
 
 void bork_editor_complete_map(struct bork_map* map, struct bork_editor_map* ed_map, int newgame)
@@ -1010,7 +1015,7 @@ void bork_editor_complete_map(struct bork_map* map, struct bork_editor_map* ed_m
                     };
                     if(ed_tile->alt_dir & (1 << 7)) new_lfix.flags |= 1;
                     pg_light_spotlight(&new_lfix.light,
-                        pos, 3.5, (vec3){ 1.5, 1.5, 1.3 }, dir_angle, 0.9);
+                        pos, 2.5, (vec3){ 1.5, 1.5, 1.3 }, dir_angle, 0.9);
                     ARR_PUSH(map->light_fixtures, new_lfix);
                     tile->type = BORK_TILE_ATMO;
                 }
@@ -1025,7 +1030,7 @@ void bork_editor_complete_map(struct bork_map* map, struct bork_editor_map* ed_m
             struct bork_sound_emitter snd = {
                 .pos = { (32 - ed_ent->pos[0]) * 2, ed_ent->pos[1] * 2, ed_ent->pos[2] * 2 },
                 .snd = BORK_SND_HUM + (ed_ent->type - BORK_SOUND_HUM),
-                .volume = ed_ent->option[0] };
+                .area = ed_ent->option[0], .volume = 0.25 };
             ARR_PUSH(map->sounds, snd);
             continue;
         }

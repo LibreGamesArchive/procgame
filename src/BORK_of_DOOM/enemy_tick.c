@@ -49,6 +49,7 @@ static void robot_dying(struct bork_play_data* d, struct bork_entity* ent)
                          (RANDF) * 0.5 };
             struct bork_fire new_fire = {
                 .flags = BORK_FIRE_MOVES,
+                .audio_handle = -1,
                 .pos = { ent->pos[0] + off[0], ent->pos[1] + off[1], ent->pos[2] + off[2] },
                 .vel = { off[0] * 0.25, off[1] * 0.25, off[2] * 0.25 },
                 .lifetime = PLAY_SECONDS(5) + PLAY_SECONDS(RANDF * 2) };

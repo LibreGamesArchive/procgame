@@ -22,6 +22,7 @@ void tick_control_inv_menu(struct bork_play_data* d)
         d->menu.state = BORK_MENU_CLOSED;
         SDL_ShowCursor(SDL_DISABLE);
         pg_mouse_mode(1);
+        pg_audio_channel_pause(1, 0);
         return;
     }
     if(d->inventory.len == 0) return;

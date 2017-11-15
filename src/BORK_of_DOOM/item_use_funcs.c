@@ -464,6 +464,7 @@ void bork_tick_grenade_inc(struct bork_entity* ent, struct bork_play_data* d)
                          ((float)rand() / RAND_MAX) * 0.5 };
             struct bork_fire new_fire = {
                 .flags = BORK_FIRE_MOVES,
+                .audio_handle = -1,
                 .pos = { ent->pos[0] + off[0], ent->pos[1] + off[1], ent->pos[2] + off[2] },
                 .vel = { off[0] * 0.25, off[1] * 0.25, off[2] * 0.25 },
                 .lifetime = PLAY_SECONDS(10) + PLAY_SECONDS(RANDF * 2) };

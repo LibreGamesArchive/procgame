@@ -22,6 +22,7 @@ void tick_datapad_menu(struct bork_play_data* d)
         d->menu.state = BORK_MENU_CLOSED;
         SDL_ShowCursor(SDL_DISABLE);
         pg_mouse_mode(1);
+        pg_audio_channel_pause(1, 0);
     }
     int stick_ctrl_y = 0, stick_ctrl_x = 0;
     if(pg_check_gamepad(PG_LEFT_STICK, PG_CONTROL_HIT)) {

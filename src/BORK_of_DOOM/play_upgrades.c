@@ -654,6 +654,7 @@ void tick_control_upgrade_menu(struct bork_play_data* d)
             d->menu.state = BORK_MENU_CLOSED;
             SDL_ShowCursor(SDL_DISABLE);
             pg_mouse_mode(1);
+            pg_audio_channel_pause(1, 0);
             return;
         }
     } else if(d->menu.upgrades.confirm == MUST_REPLACE) {

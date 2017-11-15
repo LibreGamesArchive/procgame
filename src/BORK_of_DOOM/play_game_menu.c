@@ -101,6 +101,7 @@ void tick_game_menu(struct bork_play_data* d, struct pg_game_state* state)
             d->menu.state = BORK_MENU_CLOSED;
             SDL_ShowCursor(SDL_DISABLE);
             pg_mouse_mode(1);
+            pg_audio_channel_pause(1, 0);
         }
         if(pg_check_input(kmap[BORK_CTRL_DOWN], PG_CONTROL_HIT)
         || pg_check_input(SDL_SCANCODE_DOWN, PG_CONTROL_HIT)
@@ -118,6 +119,7 @@ void tick_game_menu(struct bork_play_data* d, struct pg_game_state* state)
                 case 0:
                     d->menu.state = BORK_MENU_CLOSED;
                     pg_mouse_mode(1);
+                    pg_audio_channel_pause(1, 0);
                     SDL_ShowCursor(SDL_DISABLE);
                     break;
                 case 1: {

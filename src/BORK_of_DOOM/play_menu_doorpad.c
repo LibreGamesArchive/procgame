@@ -21,6 +21,7 @@ void tick_doorpad(struct bork_play_data* d)
         if(d->menu.doorpad.unlocked_ticks == 0) {
             d->menu.state = BORK_MENU_CLOSED;
             pg_mouse_mode(1);
+            pg_audio_channel_pause(1, 0);
         }
         return;
     }
@@ -28,6 +29,7 @@ void tick_doorpad(struct bork_play_data* d)
     || pg_check_gamepad(SDL_CONTROLLER_BUTTON_B, PG_CONTROL_HIT)) {
         d->menu.state = BORK_MENU_CLOSED;
         pg_mouse_mode(1);
+        pg_audio_channel_pause(1, 0);
     }
     float ar = d->core->aspect_ratio;
     struct bork_map_object* door = &d->map.doors.data[d->menu.doorpad.door_idx];
