@@ -30,9 +30,38 @@ static void bullet_die(struct bork_bullet* blt, struct bork_play_data* d)
                 .vel = { 0, 0, 0 },
                 .ticks_left = 15,
                 .frame_ticks = 3,
-                .start_frame = 0, .end_frame = 5
+                .start_frame = 0, .end_frame = 4
             };
             ARR_PUSH(d->particles, new_part);
+            float dist = vec3_dist(blt->pos, d->plr.pos);
+            if(dist < 8) {
+                dist = 1 - (dist / 8);
+                pg_audio_play(&d->core->sounds[BORK_SND_BULLET_HIT], dist * 0.5);
+            }
+            break;
+        } case 30: {
+            struct bork_particle new_part = {
+                .flags = BORK_PARTICLE_LIGHT,
+                .light = { 1.5, 0.5, 0.5, 2.5 },
+                .pos = { blt->pos[0], blt->pos[1], blt->pos[2] },
+                .vel = { 0, 0, 0 },
+                .ticks_left = 45,
+                .lifetime = 45
+            };
+            ARR_PUSH(d->particles, new_part);
+            pg_audio_play(&d->core->sounds[BORK_SND_PLAZMA_HIT], 1);
+            break;
+        } case 31: {
+            struct bork_particle new_part = {
+                .flags = BORK_PARTICLE_SPRITE,
+                .pos = { blt->pos[0], blt->pos[1], blt->pos[2] },
+                .vel = { 0, 0, 0 },
+                .ticks_left = 15,
+                .frame_ticks = 3,
+                .start_frame = 0, .end_frame = 4
+            };
+            ARR_PUSH(d->particles, new_part);
+            pg_audio_play(&d->core->sounds[BORK_SND_BULLET_HIT], 1);
             break;
         } case 6: {
             struct bork_particle new_part = {
@@ -45,6 +74,11 @@ static void bullet_die(struct bork_bullet* blt, struct bork_play_data* d)
             };
             ARR_PUSH(d->particles, new_part);
             red_sparks(d, blt->pos, 0.25, rand() % 4 + 4);
+            float dist = vec3_dist(blt->pos, d->plr.pos);
+            if(dist < 12) {
+                dist = 1 - (dist / 12);
+                pg_audio_play(&d->core->sounds[BORK_SND_PLAZMA_HIT], dist);
+            }
             break;
         } case 7: {
             ARR_TRUNCATE(surr, 0);
@@ -79,6 +113,11 @@ static void bullet_die(struct bork_bullet* blt, struct bork_play_data* d)
             };
             ARR_PUSH(d->particles, new_part);
             red_sparks(d, blt->pos, 0.45, rand() % 4 + 12);
+            float dist = vec3_dist(blt->pos, d->plr.pos);
+            if(dist < 16) {
+                dist = 1 - (dist / 16);
+                pg_audio_play(&d->core->sounds[BORK_SND_PLAZMA_HIT], dist * 2);
+            }
             break;
         } case 8: {
             struct bork_particle new_part = {
@@ -175,8 +214,9 @@ void bork_bullet_move(struct bork_bullet* blt, struct bork_play_data* d)
             vec3_sub(blt_to_plr, blt->pos, map->plr->pos);
             float dist = vec3_len(blt_to_plr);
             if(dist < 0.8) {
+                pg_audio_play(&d->core->sounds[BORK_SND_HURT], 1);
                 blt->flags |= BORK_BULLET_DEAD;
-                map->plr->pain_ticks = 120;
+                map->plr->pain_ticks += 120;
                 map->plr->HP -= blt->damage;
                 vec3_sub(blt->pos, new_pos, blt->dir);
                 vec3_set(blt->dir, 0, 0, 0);

@@ -128,6 +128,7 @@ static void tick_entities(struct bork_play_data* d);
 static void tick_bullets(struct bork_play_data* d);
 static void tick_particles(struct bork_play_data* d);
 static void tick_fires(struct bork_play_data* d);
+static void tick_ambient_sound(struct bork_play_data* d);
 
 void bork_play_tick(struct pg_game_state* state)
 {
@@ -180,6 +181,7 @@ void bork_play_tick(struct pg_game_state* state)
         tick_fires(d);
         tick_particles(d);
         tick_datapad(d);
+        tick_ambient_sound(d);
         d->looked_item = get_looked_item(d);
         d->looked_enemy = get_looked_enemy(d);
         d->looked_entity = get_looked_entity(d);
@@ -253,6 +255,24 @@ static void tick_menu_base(struct bork_play_data* d)
 
 }
 
+static void tick_ambient_sound(struct bork_play_data* d)
+{
+    pg_audio_set_listener(1, d->plr.pos);
+    int i;
+    struct bork_sound_emitter* snd;
+    ARR_FOREACH_PTR(d->map.sounds, snd, i) {
+        float dist = vec3_dist(snd->pos, d->plr.pos);
+        if(dist < snd->volume) {
+            if(snd->handle >= 0) continue;
+            else snd->handle = pg_audio_emitter(&d->core->sounds[snd->snd], 1,
+                                                snd->volume, snd->pos, 1);
+        } else if(snd->handle >= 0) {
+            pg_audio_emitter_remove(snd->handle);
+            snd->handle = -1;
+        }
+    }
+}
+
 static void tick_control_play(struct bork_play_data* d)
 {
     uint8_t* kmap = d->core->ctrl_map;
@@ -276,6 +296,9 @@ static void tick_control_play(struct bork_play_data* d)
     if(pg_check_input(kmap[BORK_CTRL_NEXT_TECH], PG_CONTROL_HIT)
     || pg_check_gamepad(SDL_CONTROLLER_BUTTON_LEFTSHOULDER, PG_CONTROL_HIT)) {
         select_next_upgrade(d);
+    }
+    if(pg_check_input(kmap[BORK_CTRL_DROP], PG_CONTROL_HIT)) {
+        drop_item(d);
     }
     if(pg_check_input(kmap[BORK_CTRL_INTERACT], PG_CONTROL_HIT)
     || pg_check_gamepad(SDL_CONTROLLER_BUTTON_X, PG_CONTROL_HIT)) {
@@ -306,6 +329,7 @@ static void tick_control_play(struct bork_play_data* d)
                 item->flags |= BORK_ENTFLAG_IN_INVENTORY;
                 add_inventory_item(d, d->looked_item);
             }
+            pg_audio_play(&d->core->sounds[BORK_SND_PICKUP], 0.5);
         } else if(d->looked_obj) {
             if(d->looked_obj->type == BORK_MAP_DOORPAD) {
                 struct bork_map_object* door = &d->map.doors.data[d->looked_obj->doorpad.door_idx];
@@ -319,6 +343,11 @@ static void tick_control_play(struct bork_play_data* d)
                     SDL_ShowCursor(SDL_ENABLE);
                     pg_mouse_mode(0);
                 } else {
+                    if(!door->door.open) {
+                        pg_audio_play(&d->core->sounds[BORK_SND_DOOR_OPEN], 0.5);
+                    } else {
+                        pg_audio_play(&d->core->sounds[BORK_SND_DOOR_CLOSE], 0.5);
+                    }
                     door->door.open = 1 - door->door.open;
                 }
             } else if(d->looked_obj->type == BORK_MAP_RECYCLER) {
@@ -351,6 +380,7 @@ static void tick_control_play(struct bork_play_data* d)
         d->plr.vel[2] = 0.15;
         d->plr.flags &= ~BORK_ENTFLAG_GROUND;
         d->jump_released = 0;
+        pg_audio_play(&d->core->sounds[BORK_SND_JUMP], 0.1);
     }
     if(pg_check_input(kmap[BORK_CTRL_JUMP], PG_CONTROL_RELEASED)) {
         d->jump_released = 1;
@@ -391,15 +421,34 @@ static void tick_control_play(struct bork_play_data* d)
         kbd_input = 1;
     }
     if(vec2_len(d->plr.vel) > 0.1) vec2_set_len(d->plr.vel, d->plr.vel, 0.1);
+    if((d->plr.flags & BORK_ENTFLAG_GROUND) && vec2_len(d->plr.vel) > 0.01) {
+        if(d->walk_input_ticks % 90 == 10)
+            pg_audio_play(&d->core->sounds[BORK_SND_FOOTSTEP1], 0.1);
+        else if(d->walk_input_ticks % 90 == 55)
+            pg_audio_play(&d->core->sounds[BORK_SND_FOOTSTEP2], 0.1);
+    }
     if(!kbd_input) {
         vec2 stick;
         pg_gamepad_stick(0, stick);
-        float c = cos(-d->plr.dir[0]), s = sin(d->plr.dir[0]);
-        vec2 stick_rot = {
-            stick[0] * s - stick[1] * c,
-            stick[0] * c + stick[1] * s };
-        d->plr.vel[0] += move_speed * stick_rot[0];
-        d->plr.vel[1] -= move_speed * stick_rot[1];
+        if(stick[0] != 0 || stick[1] != 0) {
+            kbd_input = 1;
+            float c = cos(-d->plr.dir[0]), s = sin(d->plr.dir[0]);
+            vec2 stick_rot = {
+                stick[0] * s - stick[1] * c,
+                stick[0] * c + stick[1] * s };
+            vec2_normalize(stick_rot, stick_rot);
+            if(vec2_len(stick_rot) > 0.5) kbd_input = 1;
+            d->plr.vel[0] += move_speed * stick_rot[0];
+            d->plr.vel[1] -= move_speed * stick_rot[1];
+        }
+    }
+    if(kbd_input) ++d->walk_input_ticks;
+    else d->walk_input_ticks = 0;
+    if((d->plr.flags & BORK_ENTFLAG_GROUND) && vec2_len(d->plr.vel) > 0.01) {
+        if(d->walk_input_ticks % 90 == 10)
+            pg_audio_play(&d->core->sounds[BORK_SND_FOOTSTEP1], 0.1);
+        else if(d->walk_input_ticks % 90 == 55)
+            pg_audio_play(&d->core->sounds[BORK_SND_FOOTSTEP2], 0.1);
     }
     if(pg_check_input(kmap[BORK_CTRL_FLASHLIGHT], PG_CONTROL_HIT)
     || pg_check_gamepad(SDL_CONTROLLER_BUTTON_Y, PG_CONTROL_HIT)) {
@@ -430,6 +479,13 @@ static void tick_control_play(struct bork_play_data* d)
     || pg_check_gamepad(SDL_CONTROLLER_BUTTON_DPAD_DOWN, PG_CONTROL_HIT)) {
         switch_item(d, d->quick_item[3]);
     }
+    /*
+    if(d->play_ticks % 10 == 0) {
+        float dist_ctr = 1 - (vec2_dist(d->plr.pos, (vec2){ 32, 32 }) / 16);
+        float loop_time = 10.0f / 120.0f;
+        float loop_origin = d->play_ticks / 120.0f;
+        pg_audio_loop(&d->core->sounds[BORK_SND_FIRE], dist_ctr * 0.25, loop_origin, loop_time);
+    }*/
 }
 
 static void tick_player(struct bork_play_data* d)
@@ -457,6 +513,7 @@ static void tick_player(struct bork_play_data* d)
                     vec3_set(d->plr.vel, 0, 0, 0);
                     d->plr.dir[0] = match->teleport.dir;
                     d->teleport_ticks = PLAY_SECONDS(2);
+                    pg_audio_play(&d->core->sounds[BORK_SND_TELEPORT], 0.5);
                 }
             }
         }
@@ -485,12 +542,22 @@ static void tick_player(struct bork_play_data* d)
             vec3_sub(surr_ent->vel, surr_ent->vel, push);
         }
     }
-    if(d->plr.flags & BORK_ENTFLAG_ON_FIRE) entity_on_fire(d, &d->plr);
+    if(d->plr.flags & BORK_ENTFLAG_ON_FIRE) {
+        entity_on_fire(d, &d->plr);
+        if(d->play_ticks % 10 == 0) {
+            int fire_ticks = d->plr.fire_ticks;
+            float vol = 2.5;
+            if(fire_ticks < 120) vol *= (float)fire_ticks / 120;
+            float loop_time = 10.0f / 120.0f;
+            float loop_origin = (float)d->play_ticks / 120.0f;
+            pg_audio_loop(&d->core->sounds[BORK_SND_FIRE], vol, loop_origin, loop_time);
+        }
+    }
     vec2_set(d->plr.dir, d->plr.dir[0] + d->mouse_motion[0],
                          d->plr.dir[1] + d->mouse_motion[1]);
     vec2_set(d->mouse_motion, 0, 0);
     d->plr.dir[0] = fmodf(d->plr.dir[0], M_PI * 2.0f);
-    bork_entity_update(&d->plr, &d->map);
+    bork_entity_update(&d->plr, d);
     if(d->plr.HP <= 0) d->menu.state = BORK_MENU_PLAYERDEAD;
 }
 
@@ -615,7 +682,7 @@ static void tick_entities(struct bork_play_data* d)
             && ent->pos[2] >= (z * 16.0f) && ent->pos[2] <= ((z + 1) * 16.0f)) {
                 const struct bork_entity_profile* prof = &BORK_ENT_PROFILES[ent->type];
                 ent->last_tick = d->ticks;
-                bork_entity_update(ent, &d->map);
+                bork_entity_update(ent, d);
                 ARR_TRUNCATE(surr, 0);
                 vec3 start, end;
                 vec3_sub(start, ent->pos, (vec3){ 2, 2, 2 });
@@ -669,7 +736,7 @@ static void tick_item(struct bork_play_data* d, struct bork_entity* ent)
         --ent->counter[3];
         if(ent->counter[3] <= 0) ent->flags &= ~BORK_ENTFLAG_SMOKING;
     }
-    bork_entity_update(ent, &d->map);
+    bork_entity_update(ent, d);
 }
 
 static void tick_items(struct bork_play_data* d)
@@ -754,13 +821,18 @@ static void tick_fires(struct bork_play_data* d)
 {
     static bork_entity_arr_t surr = {};
     ARR_TRUNCATE(surr, 0);
-    int fire_damage = 15;
+    int fire_damage = 8;
     int plr_heatshield_lvl = get_upgrade_level(d, BORK_UPGRADE_HEATSHIELD);
-    if(plr_heatshield_lvl == 0) fire_damage = 7;
+    if(plr_heatshield_lvl == 0) fire_damage = 4;
     else if(plr_heatshield_lvl == 1) fire_damage = 0;
     struct bork_fire* fire;
     int i;
     ARR_FOREACH_REV_PTR(d->map.fires, fire, i) {
+        --fire->lifetime;
+        float dist = vec3_dist(fire->pos, d->plr.pos);
+        if(dist > 32) {
+            continue;
+        }
         if(fire->flags & BORK_FIRE_MOVES) {
             vec3_add(fire->pos, fire->pos, fire->vel);
             fire->vel[2] -= 0.005;
@@ -790,6 +862,12 @@ static void tick_fires(struct bork_play_data* d)
                 .current_frame = 24 + rand() % 4,
             };
             ARR_PUSH(d->particles, new_part);
+        } else if(fire->lifetime % 10 == 0 && dist < 12) {
+            float vol = (1 - (dist / 12)) * 0.5;
+            if(fire->lifetime < 120) vol *= fire->lifetime / 120.0f;
+            float loop_time = 10.0f / 120.0f;
+            float loop_origin = fire->lifetime / 120.0f;
+            pg_audio_loop(&d->core->sounds[BORK_SND_FIRE], vol, loop_origin, loop_time);
         }
         if(d->play_ticks % 30 == 0) {
             ARR_TRUNCATE(surr, 0);
@@ -815,13 +893,13 @@ static void tick_fires(struct bork_play_data* d)
             && fabs((fire->pos[2] + 1.5) - d->plr.pos[2]) < 2) {
                 d->plr.last_fire_tick = d->play_ticks;
                 d->plr.HP -= fire_damage;
+                d->plr.pain_ticks += 30;
                 if(plr_heatshield_lvl < 0 && rand() % 3 == 0) {
                     d->plr.flags |= BORK_ENTFLAG_ON_FIRE;
-                    d->plr.fire_ticks = PLAY_SECONDS(5);
+                    d->plr.fire_ticks = PLAY_SECONDS(5) + PLAY_SECONDS(RANDF * 2);
                 }
             }
         }
-        --fire->lifetime;
         if(fire->lifetime == 0) ARR_SWAPSPLICE(d->map.fires, i, 1);
     }
 }
@@ -966,12 +1044,14 @@ static void bork_play_draw(struct pg_game_state* state)
 static void draw_lights(struct bork_play_data* d)
 {
     pg_gbuffer_begin_pointlight(&d->core->gbuf, &d->core->view);
+    vec3 plr_eye;
+    bork_entity_get_eye(&d->plr, NULL, plr_eye);
     int i;
     int nearlights = 0;
     struct pg_light* light;
     ARR_FOREACH_PTR(d->lights_buf, light, i) {
         vec3 light_to_plr;
-        vec3_sub(light_to_plr, light->pos, d->plr.pos);
+        vec3_sub(light_to_plr, light->pos, plr_eye);
         vec3_abs(light_to_plr, light_to_plr);
         if(vec3_vmax(light_to_plr) < light->size * 1.25) {
             d->lights_buf.data[nearlights++] = *light;
@@ -987,7 +1067,7 @@ static void draw_lights(struct bork_play_data* d)
     pg_gbuffer_begin_spotlight(&d->core->gbuf, &d->core->view);
     ARR_FOREACH_PTR(d->spotlights, light, i) {
         vec3 light_to_plr;
-        vec3_sub(light_to_plr, light->pos, d->plr.pos);
+        vec3_sub(light_to_plr, light->pos, plr_eye);
         vec3_abs(light_to_plr, light_to_plr);
         if(vec3_vmax(light_to_plr) < light->size * 1.5) {
             d->spotlights.data[nearlights++] = *light;

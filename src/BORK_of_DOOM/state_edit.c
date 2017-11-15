@@ -119,6 +119,8 @@ static void bork_editor_update_map(struct bork_editor_data* d)
             else if(d->ent_type == BORK_ITEM_UPGRADE) {
                 new_ent.option[0] = d->upgrade_type[0];
                 new_ent.option[1] = d->upgrade_type[1];
+            } else if(d->ent_type >= BORK_SOUND_HUM) {
+                new_ent.option[0] = d->snd_volume;
             } else if(d->ent_type == BORK_ITEM_SCHEMATIC) {
                 new_ent.option[0] = d->schematic_type;
             }
@@ -294,6 +296,12 @@ static void bork_editor_update_map(struct bork_editor_data* d)
         } else if(pg_check_input(SDL_SCANCODE_DOWN, PG_CONTROL_HIT)) {
             d->upgrade_type[t] = MOD(d->upgrade_type[t] - 1, BORK_NUM_UPGRADES);
         }
+    } else if(d->ent_type >= BORK_SOUND_HUM) {
+        if(pg_check_input(SDL_SCANCODE_UP, PG_CONTROL_HIT)) {
+            d->snd_volume += 1;
+        } else if(pg_check_input(SDL_SCANCODE_DOWN, PG_CONTROL_HIT)) {
+            d->snd_volume -= 1;
+        }
     } else if(d->ent_type == BORK_ITEM_SCHEMATIC) {
         if(pg_check_input(SDL_SCANCODE_UP, PG_CONTROL_HIT)) {
             d->schematic_type = MOD(d->schematic_type + 1, BORK_NUM_SCHEMATICS);
@@ -467,6 +475,12 @@ static void bork_editor_draw(struct pg_game_state* state)
         vec4_set(text.block_style[b], 1, 0.35, 0.02, 1.2);
         vec4_set(text.block_color[b], 1, 1, 1, 1);
         text.use_blocks += 2;
+    } else if(d->ent_type >= BORK_SOUND_HUM) {
+        int b = text.use_blocks;
+        snprintf(text.block[b], 64, "VOLUME: %d", d->snd_volume);
+        vec4_set(text.block_style[b], 1, 0.35, 0.02, 1.2);
+        vec4_set(text.block_color[b], 1, 1, 1, 1);
+        text.use_blocks += 1;
     } else if(d->ent_type == BORK_ITEM_UPGRADE) {
         int b = text.use_blocks;
         const struct bork_upgrade_detail* up_d = bork_upgrade_detail(d->upgrade_type[0]);
@@ -992,10 +1006,18 @@ void bork_editor_complete_map(struct bork_map* map, struct bork_editor_map* ed_m
         }
     }
     bork_map_calc_travel(map);
-    if(!newgame) return;
     bork_entity_t ent_arr = bork_entity_new(ed_map->ents.len);
     struct bork_editor_entity* ed_ent;
     ARR_FOREACH_PTR(ed_map->ents, ed_ent, i) {
+        if(ed_ent->type >= BORK_SOUND_HUM) {
+            struct bork_sound_emitter snd = {
+                .pos = { (32 - ed_ent->pos[0]) * 2, ed_ent->pos[1] * 2, ed_ent->pos[2] * 2 },
+                .snd = BORK_SND_HUM + (ed_ent->type - BORK_SOUND_HUM),
+                .volume = ed_ent->option[0] };
+            ARR_PUSH(map->sounds, snd);
+            continue;
+        }
+        if(!newgame) continue;
         if(ed_ent->type == BORK_ENTITY_PLAYER) {
             if(!map->plr) continue;
             vec3_set(map->plr->pos,

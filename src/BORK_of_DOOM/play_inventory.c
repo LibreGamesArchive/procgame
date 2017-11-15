@@ -415,7 +415,8 @@ bork_entity_t remove_inventory_item(struct bork_play_data* d, int inv_idx)
         else if(d->quick_item[i] > inv_idx) --d->quick_item[i];
     }
     if(d->held_item == inv_idx) d->held_item = -1;
-    bork_entity_init(item, item->type);
+    //bork_entity_init(item, item->type);
+    item->flags &= ~(BORK_ENTFLAG_IN_INVENTORY | BORK_ENTFLAG_INACTIVE);
     return item_id;
 }
 
@@ -477,3 +478,18 @@ void set_quick_item(struct bork_play_data* d, int quick_idx, int inv_idx)
     d->quick_item[quick_idx] = inv_idx;
 }
 
+void drop_item(struct bork_play_data* d)
+{
+    bork_entity_t ent_id = remove_inventory_item(d, d->held_item);
+    struct bork_entity* ent = bork_entity_get(ent_id);
+    if(!ent) return;
+    mat4 view;
+    bork_entity_get_view(&d->plr, view);
+    vec4 item_pos = { 0, 0.2, -0.2, 1 };
+    vec3 item_dir = { -0.1, 0, 0 };
+    mat3_mul_vec3(item_dir, view, item_dir);
+    mat4_mul_vec4(item_pos, view, item_pos);
+    vec3_dup(ent->pos, item_pos);
+    vec3_dup(ent->vel, item_dir);
+    bork_map_add_item(&d->map, ent_id);
+}

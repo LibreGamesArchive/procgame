@@ -27,6 +27,7 @@
 #define BORK_ENTFLAG_FLIES              (1 << 26)
 #define BORK_ENTFLAG_STATIONARY         (1 << 27)
 #define BORK_ENTFLAG_ENTITY             (1 << 28)
+#define BORK_ENTFLAG_SOUND              (1 << 29)
 
 struct bork_entity {
     int last_tick;
@@ -112,6 +113,10 @@ struct bork_entity {
         BORK_ITEM_CHEMICAL_TANK,
         BORK_ENTITY_STOOL,
         BORK_ENTITY_BARREL,
+        BORK_SOUND_HUM,
+        BORK_SOUND_HISS,
+        BORK_SOUND_BEEPS,
+        BORK_SOUND_BUZZ,
         BORK_ENTITY_TYPES,
     } type;
 };
@@ -163,6 +168,14 @@ static const struct bork_entity_profile {
     void (*use_func)(struct bork_entity*, struct bork_play_data*);
     void (*hud_func)(struct bork_entity*, struct bork_play_data*);
 } BORK_ENT_PROFILES[] = {
+    [BORK_SOUND_HUM] = { .name = "SOUND_HUM",
+        .base_flags = BORK_ENTFLAG_SOUND, },
+    [BORK_SOUND_HISS] = { .name = "SOUND_HISS",
+        .base_flags = BORK_ENTFLAG_SOUND, },
+    [BORK_SOUND_BEEPS] = { .name = "SOUND_BEEPS",
+        .base_flags = BORK_ENTFLAG_SOUND, },
+    [BORK_SOUND_BUZZ] = { .name = "SOUND_BUZZ",
+        .base_flags = BORK_ENTFLAG_SOUND, },
     [BORK_ENTITY_PLAYER] = { .name = "Player",
         .base_flags = BORK_ENTFLAG_PLAYER,
         .size = { 0.5, 0.5, 0.9 },
@@ -600,7 +613,7 @@ void bork_entpool_clear(void);
 void bork_entity_init(struct bork_entity* ent, enum bork_entity_type type);
 void bork_entity_push(struct bork_entity* ent, vec3 push);
 void bork_entity_move(struct bork_entity* ent, struct bork_map* map);
-void bork_entity_update(struct bork_entity* ent, struct bork_map* map);
+void bork_entity_update(struct bork_entity* ent, struct bork_play_data* d);
 void bork_entity_get_view(struct bork_entity* ent, mat4 view);
 void bork_entity_get_eye(struct bork_entity* ent, vec3 out_dir, vec3 out_pos);
 void bork_entity_look_at(struct bork_entity* ent, vec3 look);

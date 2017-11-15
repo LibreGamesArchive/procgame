@@ -145,6 +145,13 @@ struct bork_fire {
     vec3 vel;
 };
 
+struct bork_sound_emitter {
+    int handle;
+    enum bork_sound snd;
+    vec3 pos;
+    float volume;
+};
+
 struct bork_map {
     struct pg_model model;
     struct bork_tile data[32][32][32];
@@ -152,6 +159,7 @@ struct bork_map {
     bork_entity_arr_t enemies[4][4][4];
     bork_entity_arr_t entities[4][4][4];
     bork_entity_arr_t items[4][4][4];
+    ARR_T(struct bork_sound_emitter) sounds;
     ARR_T(struct bork_map_object) doors;
     ARR_T(struct bork_map_object) doorpads;
     ARR_T(struct bork_map_object) recyclers;

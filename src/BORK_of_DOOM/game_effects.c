@@ -18,7 +18,7 @@
 void create_spark(struct bork_play_data* d, vec3 pos)
 {
     struct bork_particle new_part = {
-        .flags = BORK_PARTICLE_GRAVITY,
+        .flags = BORK_PARTICLE_SPRITE,
         .pos = { pos[0], pos[1], pos[2] },
         .vel = { 0, 0, 0 },
         .ticks_left = 50,
@@ -37,7 +37,7 @@ void create_sparks(struct bork_play_data* d, vec3 pos, float expand, int sparks)
             (float)rand() / RAND_MAX - 0.5,
             (float)rand() / RAND_MAX };
         struct bork_particle new_part = {
-            .flags = BORK_PARTICLE_GRAVITY,
+            .flags = BORK_PARTICLE_SPRITE | BORK_PARTICLE_GRAVITY,
             .pos = { pos[0] + off[0], pos[1] + off[1], pos[2] + off[2] },
             .vel = { off[0] * expand, off[1] * expand, off[2] * expand },
             .ticks_left = 50,
@@ -145,7 +145,7 @@ void create_elec_explosion(struct bork_play_data* d, vec3 pos)
 void create_smoke(struct bork_play_data* d, vec3 pos, vec3 dir, int lifetime)
 {
     struct bork_particle new_part = {
-        .flags = BORK_PARTICLE_SPRITE | BORK_PARTICLE_BOUYANT | BORK_PARTICLE_DECELERATE,
+        .flags = BORK_PARTICLE_SPRITE | BORK_PARTICLE_BOUYANT,
         .pos = { pos[0], pos[1], pos[2] },
         .vel = { dir[0], dir[1], dir[2] },
         .vel = { 0, 0, 0 },
@@ -160,6 +160,11 @@ void robot_explosion(struct bork_play_data* d, vec3 pos)
 {
     vec3 pos_ = { pos[0], pos[1], pos[2] };
     create_explosion(d, pos, 1);
+    float dist = vec3_dist(d->plr.pos, pos);
+    if(dist < 32) {
+        dist = 1 - (dist / 32);
+        pg_audio_play(&d->core->sounds[BORK_SND_EXPLOSION], dist);
+    }
     int num_scraps = 3 + rand() % 3;
     int i;
     for(i = 0; i < num_scraps; ++i) {

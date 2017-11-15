@@ -28,11 +28,7 @@ static void entity_emp(struct bork_play_data* d, struct bork_entity* ent)
                     ent->pos[2] + (RANDF - 0.5) * 0.5 },
             (vec3){}, 180);
     } else if(ent->emp_ticks % 17 == 0) {
-        vec3 spark_pos = {
-            ent->pos[0] + (float)rand() / RAND_MAX - 0.5,
-            ent->pos[1] + (float)rand() / RAND_MAX - 0.5,
-            ent->pos[2] + (float)rand() / RAND_MAX - 0.5 };
-        create_spark(d, spark_pos);
+        create_sparks(d, ent->pos, 0.075, rand() % 2 + 1);
     }
     --ent->emp_ticks;
 }
@@ -41,14 +37,23 @@ static void robot_dying(struct bork_play_data* d, struct bork_entity* ent)
 {
     --ent->dead_ticks;
     if(ent->dead_ticks % 30 == 0) {
-        vec3 spark_pos = {
-            ent->pos[0] + (float)rand() / RAND_MAX - 0.5,
-            ent->pos[1] + (float)rand() / RAND_MAX - 0.5,
-            ent->pos[2] + (float)rand() / RAND_MAX - 0.5 };
-        create_spark(d, spark_pos);
+        create_sparks(d, ent->pos, 0.1, rand() % 2 + 1);
     } else if(ent->dead_ticks <= 0) {
         bork_entity_t ent_id = bork_entity_id(ent);
         robot_explosion(d, ent->pos);
+        int fires = rand() % 2 + 2;
+        int i;
+        for(i = 0; i < fires; ++i) {
+            vec3 off = { (RANDF - 0.5) * 0.5,
+                         (RANDF - 0.5) * 0.5,
+                         (RANDF) * 0.5 };
+            struct bork_fire new_fire = {
+                .flags = BORK_FIRE_MOVES,
+                .pos = { ent->pos[0] + off[0], ent->pos[1] + off[1], ent->pos[2] + off[2] },
+                .vel = { off[0] * 0.25, off[1] * 0.25, off[2] * 0.25 },
+                .lifetime = PLAY_SECONDS(5) + PLAY_SECONDS(RANDF * 2) };
+            ARR_PUSH(d->map.fires, new_fire);
+        }
         ent = bork_entity_get(ent_id);
         ent->flags |= BORK_ENTFLAG_DEAD;
     }
@@ -373,6 +378,19 @@ void bork_tick_tin_canine(struct bork_entity* ent, struct bork_play_data* d)
                     vec3_add(new_bullet.pos, ent->pos, new_bullet.dir);
                     new_bullet.pos[2] -= 0.1;
                     ARR_PUSH(d->bullets, new_bullet);
+                    struct bork_particle new_part = {
+                        .flags = BORK_PARTICLE_LIGHT | BORK_PARTICLE_LIGHT_DECAY,
+                        .pos = { new_bullet.pos[0], new_bullet.pos[1], new_bullet.pos[2] },
+                        .light = { 1.5, 0.5, 0.5, 3.0f },
+                        .vel = { 0, 0, 0 },
+                        .lifetime = 16,
+                        .ticks_left = 16 };
+                    ARR_PUSH(d->particles, new_part);
+                    float dist = vec3_len(ent_to_plr);
+                    if(dist < 24) {
+                        dist = 1 - (dist / 24);
+                        pg_audio_play(&d->core->sounds[BORK_SND_PLAZGUN], dist * 0.5);
+                    }
                 }
             }
         }

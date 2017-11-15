@@ -116,6 +116,7 @@ void tick_recycler_menu(struct bork_play_data* d)
                 d->looked_obj->recycler.out_pos[1] + (RANDF - 0.5) * 0.5,
                 d->looked_obj->recycler.out_pos[2]);
             bork_map_add_item(&d->map, new_id);
+            pg_audio_play(&d->core->sounds[BORK_SND_RECYCLER], 0.5);
         }
         /*  Scrolling   */
         if(vec2_dist(mouse_pos, (vec2){ 0.05, 0.2 }) < 0.04
@@ -167,6 +168,7 @@ void tick_recycler_menu(struct bork_play_data* d)
                 d->looked_obj->recycler.out_pos[1] + (RANDF - 0.5) * 0.75,
                 d->looked_obj->recycler.out_pos[2]);
             bork_map_add_item(&d->map, new_id);
+            pg_audio_play(&d->core->sounds[BORK_SND_RECYCLER], 0.5);
         }
     }
 }

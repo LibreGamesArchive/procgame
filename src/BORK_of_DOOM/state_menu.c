@@ -364,7 +364,6 @@ static void bork_menu_tick(struct pg_game_state* state)
                 d->core->mouse_sensitivity = MAX(0.0001, d->core->mouse_sensitivity - 0.0001);
             }
         } else if(pg_check_input(kmap[BORK_CTRL_SELECT], PG_CONTROL_HIT)) {
-
             if(d->opt_idx == 1 || d->opt_idx == 2) {
                 d->opt_res_typing = 1;
                 pg_text_mode(1);
@@ -436,9 +435,9 @@ static void bork_menu_draw(struct pg_game_state* state)
         }
     } else if(d->mode == BORK_MENU_SELECT_SAVE) {
         int ti = 2;
-        int i;
+        int i, len;
         int num_saves = MIN(d->core->save_files.len, 6);
-        int len = snprintf(text.block[++ti], 32, "BACK");
+        snprintf(text.block[++ti], 32, "BACK");
         vec4_set(text.block_style[ti], ar * 0.35 - (4 * 0.04 * 1.25 * 0.5),
                  0.7, 0.04, 1.2);
         if(d->save_action_idx == 0) {
@@ -562,7 +561,7 @@ static void bork_menu_draw(struct pg_game_state* state)
                 memset(text.block[ti + 1], 0, 32);
                 snprintf(text.block[ti + 1], 32, "[RESET]");
             } else {
-                strncpy(text.block[++ti], bork_ctrl_names[opt - 4], 32);
+                strncpy(text.block[++ti], bork_get_ctrl_name(opt - 4), 32);
                 strncpy(text.block[ti + 1], pg_input_name(d->core->ctrl_map[opt - 4]), 32);
             }
             vec4_set(text.block_style[ti], ar * 0.1 + is_selected * 0.05,
@@ -576,7 +575,7 @@ static void bork_menu_draw(struct pg_game_state* state)
             len = snprintf(text.block[++ti], 64, "PRESS DESIRED CONTROL FOR");
             vec4_set(text.block_style[ti], ar * 0.5 - (len * 0.025 * 1.2 * 0.5), 0.875, 0.025, 1.2);
             vec4_set(text.block_color[ti], 1, 1, 1, 1);
-            len = snprintf(text.block[++ti], 64, "%s", bork_ctrl_names[d->opt_idx - 4]);
+            len = snprintf(text.block[++ti], 64, "%s", bork_get_ctrl_name(d->opt_idx - 4));
             vec4_set(text.block_style[ti], ar * 0.5 - (len * 0.025 * 1.2 * 0.5), 0.925, 0.025, 1.2);
             vec4_set(text.block_color[ti], 1, 1, 1, 1);
         } else if(d->opt_idx > 3) {

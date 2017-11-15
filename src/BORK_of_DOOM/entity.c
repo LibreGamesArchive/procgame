@@ -9,6 +9,7 @@
 #include "physics.h"
 #include "upgrades.h"
 #include "recycler.h"
+#include "state_play.h"
 #include "game_states.h"
 
 static ARR_T(struct bork_entity) ent_pool = {};
@@ -86,14 +87,30 @@ void bork_entity_push(struct bork_entity* ent, vec3 push)
     vec3_add(ent->vel, ent->vel, push);
 }
 
-void bork_entity_update(struct bork_entity* ent, struct bork_map* map)
+void bork_entity_update(struct bork_entity* ent, struct bork_play_data* d)
 {
     if((ent->flags & BORK_ENTFLAG_DEAD) || (ent->flags & BORK_ENTFLAG_INACTIVE))
         return;
+    struct bork_map* map = &d->map;
     vec3 ent_pos, move;
+    float start_len = vec3_len(ent->vel);
+    int start_ground = ent->flags & BORK_ENTFLAG_GROUND;
     vec3_dup(ent_pos, ent->pos);
     bork_entity_move(ent, map);
     vec3_sub(move, ent_pos, ent->pos);
+    float end_len = vec3_len(ent->vel);
+    int end_ground = ent->flags & BORK_ENTFLAG_GROUND;
+    if(start_len > 0.1 && end_ground && !start_ground) {
+        float dist = vec3_dist(ent->pos, d->plr.pos);
+        if(dist < 16) {
+            dist = 1 - (dist / 16);
+            if(ent->flags & BORK_ENTFLAG_ITEM) {
+                pg_audio_play(&d->core->sounds[BORK_SND_ITEM_LAND], dist * 0.5);
+            } else if(ent->flags & BORK_ENTFLAG_PLAYER) {
+                pg_audio_play(&d->core->sounds[BORK_SND_PLAYER_LAND], 0.25);
+            }
+        }
+    }
     if((ent->flags & BORK_ENTFLAG_ITEM) && vec3_len(move) < 0.01) {
         ++ent->still_ticks;
         if(ent->still_ticks >= 10) ent->flags |= BORK_ENTFLAG_INACTIVE;

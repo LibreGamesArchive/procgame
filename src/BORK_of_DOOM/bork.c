@@ -59,15 +59,15 @@ void bork_init(struct bork_game_core* core, char* base_path)
     bork_load_options(core);
     /*  Set up the gbuffer for deferred shading */
     pg_gbuffer_init(&core->gbuf, sw, sh);
-    pg_gbuffer_bind(&core->gbuf, 21, 22, 23, 24);
+    pg_gbuffer_bind(&core->gbuf, 22, 23, 24, 25);
     pg_viewer_init(&core->view, (vec3){ 0, 0, 0 }, (vec2){ 0, 0 },
-        core->screen_size, (vec2){ 0.01, 200 });
+        core->screen_size, (vec2){ 0.01, 256 });
     /*  Set up the shaders  */
     pg_shader_3d(&core->shader_3d);
     pg_shader_2d(&core->shader_2d);
     pg_shader_sprite(&core->shader_sprite);
     pg_shader_text(&core->shader_text);
-    pg_ppbuffer_init(&core->ppbuf, sw, sh, 26, 27);
+    pg_ppbuffer_init(&core->ppbuf, sw, sh, 27, 28);
     pg_postproc_blur(&core->post_blur, PG_BLUR7);
     pg_postproc_screen(&core->post_screen);
     /*  Get the models, textures, sounds, etc.*    */
@@ -92,10 +92,10 @@ void bork_reinit_gfx(struct bork_game_core* core, int sw, int sh, int fullscreen
     pg_gbuffer_deinit(&core->gbuf);
     pg_ppbuffer_deinit(&core->ppbuf);
     pg_gbuffer_init(&core->gbuf, sw, sh);
-    pg_gbuffer_bind(&core->gbuf, 21, 22, 23, 24);
+    pg_gbuffer_bind(&core->gbuf, 22, 23, 24, 25);
     pg_viewer_init(&core->view, (vec3){ 0, 0, 0 }, (vec2){ 0, 0 },
-        core->screen_size, (vec2){ 0.01, 200 });
-    pg_ppbuffer_init(&core->ppbuf, sw, sh, 26, 27);
+        core->screen_size, (vec2){ 0.01, 256 });
+    pg_ppbuffer_init(&core->ppbuf, sw, sh, 27, 28);
     pg_window_resize(sw, sh, fullscreen);
 }
 
@@ -119,6 +119,15 @@ static void load_from_base_dir(struct bork_game_core* core,
     if(f1) snprintf(f1_, 1024, "%s%s", core->base_path, f1);
     if(f2) snprintf(f2_, 1024, "%s%s", core->base_path, f2);
     pg_texture_init_from_file(tex, f1 ? f1_ : NULL, f2 ? f2_ : NULL);
+}
+
+static void load_wav_from_base_dir(struct bork_game_core* core,
+                                   struct pg_audio_chunk* audio,
+                                   const char* filename)
+{
+    char f[1024];
+    snprintf(f, 1024, "%s%s", core->base_path, filename);
+    pg_audio_load_wav(audio, f);
 }
 
 void bork_load_assets(struct bork_game_core* core)
@@ -148,13 +157,15 @@ void bork_load_assets(struct bork_game_core* core)
     load_from_base_dir(core, &core->upgrades_tex, "res/upgrades.png", NULL);
     pg_texture_set_atlas(&core->upgrades_tex, 32, 32);
     pg_texture_bind(&core->upgrades_tex, 16, 0);
+    load_from_base_dir(core, &core->starfield_tex, "res/starfield.png", "res/starfield_lightmap.png");
+    pg_texture_bind(&core->starfield_tex, 17, 18);
     /*  Generate the backdrop texture (cloudy reddish fog)  */
     pg_texture_init(&core->backdrop_tex, 256, 256);
     pg_texture_init(&core->menu_vignette, 256, 256);
     pg_texture_init(&core->radial_vignette, 256, 256);
-    pg_texture_bind(&core->backdrop_tex, 18, -1);
-    pg_texture_bind(&core->menu_vignette, 19, -1);
-    pg_texture_bind(&core->radial_vignette, 20, -1);
+    pg_texture_bind(&core->backdrop_tex, 19, -1);
+    pg_texture_bind(&core->menu_vignette, 20, -1);
+    pg_texture_bind(&core->radial_vignette, 21, -1);
     float seed = (float)rand() / RAND_MAX * 1000;
     struct pg_wave backdrop_wave[8] = {
         PG_WAVE_MOD_SEAMLESS_2D(.scale = 0.5),
@@ -241,6 +252,29 @@ void bork_load_assets(struct bork_game_core* core)
     };
     pg_audio_alloc(&core->menu_sound, 0.15);
     pg_audio_generate(&core->menu_sound, 0.15, &PG_WAVE_ARRAY(menu_wave, 4), &env);
+    /*  Load audio  */
+    load_wav_from_base_dir(core, &core->sounds[BORK_SND_PICKUP], "res/audio/Pickup.wav");
+    load_wav_from_base_dir(core, &core->sounds[BORK_SND_PISTOL], "res/audio/Pistol.wav");
+    load_wav_from_base_dir(core, &core->sounds[BORK_SND_MACHINEGUN], "res/audio/Machine_gun.wav");
+    load_wav_from_base_dir(core, &core->sounds[BORK_SND_SHOTGUN], "res/audio/Shotgun.wav");
+    load_wav_from_base_dir(core, &core->sounds[BORK_SND_PLAZGUN], "res/audio/Plaz-gun.wav");
+    load_wav_from_base_dir(core, &core->sounds[BORK_SND_BULLET_HIT], "res/audio/Bullet_hit.wav");
+    load_wav_from_base_dir(core, &core->sounds[BORK_SND_PLAZMA_HIT], "res/audio/Plazgun_hit.wav");
+    load_wav_from_base_dir(core, &core->sounds[BORK_SND_RECYCLER], "res/audio/Recycler.wav");
+    load_wav_from_base_dir(core, &core->sounds[BORK_SND_DEFENSE_FIELD], "res/audio/Defense_field.wav");
+    load_wav_from_base_dir(core, &core->sounds[BORK_SND_DOOR_OPEN], "res/audio/Door_open.wav");
+    load_wav_from_base_dir(core, &core->sounds[BORK_SND_DOOR_CLOSE], "res/audio/Door_close.wav");
+    load_wav_from_base_dir(core, &core->sounds[BORK_SND_TELEPORT], "res/audio/Teleporter.wav");
+    load_wav_from_base_dir(core, &core->sounds[BORK_SND_ITEM_LAND], "res/audio/Item_land.wav");
+    load_wav_from_base_dir(core, &core->sounds[BORK_SND_PLAYER_LAND], "res/audio/Player_land.wav");
+    load_wav_from_base_dir(core, &core->sounds[BORK_SND_JUMP], "res/audio/Jump.wav");
+    load_wav_from_base_dir(core, &core->sounds[BORK_SND_FOOTSTEP1], "res/audio/Footstep1.wav");
+    load_wav_from_base_dir(core, &core->sounds[BORK_SND_FOOTSTEP2], "res/audio/Footstep2.wav");
+    load_wav_from_base_dir(core, &core->sounds[BORK_SND_FIRE], "res/audio/Fire.wav");
+    load_wav_from_base_dir(core, &core->sounds[BORK_SND_EXPLOSION], "res/audio/Explosion1.wav");
+    load_wav_from_base_dir(core, &core->sounds[BORK_SND_HURT], "res/audio/Hurt.wav");
+    load_wav_from_base_dir(core, &core->sounds[BORK_SND_HUM], "res/audio/Ambient_hum_loop.wav");
+    load_wav_from_base_dir(core, &core->sounds[BORK_SND_HISS], "res/audio/Ambient_hiss.wav");
 }
 
 static void list_save(tfFILE* f, void* udata)
@@ -300,6 +334,38 @@ void bork_save_options(struct bork_game_core* core)
         core->fullscreen, core->mouse_sensitivity);
     fclose(f);
 
+}
+
+static const char* bork_ctrl_names[] = {
+    [BORK_CTRL_UP] =            "WALK FORWARD",
+    [BORK_CTRL_DOWN] =          "WALK BACKWARD",
+    [BORK_CTRL_LEFT] =          "WALK LEFT",
+    [BORK_CTRL_RIGHT] =         "WALK RIGHT",
+    [BORK_CTRL_JUMP] =          "JUMP",
+    [BORK_CTRL_CROUCH] =        "CROUCH",
+    [BORK_CTRL_FLASHLIGHT] =    "FLASHLIGHT",
+    [BORK_CTRL_FIRE] =          "USE HELD ITEM (SHOOT)",
+    [BORK_CTRL_RELOAD] =        "RELOAD",
+    [BORK_CTRL_DROP] =          "DROP ITEM",
+    [BORK_CTRL_INTERACT] =      "INTERACT",
+    [BORK_CTRL_USE_TECH] =      "USE TECH UPGRADE",
+    [BORK_CTRL_NEXT_TECH] =     "NEXT UPGRADE",
+    [BORK_CTRL_PREV_TECH] =     "PREVIOUS UPGRADE",
+    [BORK_CTRL_NEXT_ITEM] =     "NEXT ITEM",
+    [BORK_CTRL_PREV_ITEM] =     "PREV ITEM",
+    [BORK_CTRL_BIND1] =         "QUICK FETCH 1",
+    [BORK_CTRL_BIND2] =         "QUICK FETCH 2",
+    [BORK_CTRL_BIND3] =         "QUICK FETCH 3",
+    [BORK_CTRL_BIND4] =         "QUICK FETCH 4",
+    [BORK_CTRL_MENU] =          "MENU",
+    [BORK_CTRL_MENU_BACK] =     "MENU BACK",
+    [BORK_CTRL_SELECT] =        "SELECT OPTION",
+    [BORK_CTRL_COUNT] =         "NULL"
+};
+
+const char* bork_get_ctrl_name(enum bork_control ctrl)
+{
+    return bork_ctrl_names[ctrl];
 }
 
 void bork_draw_fps(struct bork_game_core* core)

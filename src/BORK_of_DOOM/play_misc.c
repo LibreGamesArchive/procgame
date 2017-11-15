@@ -35,8 +35,9 @@ void entity_on_fire(struct bork_play_data* d, struct bork_entity* ent)
             .current_frame = 24 + rand() % 4,
         };
         ARR_PUSH(d->particles, new_part);
-    } else if(ent->fire_ticks % 90 == 0) {
-        ent->HP -= 8;
+    } else if(ent->fire_ticks % 30 == 0) {
+        ent->HP -= 1;
+        ent->pain_ticks += 30;
     }
     --ent->fire_ticks;
     if(ent->fire_ticks == 0) ent->flags &= ~BORK_ENTFLAG_ON_FIRE;

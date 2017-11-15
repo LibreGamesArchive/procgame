@@ -303,7 +303,7 @@ void draw_game_menu(struct bork_play_data* d, float t)
     float base_menu_color = (d->menu.game.mode == GAME_MENU_BASE ? 1 : 0.25);
     for(i = 0; i < 5; ++i) {
         int is_selected = (i == d->menu.game.selection_idx);
-        int len = snprintf(text.block[++ti], 16, "%s", game_menu_opts[i]);
+        snprintf(text.block[++ti], 16, "%s", game_menu_opts[i]);
         vec4_set(text.block_style[ti], 0.15 + 0.05 * is_selected,
                  0.25 + 0.1 * i, 0.04, 1.2);
         vec4_set(text.block_color[ti], 1, 1, 1, is_selected ? 1 : base_menu_color);
@@ -313,7 +313,7 @@ void draw_game_menu(struct bork_play_data* d, float t)
         for(i = 0; i < num_saves; ++i) {
             int is_selected = (i + d->menu.game.save_scroll == d->menu.game.save_idx);
             struct bork_save* save = &d->core->save_files.data[i + d->menu.game.save_scroll];
-            int len = snprintf(text.block[++ti], 32, "%s", save->name);
+            snprintf(text.block[++ti], 32, "%s", save->name);
             vec4_set(text.block_style[ti], ar * 0.55 + 0.04 * is_selected,
                      0.25 + 0.1 * i, 0.03, 1.2);
             vec4_set(text.block_color[ti], 1, 1, 1, 1);
@@ -329,7 +329,7 @@ void draw_game_menu(struct bork_play_data* d, float t)
         for(i = 0; i < num_saves; ++i) {
             int is_selected = (i + d->menu.game.save_scroll == d->menu.game.save_idx);
             if(i + d->menu.game.save_scroll == -1) {
-                int len = snprintf(text.block[++ti], 32, "%s",
+                snprintf(text.block[++ti], 32, "%s",
                                    d->menu.game.save_name);
                 vec4_set(text.block_style[ti], ar * 0.55 + 0.04 * is_selected,
                          0.25, 0.04, 1.2);
@@ -342,7 +342,7 @@ void draw_game_menu(struct bork_play_data* d, float t)
                 continue;
             }
             struct bork_save* save = &d->core->save_files.data[i + d->menu.game.save_scroll];
-            int len = snprintf(text.block[++ti], 32, "%s", save->name);
+            snprintf(text.block[++ti], 32, "%s", save->name);
             vec4_set(text.block_style[ti], ar * 0.55 + 0.04 * is_selected,
                      0.25 + 0.1 * i, 0.03, 1.2);
             vec4_set(text.block_color[ti], 1, 1, 1,

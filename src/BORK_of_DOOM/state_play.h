@@ -54,6 +54,7 @@ struct bork_play_data {
     /*  Input states    */
     vec2 mouse_motion;
     int crouch_toggle;
+    int walk_input_ticks;
     int joystick_held[2];
     int trigger_held[2];
     struct {
@@ -120,6 +121,7 @@ bork_entity_t get_looked_enemy(struct bork_play_data* d);
 bork_entity_t get_looked_entity(struct bork_play_data* d);
 struct bork_map_object* get_looked_map_object(struct bork_play_data* d);
 void game_explosion(struct bork_play_data* d, vec3 pos, float intensity);
+void drop_item(struct bork_play_data* d);
 
 /*  Cosmetic/mainly visual type stuff   game_effects.c  */
 void create_explosion(struct bork_play_data* d, vec3 pos, float intensity);

@@ -91,6 +91,7 @@ void bork_use_pistol(struct bork_entity* ent, struct bork_play_data* d)
         .ticks_left = 8,
     };
     ARR_PUSH(d->particles, new_part);
+    pg_audio_play(&d->core->sounds[BORK_SND_PISTOL], 0.5f);
 }
 
 void bork_hud_pistol(struct bork_entity* ent, struct bork_play_data* d)
@@ -175,6 +176,7 @@ void bork_use_shotgun(struct bork_entity* ent, struct bork_play_data* d)
         .ticks_left = 4,
     };
     ARR_PUSH(d->particles, new_part);
+    pg_audio_play(&d->core->sounds[BORK_SND_SHOTGUN], 0.5f);
 }
 
 void bork_hud_shotgun(struct bork_entity* ent, struct bork_play_data* d)
@@ -232,6 +234,7 @@ void bork_use_machinegun(struct bork_entity* ent, struct bork_play_data* d)
         .ticks_left = 4,
     };
     ARR_PUSH(d->particles, new_part);
+    pg_audio_play(&d->core->sounds[BORK_SND_MACHINEGUN], 0.5f);
 }
 
 void bork_hud_machinegun(struct bork_entity* ent, struct bork_play_data* d)
@@ -293,6 +296,7 @@ void bork_use_plazgun(struct bork_entity* ent, struct bork_play_data* d)
     };
     if(ent->ammo_type == 2) vec4_set(new_part.light, 0.5, 0.5, 1.5, 8.0);
     ARR_PUSH(d->particles, new_part);
+    pg_audio_play(&d->core->sounds[BORK_SND_PLAZGUN], 0.5f);
 }
 
 void bork_hud_plazgun(struct bork_entity* ent, struct bork_play_data* d)
@@ -333,7 +337,7 @@ static void melee_callback(struct bork_entity* item, struct bork_play_data* d)
     mat3_mul_vec3(bullet_dir, view, bullet_dir);
     mat4_mul_vec4(gun_pos, view, gun_pos);
     struct bork_bullet new_bullet =
-        { .type = 31,
+        { .type = (item->type == BORK_ITEM_BEAMSWORD) ? 30 : 31,
           .flags = BORK_BULLET_HURTS_ENEMY,
           .damage = item_prof->damage +
                     item_prof->damage * (get_upgrade_level(d, BORK_UPGRADE_STRENGTH) + 1),

@@ -25,31 +25,36 @@ enum bork_control {
     BORK_CTRL_COUNT,
 };
 
-static const char* bork_ctrl_names[] = {
-    [BORK_CTRL_UP] =            "WALK FORWARD",
-    [BORK_CTRL_DOWN] =          "WALK BACKWARD",
-    [BORK_CTRL_LEFT] =          "WALK LEFT",
-    [BORK_CTRL_RIGHT] =         "WALK RIGHT",
-    [BORK_CTRL_JUMP] =          "JUMP",
-    [BORK_CTRL_CROUCH] =        "CROUCH",
-    [BORK_CTRL_FLASHLIGHT] =    "FLASHLIGHT",
-    [BORK_CTRL_FIRE] =          "USE HELD ITEM (SHOOT)",
-    [BORK_CTRL_RELOAD] =        "RELOAD",
-    [BORK_CTRL_DROP] =          "DROP ITEM",
-    [BORK_CTRL_INTERACT] =      "INTERACT",
-    [BORK_CTRL_USE_TECH] =      "USE TECH UPGRADE",
-    [BORK_CTRL_NEXT_TECH] =     "NEXT UPGRADE",
-    [BORK_CTRL_PREV_TECH] =     "PREVIOUS UPGRADE",
-    [BORK_CTRL_NEXT_ITEM] =     "NEXT ITEM",
-    [BORK_CTRL_PREV_ITEM] =     "PREV ITEM",
-    [BORK_CTRL_BIND1] =         "QUICK FETCH 1",
-    [BORK_CTRL_BIND2] =         "QUICK FETCH 2",
-    [BORK_CTRL_BIND3] =         "QUICK FETCH 3",
-    [BORK_CTRL_BIND4] =         "QUICK FETCH 4",
-    [BORK_CTRL_MENU] =          "MENU",
-    [BORK_CTRL_MENU_BACK] =     "MENU BACK",
-    [BORK_CTRL_SELECT] =        "SELECT OPTION",
-    [BORK_CTRL_COUNT] =         "NULL"
+enum bork_sound {
+    BORK_SND_PISTOL,
+    BORK_SND_SHOTGUN,
+    BORK_SND_MACHINEGUN,
+    BORK_SND_PLAZGUN,
+    BORK_SND_BULLET_HIT,
+    BORK_SND_PLAZMA_HIT,
+    BORK_SND_EXPLOSION,
+    BORK_SND_EXPLOSION_ELEC,
+    BORK_SND_TELEPORT,
+    BORK_SND_PICKUP,
+    BORK_SND_RECYCLER,
+    BORK_SND_DEFENSE_FIELD,
+    BORK_SND_DOOR_OPEN,
+    BORK_SND_DOOR_CLOSE,
+    BORK_SND_FIRE,
+    BORK_SND_FOOTSTEP1,
+    BORK_SND_FOOTSTEP2,
+    BORK_SND_JUMP,
+    BORK_SND_PLAYER_LAND,
+    BORK_SND_ITEM_LAND,
+    BORK_SND_KEYPAD_PRESS,
+    BORK_SND_SWING_PIPE,
+    BORK_SND_SWING_BEAMSWORD,
+    BORK_SND_HURT,
+    BORK_SND_HUM,
+    BORK_SND_HISS,
+    BORK_SND_BEEPS,
+    BORK_SND_BUZZ,
+    BORK_NUM_SOUNDS
 };
 
 struct bork_save {
@@ -82,7 +87,10 @@ struct bork_game_core {
     struct pg_texture upgrades_tex;
     struct pg_texture item_tex;
     struct pg_texture enemies_tex;
+    struct pg_texture starfield_tex;
+    struct pg_texture moon_tex;
     struct pg_texture font;
+    struct pg_audio_chunk sounds[BORK_NUM_SOUNDS];
     /*  Generated assets    */
     struct pg_texture backdrop_tex;
     struct pg_texture menu_vignette;
@@ -109,6 +117,9 @@ void bork_init(struct bork_game_core* core, char* base_path);
 void bork_delete_save(struct bork_game_core* core, int save_idx);
 void bork_load_options(struct bork_game_core* core);
 void bork_save_options(struct bork_game_core* core);
+void bork_reinit_gfx(struct bork_game_core* core, int sw, int sh, int fullscreen);
+void bork_reset_keymap(struct bork_game_core* core);
+const char* bork_get_ctrl_name(enum bork_control ctrl);
 void bork_deinit(struct bork_game_core* core);
 void bork_load_assets(struct bork_game_core* core);
 void bork_menu_start(struct pg_game_state* state, struct bork_game_core* core);
