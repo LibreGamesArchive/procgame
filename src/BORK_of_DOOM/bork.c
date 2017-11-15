@@ -83,6 +83,41 @@ void bork_init(struct bork_game_core* core, char* base_path)
     bork_read_saves(core);
 }
 
+void bork_deinit(struct bork_game_core* core)
+{
+    pg_texture_deinit(&core->env_atlas);
+    pg_texture_deinit(&core->editor_atlas);
+    pg_texture_deinit(&core->bullet_tex);
+    pg_texture_deinit(&core->particle_tex);
+    pg_texture_deinit(&core->upgrades_tex);
+    pg_texture_deinit(&core->item_tex);
+    pg_texture_deinit(&core->enemies_tex);
+    pg_texture_deinit(&core->starfield_tex);
+    pg_texture_deinit(&core->moon_tex);
+    pg_texture_deinit(&core->font);
+    pg_texture_deinit(&core->backdrop_tex);
+    pg_texture_deinit(&core->menu_vignette);
+    pg_texture_deinit(&core->radial_vignette);
+    pg_audio_free(&core->menu_sound);
+    int i;
+    for(i = 0; i < BORK_NUM_SOUNDS; ++i) {
+        if(core->sounds[i].len) pg_audio_free(&core->sounds[i]);
+    }
+    pg_model_deinit(&core->quad_2d);
+    pg_model_deinit(&core->quad_2d_ctr);
+    pg_model_deinit(&core->bullet_model);
+    pg_model_deinit(&core->enemy_model);
+    pg_model_deinit(&core->gun_model);
+    pg_ppbuffer_deinit(&core->ppbuf);
+    pg_gbuffer_deinit(&core->gbuf);
+    pg_shader_deinit(&core->shader_3d);
+    pg_shader_deinit(&core->shader_2d);
+    pg_shader_deinit(&core->shader_sprite);
+    pg_shader_deinit(&core->shader_text);
+    pg_postproc_deinit(&core->post_blur);
+    pg_postproc_deinit(&core->post_screen);
+}
+
 void bork_reinit_gfx(struct bork_game_core* core, int sw, int sh, int fullscreen)
 {
     core->fullscreen = fullscreen;

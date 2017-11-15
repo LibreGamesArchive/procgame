@@ -45,6 +45,7 @@ int main(int argc, char *argv[])
     }
     /*  Clean it all up */
     pg_game_state_deinit(&game);
+    bork_deinit(&bork);
     pg_deinit();
     return 0;
 }

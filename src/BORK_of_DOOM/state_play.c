@@ -39,6 +39,10 @@ void bork_play_deinit(void* data)
 {
     struct bork_play_data* d = data;
     bork_map_deinit(&d->map);
+    ARR_DEINIT(d->particles);
+    ARR_DEINIT(d->plr_enemy_query);
+    ARR_DEINIT(d->plr_item_query);
+    ARR_DEINIT(d->plr_entity_query);
     ARR_DEINIT(d->lights_buf);
     ARR_DEINIT(d->spotlights);
     ARR_DEINIT(d->inventory);
