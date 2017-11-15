@@ -5,6 +5,7 @@
 #define BORK_PARTICLE_LOOP_ANIM     (1 << 4)
 #define BORK_PARTICLE_LIGHT_DECAY   (1 << 5)
 #define BORK_PARTICLE_DECELERATE    (1 << 6)
+#define BORK_PARTICLE_COLLIDE_DIE   (1 << 7)
 
 struct bork_particle {
     vec3 pos;

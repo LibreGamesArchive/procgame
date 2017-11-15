@@ -813,6 +813,11 @@ static void tick_particles(struct bork_play_data* d)
         if(part->flags & BORK_PARTICLE_GRAVITY) part->vel[2] -= 0.005;
         else if(part->flags & BORK_PARTICLE_BOUYANT) part->vel[2] += 0.00025;
         if(part->flags & BORK_PARTICLE_DECELERATE) vec3_scale(part->vel, part->vel, 0.95);
+        if(part->flags & BORK_PARTICLE_COLLIDE_DIE) {
+            if(bork_map_check_sphere(&d->map, NULL, part->pos, 0.1)) {
+                part->ticks_left = 0;
+            }
+        }
 
     }
 }
