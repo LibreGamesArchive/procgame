@@ -689,7 +689,10 @@ void bork_editor_complete_duct(struct bork_map* map, struct bork_editor_map* ed_
     if(ed_tile->dir & (1 << PG_LEFT)) {
         struct bork_editor_tile* opp_tile = &ed_map->tiles[x + 1][y][z];
         if(opp_tile->type <= BORK_TILE_ATMO
-        || opp_tile->type == BORK_TILE_CATWALK) {
+        || opp_tile->type == BORK_TILE_CATWALK
+        || opp_tile->type == BORK_TILE_PIPES
+        || opp_tile->type == BORK_TILE_WINDOW
+        || opp_tile->type == BORK_TILE_LADDER) {
             quat_rotate(dir, M_PI * 1.5, (vec3){ 0, 0, 1 });
             struct bork_map_object new_obj = {
                 .type = BORK_MAP_GRATE,
@@ -702,7 +705,10 @@ void bork_editor_complete_duct(struct bork_map* map, struct bork_editor_map* ed_
     if(ed_tile->dir & (1 << PG_BACK)) {
         struct bork_editor_tile* opp_tile = &ed_map->tiles[x][y - 1][z];
         if(opp_tile->type <= BORK_TILE_ATMO
-        || opp_tile->type == BORK_TILE_CATWALK) {
+        || opp_tile->type == BORK_TILE_CATWALK
+        || opp_tile->type == BORK_TILE_PIPES
+        || opp_tile->type == BORK_TILE_WINDOW
+        || opp_tile->type == BORK_TILE_LADDER) {
             quat_rotate(dir, M_PI, (vec3){ 0, 0, 1 });
             struct bork_map_object new_obj = {
                 .type = BORK_MAP_GRATE,
@@ -715,7 +721,10 @@ void bork_editor_complete_duct(struct bork_map* map, struct bork_editor_map* ed_
     if(ed_tile->dir & (1 << PG_RIGHT)) {
         struct bork_editor_tile* opp_tile = &ed_map->tiles[x - 1][y][z];
         if(opp_tile->type <= BORK_TILE_ATMO
-        || opp_tile->type == BORK_TILE_CATWALK) {
+        || opp_tile->type == BORK_TILE_CATWALK
+        || opp_tile->type == BORK_TILE_PIPES
+        || opp_tile->type == BORK_TILE_WINDOW
+        || opp_tile->type == BORK_TILE_LADDER) {
             quat_rotate(dir, M_PI * 0.5, (vec3){ 0, 0, 1 });
             struct bork_map_object new_obj = {
                 .type = BORK_MAP_GRATE,
@@ -728,7 +737,10 @@ void bork_editor_complete_duct(struct bork_map* map, struct bork_editor_map* ed_
     if(ed_tile->dir & (1 << PG_FRONT)) {
         struct bork_editor_tile* opp_tile = &ed_map->tiles[x][y + 1][z];
         if(opp_tile->type <= BORK_TILE_ATMO
-        || opp_tile->type == BORK_TILE_CATWALK) {
+        || opp_tile->type == BORK_TILE_CATWALK
+        || opp_tile->type == BORK_TILE_PIPES
+        || opp_tile->type == BORK_TILE_WINDOW
+        || opp_tile->type == BORK_TILE_LADDER) {
             quat_identity(dir);
             struct bork_map_object new_obj = {
                 .type = BORK_MAP_GRATE,
