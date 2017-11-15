@@ -10,6 +10,11 @@
 #define DR_WAV_IMPLEMENTATION
 #include "ext/dr_wav.h"
 
+static struct pg_audio_channel {
+    int paused;
+    vec3 listener;
+} channels[32];
+
 struct pg_audio_chunk_ref {
     struct pg_audio_chunk* chunk;
     float volume;
@@ -17,11 +22,19 @@ struct pg_audio_chunk_ref {
     int progress;
 };
 
+struct pg_audio_emitter {
+    int handle;
+    struct pg_audio_chunk* chunk;
+    int progress, channel;
+    float volume, area;
+    vec3 pos;
+};
 
 static SDL_AudioSpec pg_audio_spec;
 static SDL_AudioDeviceID pg_audio_dev;
 static int pg_have_audio;
 static ARR_T(struct pg_audio_chunk_ref) pg_audio_play_queue;
+static ARR_T(struct pg_audio_emitter) pg_audio_active_emitters;
 
 /*  The callback for SDL; buffers from the play queue, deletes sounds that
     are finished playing    */
@@ -29,6 +42,8 @@ static void pg_buffer_audio(void* udata, Uint8* stream, int len)
 {
     memset(stream, pg_audio_spec.silence, len);
     int s_len = len / sizeof(int16_t);
+    int32_t mix[len];
+    memset(mix, 0, len * sizeof(int32_t));
     int16_t* s_stream = (int16_t*)stream;
     struct pg_audio_chunk_ref* ref;
     int i;
@@ -42,12 +57,36 @@ static void pg_buffer_audio(void* udata, Uint8* stream, int len)
         int stream_i = 0;
         ref->progress += segment_len;
         for(ref_i = segment; ref_i < first_end; ++ref_i, ++stream_i) {
-            s_stream[stream_i] += ref->chunk->samples[ref_i] * ref->volume;
+            mix[stream_i] += ref->chunk->samples[ref_i] * ref->volume;
         }
         for(ref_i = 0; ref_i < pos_from_beginning; ++ref_i, ++stream_i) {
-            s_stream[stream_i] += ref->chunk->samples[ref_i] * ref->volume;
+            mix[stream_i] += ref->chunk->samples[ref_i] * ref->volume;
         }
         if(ref->progress >= ref->len) ARR_SWAPSPLICE(pg_audio_play_queue, i, 1);
+    }
+    struct pg_audio_emitter* em;
+    ARR_FOREACH_PTR(pg_audio_active_emitters, em, i) {
+        if(channels[em->channel].paused) continue;
+        float vol = vec3_dist(em->pos, channels[em->channel].listener);
+        if(vol > em->area) continue;
+        vol = (1 - (vol / em->area)) * em->volume;
+        int segment = em->progress % em->chunk->len;
+        int segment_len = MIN(em->chunk->len - em->progress, s_len);
+        int pos_to_end = MIN(em->chunk->len - segment, segment_len);
+        int pos_from_beginning = MAX(0, segment_len - pos_to_end);
+        int first_end = segment + pos_to_end;
+        int em_i = segment;
+        int stream_i = 0;
+        em->progress = (segment_len + em->progress) % em->chunk->len;
+        for(em_i = segment; em_i < first_end; ++em_i, ++stream_i) {
+            mix[stream_i] += em->chunk->samples[em_i] * vol;
+        }
+        for(em_i = 0; em_i < pos_from_beginning; ++em_i, ++stream_i) {
+            mix[stream_i] += em->chunk->samples[em_i] * vol;
+        }
+    }
+    for(i = 0; i < s_len; ++i) {
+        s_stream[i] = CLAMP(mix[i], INT16_MIN, INT16_MAX);
     }
 }
 
@@ -115,24 +154,78 @@ void pg_audio_generate(struct pg_audio_chunk* chunk, float len,
 
 void pg_audio_play(struct pg_audio_chunk* chunk, float volume)
 {
+    if(!chunk || !chunk->len) return;
     struct pg_audio_chunk_ref ref = {
         .chunk = chunk,
         .volume = volume,
         .start = 0, .len = chunk->len,
         .progress = 0 };
+    SDL_LockAudioDevice(pg_audio_dev);
     ARR_PUSH(pg_audio_play_queue, ref);
+    SDL_UnlockAudioDevice(pg_audio_dev);
 }
 
 void pg_audio_loop(struct pg_audio_chunk* chunk, float volume,
                    float start, float len)
 {
+    if(!chunk || !chunk->len) return;
     struct pg_audio_chunk_ref ref = {
         .chunk = chunk,
         .volume = volume,
         .start = (int)(start * PG_AUDIO_SAMPLE_RATE) % chunk->len,
         .len = (int)(len * PG_AUDIO_SAMPLE_RATE),
         .progress = 0 };
+    printf("%d %d\n", ref.start, ref.len);
+    SDL_LockAudioDevice(pg_audio_dev);
     ARR_PUSH(pg_audio_play_queue, ref);
+    SDL_UnlockAudioDevice(pg_audio_dev);
+}
+
+int pg_audio_emitter(struct pg_audio_chunk* chunk, float volume,
+                     float area, vec3 pos, int channel)
+{
+    static uint64_t emitter_handle = 0;
+    struct pg_audio_emitter emitter = {
+        .handle = emitter_handle++,
+        .chunk = chunk,
+        .progress = 0,
+        .channel = channel,
+        .volume = volume,
+        .area = area,
+        .pos = { pos[0], pos[1], pos[2] } };
+    SDL_LockAudioDevice(pg_audio_dev);
+    ARR_PUSH(pg_audio_active_emitters, emitter);
+    SDL_UnlockAudioDevice(pg_audio_dev);
+    return emitter.handle;
+}
+
+void pg_audio_emitter_remove(int handle)
+{
+    int i;
+    struct pg_audio_emitter* emitter;
+    ARR_FOREACH_PTR_REV(pg_audio_active_emitters, emitter, i) {
+        if(emitter->handle == handle) {
+            SDL_LockAudioDevice(pg_audio_dev);
+            ARR_SWAPSPLICE(pg_audio_active_emitters, i, 1);
+            SDL_UnlockAudioDevice(pg_audio_dev);
+        }
+    }
+}
+
+void pg_audio_set_listener(int channel, vec3 pos)
+{
+    if(channel < 0 || channel >= 32) return;
+    SDL_LockAudioDevice(pg_audio_dev);
+    vec3_dup(channels[channel].listener, pos);
+    SDL_UnlockAudioDevice(pg_audio_dev);
+}
+
+void pg_audio_channel_pause(int channel, int paused)
+{
+    if(channel < 0 || channel >= 32) return;
+    SDL_LockAudioDevice(pg_audio_dev);
+    channels[channel].paused = paused;
+    SDL_UnlockAudioDevice(pg_audio_dev);
 }
 
 void pg_audio_save(struct pg_audio_chunk* chunk, const char* filename)
