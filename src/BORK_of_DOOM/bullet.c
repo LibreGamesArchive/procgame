@@ -83,7 +83,6 @@ static void bullet_die(struct bork_bullet* blt, struct bork_play_data* d)
         } case 7: {
             ARR_TRUNCATE(surr, 0);
             vec3 surr_start, surr_end;
-            vec3 surr_center;
             vec3_sub(surr_start, blt->pos, (vec3){ 3, 3, 3 });
             vec3_add(surr_end, blt->pos, (vec3){ 3, 3, 3 });
             bork_map_query_enemies(&d->map, &surr, surr_start, surr_end);
@@ -129,7 +128,25 @@ static void bullet_die(struct bork_bullet* blt, struct bork_play_data* d)
                 .lifetime = 30
             };
             ARR_PUSH(d->particles, new_part);
-            blue_sparks(d, blt->pos, 0.05, rand() % 4 + 4);
+            ice_sparks(d, blt->pos, 0.05, rand() % 4 + 4);
+            break;
+        } case 9: {
+            ARR_TRUNCATE(surr, 0);
+            struct bork_particle new_part = {
+                .flags = BORK_PARTICLE_LIGHT,
+                .light = { 1.5, 0.5, 0.5, 4 },
+                .pos = { blt->pos[0], blt->pos[1], blt->pos[2] },
+                .vel = { 0, 0, 0 },
+                .ticks_left = 45,
+                .lifetime = 45
+            };
+            ARR_PUSH(d->particles, new_part);
+            red_sparks(d, blt->pos, 0.45, rand() % 4 + 12);
+            float dist = vec3_dist(blt->pos, d->plr.pos);
+            if(dist < 16) {
+                dist = 1 - (dist / 16);
+                pg_audio_play(&d->core->sounds[BORK_SND_PLAZMA_HIT], dist);
+            }
             break;
         } default: break;
     }
@@ -151,7 +168,7 @@ void bork_bullet_move(struct bork_bullet* blt, struct bork_play_data* d)
     float curr_move = 0;
     float max_move = 0.01;
     float full_dist = vec3_len(blt->dir);
-    vec3 max_move_dir;
+    vec3 max_move_dir = {};
     vec3_set_len(max_move_dir, blt->dir, max_move);
     vec3 new_pos = { blt->pos[0], blt->pos[1], blt->pos[2] };
     while(curr_move < full_dist) {
@@ -192,7 +209,7 @@ void bork_bullet_move(struct bork_bullet* blt, struct bork_play_data* d)
                 blt->flags |= BORK_BULLET_DEAD;
                 if(!(closest_ent->flags & BORK_ENTFLAG_STATIONARY)
                 && closest_ent->freeze_ticks < 60 && blt->type != 8) {
-                    vec3 knockback;
+                    vec3 knockback = {};
                     vec3_set_len(knockback, blt->dir, 0.1);
                     vec3_add(closest_ent->vel, closest_ent->vel, knockback);
                 }
