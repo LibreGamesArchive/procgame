@@ -405,6 +405,7 @@ const char* bork_get_ctrl_name(enum bork_control ctrl)
 
 void bork_draw_fps(struct bork_game_core* core)
 {
+    if(!core->show_fps) return;
     struct pg_shader_text fps_text = { .use_blocks = 1 };
     struct pg_shader* shader = &core->shader_text;
     pg_shader_text_resolution(shader, core->screen_size);

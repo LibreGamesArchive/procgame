@@ -270,7 +270,7 @@ static void bork_menu_tick(struct pg_game_state* state)
         if(d->remap_ctrl) {
             uint8_t ctrl = pg_first_input();
             if(ctrl) {
-                d->core->ctrl_map[d->opt_idx - 4] = ctrl;
+                d->core->ctrl_map[d->opt_idx - 5] = ctrl;
                 d->remap_ctrl = 0;
             }
         } else if(d->opt_res_typing) {
@@ -333,6 +333,8 @@ static void bork_menu_tick(struct pg_game_state* state)
                             d->opt_res_input_idx = 0;
                             pg_text_mode(1);
                         } else if(opt == 3) {
+                            d->core->show_fps = 1 - d->core->show_fps;
+                        } else if(opt == 4) {
                             if(fabs(mouse_pos[0] - (ar * 0.65 + 0.0125)) < 0.03) {
                                 d->core->mouse_sensitivity =
                                     MAX(0.0001, d->core->mouse_sensitivity - 0.0001);
@@ -354,6 +356,8 @@ static void bork_menu_tick(struct pg_game_state* state)
             if(d->opt_idx == 0) {
                 d->opt_fullscreen = 1 - d->opt_fullscreen;
             } else if(d->opt_idx == 3) {
+                d->core->show_fps = 1 - d->core->show_fps;
+            } else if(d->opt_idx == 4) {
                 d->core->mouse_sensitivity = MIN(5.0f / 1000, d->core->mouse_sensitivity + 0.0001);
             }
         } else if(pg_check_input(kmap[BORK_CTRL_LEFT], PG_CONTROL_HIT)
@@ -361,6 +365,8 @@ static void bork_menu_tick(struct pg_game_state* state)
             if(d->opt_idx == 0) {
                 d->opt_fullscreen = 1 - d->opt_fullscreen;
             } else if(d->opt_idx == 3) {
+                d->core->show_fps = 1 - d->core->show_fps;
+            } else if(d->opt_idx == 4) {
                 d->core->mouse_sensitivity = MAX(0.0001, d->core->mouse_sensitivity - 0.0001);
             }
         } else if(pg_check_input(kmap[BORK_CTRL_SELECT], PG_CONTROL_HIT)) {
@@ -369,14 +375,16 @@ static void bork_menu_tick(struct pg_game_state* state)
                 pg_text_mode(1);
             } else if(d->opt_idx == 0) {
                 d->opt_fullscreen = 1 - d->opt_fullscreen;
-            } else if(d->opt_idx == BORK_CTRL_COUNT + 4) {
+            } else if(d->opt_idx == 3) {
+                d->core->show_fps = 1 - d->core->show_fps;
+            } else if(d->opt_idx == BORK_CTRL_COUNT + 5) {
                 bork_reset_keymap(d->core);
                 d->core->mouse_sensitivity = 1.0f / 1000;
-            } else if(d->opt_idx > 3) d->remap_ctrl = 1;
+            } else if(d->opt_idx > 4) d->remap_ctrl = 1;
         } else if(pg_check_input(SDL_SCANCODE_DOWN, PG_CONTROL_HIT)
                || pg_check_input(kmap[BORK_CTRL_DOWN], PG_CONTROL_HIT)
                || stick_ctrl_y == 1) {
-            d->opt_idx = MIN(BORK_CTRL_COUNT + 4, d->opt_idx + 1);
+            d->opt_idx = MIN(BORK_CTRL_COUNT + 5, d->opt_idx + 1);
             if(d->opt_scroll + 9 < d->opt_idx) d->opt_scroll = d->opt_idx - 9;
             else if(d->opt_scroll > d->opt_idx) d->opt_scroll = d->opt_idx;
             pg_audio_play(&d->core->menu_sound, 0.2);
@@ -391,7 +399,7 @@ static void bork_menu_tick(struct pg_game_state* state)
         && d->opt_scroll > 0) {
             d->opt_scroll -= 1;
         } else if(pg_check_input(PG_MOUSEWHEEL_DOWN, PG_CONTROL_HIT)
-        && d->opt_scroll + 10 < BORK_CTRL_COUNT + 5) {
+        && d->opt_scroll + 10 < BORK_CTRL_COUNT + 6) {
             d->opt_scroll += 1;
         }
     }
@@ -404,38 +412,55 @@ static void bork_menu_draw(struct pg_game_state* state)
     float ar = d->core->aspect_ratio;
     /*  Overlay */
     pg_screen_dst();
-    struct pg_shader* shader = &d->core->shader_text;
     bork_draw_backdrop(d->core, (vec4){ 2, 2, 2, 1 },
                        (float)state->ticks / (float)state->tick_rate);
     bork_draw_linear_vignette(d->core, (vec4){ 0, 0, 0, 1 });
+    struct pg_shader* shader = &d->core->shader_2d;
+    pg_shader_2d_resolution(shader, (vec2){ ar, 1 });
+    pg_shader_2d_set_light(&d->core->shader_2d, (vec2){}, (vec3){}, (vec3){ 1, 1, 1 });
+    pg_shader_2d_color_mod(shader, (vec4){ 0.2, 0.2, 0.2, 1 }, (vec4){});
+    pg_shader_2d_texture(shader, &d->core->env_atlas);
+    pg_shader_2d_tex_frame(shader, 45);
+    pg_shader_2d_add_tex_tx(shader, (vec2){ 2, 2 }, (vec2){});
+    pg_shader_2d_transform(shader, (vec2){ ar * 0.275, 0.5 }, (vec2){ 0.3, 0.3 }, 0);
+    pg_shader_begin(shader, NULL);
+    pg_model_begin(&d->core->quad_2d_ctr, shader);
+    pg_model_draw(&d->core->quad_2d_ctr, NULL);
+    pg_shader_2d_color_mod(shader, (vec4){ 1, 1, 1, 0.2 }, (vec4){});
+    pg_shader_2d_tex_frame(shader, 77);
+    pg_shader_2d_add_tex_tx(shader, (vec2){ 2, 2 }, (vec2){});
+    pg_shader_2d_transform(shader, (vec2){ ar * 0.275, 0.5 }, (vec2){ 0.2, 0.2 }, 0);
+    pg_model_draw(&d->core->quad_2d_ctr, NULL);
+    shader = &d->core->shader_text;
     pg_shader_begin(shader, NULL);
     pg_shader_text_resolution(shader, (vec2){d->core->aspect_ratio, 1});
     pg_shader_text_transform(shader, (vec2){ 1, 1 }, (vec2){});
     static const char* menu_opts[] = {
         "NEW GAME", "CONTINUE", "OPTIONS", "CREDITS", "EXIT", "EDITOR" };
     struct pg_shader_text text = {
-        .use_blocks = 9,
-        .block = { "BORK", "OF", "DOOM!", },
+        .use_blocks = 10,
+        .block = { "THE", "COMMUNIST", "DOG      ", "   IFESTO" },
         .block_style = {
             /*  BORK OF DOOOOOM */
-            { ar * 0.25 - (4 * 0.1 * 1.1 * 0.5), 0.45, 0.1, 1.1 },
-            { ar * 0.25 - (2 * 0.025 * 1.1 * 0.5) - 0.17, 0.58, 0.025, 1.1 },
-            { ar * 0.25 - (5 * 0.06 * 1.1 * 0.5) + 0.07, 0.56, 0.06, 1.1 },
+            { ar * 0.275 - (3 * 0.025 * 1.1 * 0.5), 0.44, 0.025, 1.1 },
+            { ar * 0.275 - (9 * 0.06 * 1.1 * 0.5), 0.48, 0.06, 1.1 },
+            { ar * 0.275 - (9 * 0.06 * 1.1 * 0.5), 0.56, 0.06, 1.1 },
+            { ar * 0.275 - (9 * 0.06 * 1.1 * 0.5), 0.56, 0.06, 1.1 },
         },
-        .block_color = { { 1, 1, 1, 0.7 }, { 1, 1, 1, 0.6 }, { 1, 0, 0, 1 }, },
+        .block_color = { { 1, 1, 1, 0.75 }, { 1, 0, 0, 0.75 }, { 1, 1, 1, 1 }, { 1, 1, 1, 0.75 } }
     };
     if(d->mode == BORK_MENU_BASE) {
         int i;
         for(i = 0; i < BORK_MENU_COUNT; ++i) {
-            strncpy(text.block[i + 3], menu_opts[i], 10);
-            vec4_set(text.block_style[i + 3],
+            strncpy(text.block[i + 4], menu_opts[i], 10);
+            vec4_set(text.block_style[i + 4],
                 (d->current_selection == i) * 0.075 + ar * 0.55,
                 i * 0.1 + 0.225, 0.04, 1.2);
-            vec4_set(text.block_color[i + 3], 1, 1, 1, 1);
+            vec4_set(text.block_color[i + 4], 1, 1, 1, 1);
         }
     } else if(d->mode == BORK_MENU_SELECT_SAVE) {
         int ti = 2;
-        int i, len;
+        int i;
         int num_saves = MIN(d->core->save_files.len, 6);
         snprintf(text.block[++ti], 32, "BACK");
         vec4_set(text.block_style[ti], ar * 0.35 - (4 * 0.04 * 1.25 * 0.5),
@@ -445,7 +470,7 @@ static void bork_menu_draw(struct pg_game_state* state)
         } else {
             vec4_set(text.block_color[ti], 1, 1, 1, d->save_side == 0 ? 0.5 : 1);
         }
-        len = snprintf(text.block[++ti], 32, "DELETE");
+        snprintf(text.block[++ti], 32, "DELETE");
         vec4_set(text.block_style[ti], ar * 0.35 - (6 * 0.04 * 1.25 * 0.5),
                  0.8, 0.04, 1.2);
         if(d->delete_ticks) {
@@ -457,14 +482,14 @@ static void bork_menu_draw(struct pg_game_state* state)
         } else {
             vec4_set(text.block_color[ti], 1, 1, 1, d->save_side == 0 ? 0.75 : 0.5);
         }
-        len = snprintf(text.block[++ti], 32, "LOAD");
+        snprintf(text.block[++ti], 32, "LOAD");
         vec4_set(text.block_style[ti], ar * 0.655 - (4 * 0.05 * 1.25 * 0.5),
                  0.9, 0.05, 1.2);
         vec4_set(text.block_color[ti], 1, 1, 1, 1);
         for(i = 0; i < num_saves; ++i) {
             int is_selected = (i + d->save_scroll == d->save_idx);
             struct bork_save* save = &d->core->save_files.data[i + d->save_scroll];
-            len = snprintf(text.block[++ti], 32, "%s", save->name);
+            snprintf(text.block[++ti], 32, "%s", save->name);
             vec4_set(text.block_style[ti], ar * 0.55 + 0.04 * is_selected,
                      0.25 + 0.1 * i, 0.03, 1.2);
             vec4_set(text.block_color[ti], 1, 1, 1, 1);
@@ -553,16 +578,20 @@ static void bork_menu_draw(struct pg_game_state* state)
                     snprintf(text.block[ti + 1], 32, "%d", d->opt_res[1]);
                 }
             } else if(opt == 3) {
+                strncpy(text.block[++ti], "SHOW FPS", 32);
+                memset(text.block[ti + 1], 0, 32);
+                snprintf(text.block[ti + 1], 32, "%s", d->core->show_fps ? "YES" : "NO");
+            } else if(opt == 4) {
                 strncpy(text.block[++ti], "MOUSE SENSITIVITY", 32);
                 memset(text.block[ti + 1], 0, 32);
                 snprintf(text.block[ti + 1], 32, "< %.1f >", d->core->mouse_sensitivity * 1000);
-            } else if(opt == BORK_CTRL_COUNT + 4) {
+            } else if(opt == BORK_CTRL_COUNT + 5) {
                 strncpy(text.block[++ti], "RESET TO DEFAULTS", 32);
                 memset(text.block[ti + 1], 0, 32);
                 snprintf(text.block[ti + 1], 32, "[RESET]");
             } else {
-                strncpy(text.block[++ti], bork_get_ctrl_name(opt - 4), 32);
-                strncpy(text.block[ti + 1], pg_input_name(d->core->ctrl_map[opt - 4]), 32);
+                strncpy(text.block[++ti], bork_get_ctrl_name(opt - 5), 32);
+                strncpy(text.block[ti + 1], pg_input_name(d->core->ctrl_map[opt - 5]), 32);
             }
             vec4_set(text.block_style[ti], ar * 0.1 + is_selected * 0.05,
                                            0.25 + i * 0.06, 0.025, 1.2);
@@ -578,12 +607,12 @@ static void bork_menu_draw(struct pg_game_state* state)
             len = snprintf(text.block[++ti], 64, "%s", bork_get_ctrl_name(d->opt_idx - 4));
             vec4_set(text.block_style[ti], ar * 0.5 - (len * 0.025 * 1.2 * 0.5), 0.925, 0.025, 1.2);
             vec4_set(text.block_color[ti], 1, 1, 1, 1);
-        } else if(d->opt_idx > 3) {
+        } else if(d->opt_idx > 4) {
             len = snprintf(text.block[++ti], 64, "PRESS %s TO RE-MAP CONTROL",
                            pg_input_name(d->core->ctrl_map[BORK_CTRL_SELECT]));
             vec4_set(text.block_style[ti], ar * 0.5 - (len * 0.025 * 1.2 * 0.5), 0.875, 0.025, 1.2);
             vec4_set(text.block_color[ti], 1, 1, 1, 1);
-        } else if(d->opt_idx == 0 || d->opt_idx == 3) {
+        } else if(d->opt_idx == 0 || d->opt_idx == 3 || d->opt_idx == 4) {
             len = snprintf(text.block[++ti], 64, "LEFT/RIGHT TO SET OPTION");
             vec4_set(text.block_style[ti], ar * 0.5 - (len * 0.025 * 1.2 * 0.5), 0.875, 0.025, 1.2);
             vec4_set(text.block_color[ti], 1, 1, 1, 1);

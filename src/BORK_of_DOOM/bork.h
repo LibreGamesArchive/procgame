@@ -102,6 +102,7 @@ struct bork_game_core {
     struct pg_model gun_model;
     struct pg_audio_chunk menu_sound;
     /*  Input state */
+    int show_fps;
     uint8_t ctrl_map[BORK_CTRL_COUNT];
     float mouse_sensitivity;
     int mouse_relative;
