@@ -471,6 +471,7 @@ void draw_upgrade_hud(struct bork_play_data* d)
 
 int get_upgrade_level(struct bork_play_data* d, enum bork_upgrade up)
 {
+    if(up == BORK_UPGRADE_SCANNING) return d->upgrade_level[3];
     if(d->upgrades[0] == up) return d->upgrade_level[0];
     if(d->upgrades[1] == up) return d->upgrade_level[1];
     if(d->upgrades[2] == up) return d->upgrade_level[2];
@@ -486,6 +487,14 @@ static int can_install(struct bork_play_data* d, int up_type)
 {
     int i;
     int can = MUST_REPLACE;
+    if(up_type == BORK_UPGRADE_SCANNING) {
+        if(d->upgrade_level[3] == 0) {
+            d->menu.upgrades.replace_idx = 3;
+            return CAN_UPGRADE;
+        } else {
+            return CANNOT_UPGRADE;
+        }
+    }
     for(i = 0; i < 3; ++i) {
         if(d->upgrades[i] == up_type) {
             if(d->upgrade_level[i] == 0) {
@@ -500,7 +509,7 @@ static int can_install(struct bork_play_data* d, int up_type)
             break;
         }
     }
-    d->menu.upgrades.replace_idx = i % 3;
+    d->menu.upgrades.replace_idx = i;
     return can;
 }
 
