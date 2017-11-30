@@ -36,6 +36,7 @@ const char* bork_map_area_str(enum bork_area area);
 enum bork_tile_type {
     BORK_TILE_VAC,
     BORK_TILE_ATMO,
+    BORK_TILE_SPEC_WALL,
     BORK_TILE_HULL,
     BORK_TILE_HULL_HALF,
     BORK_TILE_HULL_EDGE,
@@ -59,11 +60,10 @@ enum bork_tile_type {
     BORK_TILE_RAMP_BOTTOM, BORK_TILE_RAMP_TOP,
     BORK_TILE_PIPES,
     BORK_TILE_WINDOW,
-    BORK_TILE_PLACEHOLD_1,
+    BORK_TILE_CARGO_YELLOW,
     BORK_TILE_PLACEHOLD_2,
     BORK_TILE_PLACEHOLD_3,
     BORK_TILE_PLACEHOLD_4,
-    BORK_TILE_PLACEHOLD_5,
     BORK_TILE_EDITOR_FIRE_LOW,
     BORK_TILE_EDITOR_FIRE_MID,
     BORK_TILE_EDITOR_FIRE_HIGH,
@@ -76,6 +76,8 @@ enum bork_tile_type {
     BORK_TILE_EDITOR_LIGHT_SMALLMOUNT,
     BORK_TILE_EDITOR_LIGHT2,
     BORK_TILE_EDITOR_EMER_LIGHT,
+    BORK_TILE_EDITOR_BROKEN_BIG_LIGHT,
+    BORK_TILE_EDITOR_BROKEN_SMALL_LIGHT,
     BORK_TILE_COUNT,
 };
 
@@ -109,12 +111,13 @@ struct bork_map_object {
         } door;
         struct {
             int door_idx;
+            int locked_side;
         } doorpad;
         struct {
             vec3 out_pos;
         } recycler;
         struct {
-            char text[16];
+            char text[32];
             vec4 color;
             float scale;
         } text;
