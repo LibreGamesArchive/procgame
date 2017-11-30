@@ -212,7 +212,7 @@ int bork_map_check_ellipsoid(struct bork_map* map, vec3 const pos, vec3 const r)
 int bork_map_check_sphere(struct bork_map* map, struct bork_map_object** hit_obj,
                           vec3 const pos, float r);
 int bork_map_check_vis(struct bork_map* map, vec3 const start, vec3 const end);
-float bork_map_vis_dist(struct bork_map* map, vec3 const start, vec3 const dir);
+float bork_map_vis_dist(struct bork_map* map, vec3 const start, vec3 const dir, float max);
 int bork_map_tile_walkable(struct bork_map* map, int x, int y, int z);
 void bork_map_build_plr_dist(struct bork_map* map, vec3 pos);
 void bork_map_calc_travel(struct bork_map* map);

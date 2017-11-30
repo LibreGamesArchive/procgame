@@ -946,9 +946,9 @@ int bork_map_check_vis(struct bork_map* map, vec3 const start, vec3 const end)
     return 1;
 }
 
-float bork_map_vis_dist(struct bork_map* map, vec3 const start, vec3 const dir)
+float bork_map_vis_dist(struct bork_map* map, vec3 const start, vec3 const dir, float max)
 {
-    vec3 part_vec, curr_point;
+    vec3 part_vec = {}, curr_point = {};
     float part_dist = 0.25;
     float curr_dist = 0;
     vec3_set_len(part_vec, dir, part_dist);
@@ -957,6 +957,7 @@ float bork_map_vis_dist(struct bork_map* map, vec3 const start, vec3 const dir)
         if(bork_map_check_sphere(map, NULL, curr_point, 0.25)) return curr_dist;
         vec3_add(curr_point, curr_point, part_vec);
         curr_dist += part_dist;
+        if(curr_dist >= max) return max;
     }
     return curr_dist;
 }
@@ -1062,6 +1063,10 @@ void bork_map_calc_travel(struct bork_map* map)
                 tile->travel_flags |= (1 << 7) | (1 << 6);
             }
             if(opp_d->tile_flags & BORK_TILE_WALK_ABOVE) tile->travel_flags |= (1 << 6);
+            if(opp->type == BORK_TILE_SPEC_WALL && (opp->orientation & (1 << PG_TOP)))
+                tile->travel_flags |= (1 << 6);
+            if(tile->type == BORK_TILE_SPEC_WALL && (tile->orientation & (1 << PG_BOTTOM)))
+                tile->travel_flags |= (1 << 6);
         }
         for(i = 0; i < 4; ++i) {
             int dx = x + PG_DIR_IDX[i][0];
@@ -1075,7 +1080,8 @@ void bork_map_calc_travel(struct bork_map* map)
             && !(opp_d->tile_flags & BORK_TILE_TRAVEL_DROP)) {
                 opp = bork_map_tile_ptri(map, dx, dy, dz - 1);
                 opp_d = bork_tile_detail(opp->type);
-                if(!(opp_d->tile_flags & BORK_TILE_WALK_ABOVE)) continue;
+                if(!(opp->type == BORK_TILE_SPEC_WALL && (opp->orientation & (1 << PG_TOP)))
+                && !(opp_d->tile_flags & BORK_TILE_WALK_ABOVE)) continue;
             }
             tile->travel_flags |= ((tile_travel(tile, i) && opp_travel) << i);
         }
@@ -1241,11 +1247,17 @@ static void bork_map_generate_model(struct bork_map* map, struct bork_editor_map
         for(y = 0; y < 32; ++y) {
             for(z = 0; z < 32; ++z) {
                 tile = &map->data[x][y][z];
-                if(!tile || tile->type < 2) continue;
                 struct bork_tile_detail* detail = &BORK_TILE_DETAILS[tile->type];
                 tile->model_tri_idx = map->model.tris.len;
+                tile->num_tris = 0;
+                struct bork_editor_tile* ed_tile = &ed_map->tiles[x][y][z];
+                if(ed_tile->alt_type == BORK_TILE_DUCT) {
+                    tile->num_tris += tile_model_duct(map, ed_map, env_atlas, tile, x, y, z);
+                } else if(ed_tile->alt_type == BORK_TILE_PIPES) {
+                    tile->num_tris += tile_model_pipes(map, ed_map, env_atlas, tile, x, y, z);
+                }
                 if(detail->add_model) {
-                    tile->num_tris = detail->add_model(map, ed_map, env_atlas, tile, x, y, z);
+                    tile->num_tris += detail->add_model(map, ed_map, env_atlas, tile, x, y, z);
                 }
             }
         }

@@ -395,12 +395,10 @@ static void tick_control_play(struct bork_play_data* d)
     || pg_check_gamepad(SDL_CONTROLLER_BUTTON_LEFTSTICK, PG_CONTROL_HELD)) {
         d->plr.flags |= BORK_ENTFLAG_CROUCH;
     } else if(d->plr.flags & BORK_ENTFLAG_CROUCH) {
-        if(!bork_map_check_ellipsoid(&d->map,
-            (vec3){ d->plr.pos[0], d->plr.pos[1], d->plr.pos[2] + 0.5 },
-            BORK_ENT_PROFILES[BORK_ENTITY_PLAYER].size))
-        {
+        vec3 check_pos;
+        vec3_sub(check_pos, d->plr.pos, (vec3){ 0, 0, 0.1 });
+        if(bork_map_vis_dist(&d->map, check_pos, (vec3){ 0, 0, 1 }, 1) >= 0.75) {
             d->plr.flags &= ~BORK_ENTFLAG_CROUCH;
-            d->plr.pos[2] += 0.5;
         }
     }
     int kbd_input = 0;
