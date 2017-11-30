@@ -870,7 +870,7 @@ void draw_upgrade_menu(struct bork_play_data* d, float t)
     pg_shader_text_write(&d->core->shader_text, &text);
 }
 
-void select_next_upgrade(struct bork_play_data* d)
+void select_next_upgrade(struct bork_play_data* d, int n)
 {
     int checks = 0;
     int i;
@@ -878,7 +878,7 @@ void select_next_upgrade(struct bork_play_data* d)
     else i = d->upgrade_selected * 2 + d->upgrade_use_level;
     while(checks < 8) {
         ++checks;
-        i = (i + 1) % 8;
+        i = MOD(i + n, 8);
         int u = i / 2;
         int l = i % 2;
         const struct bork_upgrade_detail* up = bork_upgrade_detail(d->upgrades[u]);

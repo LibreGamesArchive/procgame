@@ -299,7 +299,14 @@ static void tick_control_play(struct bork_play_data* d)
     }
     if(pg_check_input(kmap[BORK_CTRL_NEXT_TECH], PG_CONTROL_HIT)
     || pg_check_gamepad(SDL_CONTROLLER_BUTTON_LEFTSHOULDER, PG_CONTROL_HIT)) {
-        select_next_upgrade(d);
+        select_next_upgrade(d, 1);
+    } else if(pg_check_input(kmap[BORK_CTRL_PREV_TECH], PG_CONTROL_HIT)) {
+        select_next_upgrade(d, -1);
+    }
+    if(pg_check_input(kmap[BORK_CTRL_NEXT_ITEM], PG_CONTROL_HIT)) {
+        next_item(d, 1);
+    } else if(pg_check_input(kmap[BORK_CTRL_PREV_ITEM], PG_CONTROL_HIT)) {
+        next_item(d, -1);
     }
     if(pg_check_input(kmap[BORK_CTRL_DROP], PG_CONTROL_HIT)) {
         drop_item(d);

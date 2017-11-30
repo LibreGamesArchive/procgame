@@ -452,9 +452,15 @@ void add_inventory_item(struct bork_play_data* d, bork_entity_t ent_id)
     }
 }
 
-void switch_item(struct bork_play_data* d, int inv_idx)
+void switch_item(struct bork_play_data* d, int quick_idx)
 {
+    int inv_idx = d->quick_item[quick_idx];
     if(inv_idx < 0 || inv_idx >= d->inventory.len || d->held_item == inv_idx) return;
+    if(d->switch_ticks < 30) {
+        d->switch_start_idx = d->held_item;
+        if(d->switch_ticks > 0) d->switch_ticks = 30;
+        else d->switch_ticks = 60;
+    }
     if(d->hud_anim_active && d->hud_anim_destroy_when_finished) {
         struct bork_entity* ent = bork_entity_get(remove_inventory_item(d, d->held_item));
         ent->flags |= BORK_ENTFLAG_DEAD;
@@ -464,6 +470,22 @@ void switch_item(struct bork_play_data* d, int inv_idx)
     d->held_item = inv_idx;
     bork_play_reset_hud_anim(d);
     d->hud_angle[0] = prof->hud_angle;
+}
+
+void next_item(struct bork_play_data* d, int n)
+{
+    int current_quick_item = 0;
+    int i;
+    for(i = 0; i < 4; ++i) {
+        if(d->quick_item[i] == -1) continue;
+        if(d->quick_item[i] == d->held_item) current_quick_item = i;
+    }
+    int num_checks = 0;
+    while(num_checks < 3) {
+        current_quick_item = MOD(current_quick_item + n, 4);
+        if(d->quick_item[current_quick_item] != -1) switch_item(d, current_quick_item);
+        ++num_checks;
+    }
 }
 
 void set_quick_item(struct bork_play_data* d, int quick_idx, int inv_idx)
