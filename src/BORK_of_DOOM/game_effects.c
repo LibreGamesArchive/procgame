@@ -79,6 +79,26 @@ void blue_sparks(struct bork_play_data* d, vec3 pos, float expand, int sparks)
             .flags = BORK_PARTICLE_SPRITE | BORK_PARTICLE_DECELERATE,
             .pos = { pos[0] + off[0] * 0.25, pos[1] + off[1] * 0.25, pos[2] + off[2] * 0.25 },
             .vel = { off[0] * expand, off[1] * expand, off[2] * expand },
+            .ticks_left = 30,
+            .frame_ticks = 0,
+            .current_frame = 32,
+            .start_frame = 32, .end_frame = 32 };
+        ARR_PUSH(d->particles, new_part);
+    }
+}
+
+void ice_sparks(struct bork_play_data* d, vec3 pos, float expand, int sparks)
+{
+    int i;
+    for(i = 0; i < sparks; ++i) {
+        vec3 off = {
+            (float)rand() / RAND_MAX - 0.5,
+            (float)rand() / RAND_MAX - 0.5,
+            (float)rand() / RAND_MAX - 0.5 };
+        struct bork_particle new_part = {
+            .flags = BORK_PARTICLE_SPRITE | BORK_PARTICLE_DECELERATE,
+            .pos = { pos[0] + off[0] * 0.25, pos[1] + off[1] * 0.25, pos[2] + off[2] * 0.25 },
+            .vel = { off[0] * expand, off[1] * expand, off[2] * expand },
             .ticks_left = PLAY_SECONDS(7.5) + rand() % 60,
             .frame_ticks = 0,
             .current_frame = 32,
