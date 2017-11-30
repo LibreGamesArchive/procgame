@@ -16,14 +16,13 @@ struct pg_audio_envelope {
 };
 
 int pg_init_audio(void);
+void pg_deinit_audio(void);
 
 void pg_audio_alloc(struct pg_audio_chunk* chunk, float len);
 void pg_audio_free(struct pg_audio_chunk* chunk);
 void pg_audio_generate(struct pg_audio_chunk* chunk, float len,
                        struct pg_wave* w, struct pg_audio_envelope* env);
 void pg_audio_play(struct pg_audio_chunk* chunk, float volume);
-void pg_audio_loop(struct pg_audio_chunk* chunk, float volume,
-                   float start, float len);
 int pg_audio_emitter(struct pg_audio_chunk* chunk, float volume,
                      float area, vec3 pos, int channel);
 void pg_audio_set_listener(int channel, vec3 pos);

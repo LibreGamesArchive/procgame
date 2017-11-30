@@ -48,6 +48,10 @@ static void pg_buffer_audio(void* udata, Uint8* stream, int len)
     struct pg_audio_chunk_ref* ref;
     int i;
     ARR_FOREACH_PTR_REV(pg_audio_play_queue, ref, i) {
+        if(!ref->chunk->len) {
+            ARR_SWAPSPLICE(pg_audio_play_queue, i, 1);
+            continue;
+        }
         int segment = (ref->start + ref->progress) % ref->chunk->len;
         int segment_len = MIN(ref->len - ref->progress, s_len);
         int pos_to_end = MIN(ref->chunk->len - segment, segment_len);
@@ -110,6 +114,11 @@ int pg_init_audio(void)
     } else pg_have_audio = 1;
     SDL_PauseAudioDevice(pg_audio_dev, 0);
     return 1;
+}
+
+void pg_deinit_audio(void)
+{
+    SDL_CloseAudioDevice(pg_audio_dev);
 }
 
 void pg_audio_alloc(struct pg_audio_chunk* chunk, float len)
