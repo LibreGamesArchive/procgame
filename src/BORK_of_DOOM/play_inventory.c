@@ -17,12 +17,14 @@
 void tick_control_inv_menu(struct bork_play_data* d)
 {
     uint8_t* kmap = d->core->ctrl_map;
+    int8_t* gmap = d->core->gpad_map;
     if(pg_check_input(kmap[BORK_CTRL_MENU_BACK], PG_CONTROL_HIT)
-    || pg_check_gamepad(SDL_CONTROLLER_BUTTON_B, PG_CONTROL_HIT)) {
+    || pg_check_gamepad(gmap[BORK_CTRL_MENU_BACK], PG_CONTROL_HIT)) {
         d->menu.state = BORK_MENU_CLOSED;
         SDL_ShowCursor(SDL_DISABLE);
         pg_mouse_mode(1);
         pg_audio_channel_pause(1, 0);
+        pg_audio_channel_pause(2, 0);
         return;
     }
     if(d->inventory.len == 0) return;
@@ -45,6 +47,7 @@ void tick_control_inv_menu(struct bork_play_data* d)
             if(mouse_pos[1] > 0.2 + 0.06 * i && mouse_pos[1] < 0.2 + 0.06 + 0.06 * i
             && mouse_pos[0] > 0.1 && mouse_pos[0] < 0.5) {
                 d->menu.inv.selection_idx = i + inv_start;
+                pg_audio_play(&d->core->menu_sound, 0.5);
             }
         }
         /*  Scrolling   */
@@ -62,6 +65,7 @@ void tick_control_inv_menu(struct bork_play_data* d)
                 && item->ammo_type != i) {
                     int ammo_type = prof->use_ammo[i] - BORK_ITEM_BULLETS;
                     if(d->ammo[ammo_type] == 0) continue;
+                    pg_audio_play(&d->core->menu_sound, 0.5);
                     int used_ammo = prof->use_ammo[item->ammo_type] - BORK_ITEM_BULLETS;
                     d->menu.inv.ammo_select = i;
                     d->ammo[used_ammo] += item->ammo;
@@ -99,12 +103,14 @@ void tick_control_inv_menu(struct bork_play_data* d)
     }
     int start_select = d->menu.inv.selection_idx;
     if(pg_check_input(kmap[BORK_CTRL_DOWN], PG_CONTROL_HIT) || stick_ctrl_y == 1) {
+        pg_audio_play(&d->core->menu_sound, 0.5);
         d->menu.inv.selection_idx = MIN(d->menu.inv.selection_idx + 1, d->inventory.len - 1);
         if(d->menu.inv.selection_idx >= d->menu.inv.scroll_idx + 10)
             d->menu.inv.scroll_idx = d->menu.inv.selection_idx - 9;
         else if(d->menu.inv.selection_idx < d->menu.inv.scroll_idx)
             d->menu.inv.scroll_idx = d->menu.inv.selection_idx;
     } else if(pg_check_input(kmap[BORK_CTRL_UP], PG_CONTROL_HIT) || stick_ctrl_y == -1) {
+        pg_audio_play(&d->core->menu_sound, 0.5);
         d->menu.inv.selection_idx = MAX(d->menu.inv.selection_idx - 1, 0);
         if(d->menu.inv.selection_idx >= d->menu.inv.scroll_idx + 10)
             d->menu.inv.scroll_idx = d->menu.inv.selection_idx - 9;
@@ -121,12 +127,14 @@ void tick_control_inv_menu(struct bork_play_data* d)
     if(item->flags & BORK_ENTFLAG_IS_GUN) {
         int ammo_iter = d->menu.inv.ammo_select;
         if(pg_check_input(kmap[BORK_CTRL_LEFT], PG_CONTROL_HIT) || stick_ctrl_x == -1) {
+            pg_audio_play(&d->core->menu_sound, 0.5);
             ammo_iter = MOD(ammo_iter - 1, prof->ammo_types);
             while(ammo_iter != d->menu.inv.ammo_select
             && d->ammo[prof->use_ammo[ammo_iter] - BORK_ITEM_BULLETS] <= 0) {
                 ammo_iter = MOD(ammo_iter - 1, prof->ammo_types);
             }
         } else if(pg_check_input(kmap[BORK_CTRL_RIGHT], PG_CONTROL_HIT) || stick_ctrl_x == 1) {
+            pg_audio_play(&d->core->menu_sound, 0.5);
             ammo_iter = MOD(ammo_iter + 1, prof->ammo_types);
             while(ammo_iter != d->menu.inv.ammo_select
             && d->ammo[prof->use_ammo[ammo_iter] - BORK_ITEM_BULLETS] <= 0) {
@@ -137,7 +145,8 @@ void tick_control_inv_menu(struct bork_play_data* d)
         int ammo_type = prof->use_ammo[ammo_iter] - BORK_ITEM_BULLETS;
         int used_ammo = prof->use_ammo[item->ammo_type] - BORK_ITEM_BULLETS;
         if(pg_check_input(kmap[BORK_CTRL_SELECT], PG_CONTROL_HIT)
-        || pg_check_gamepad(SDL_CONTROLLER_BUTTON_X, PG_CONTROL_HIT)) {
+        || pg_check_gamepad(gmap[BORK_CTRL_SELECT], PG_CONTROL_HIT)) {
+            pg_audio_play(&d->core->menu_sound, 0.5);
             if(d->menu.inv.ammo_select == item->ammo_type) {
                 d->ammo[ammo_type] += item->ammo;
                 item->ammo = 0;
@@ -145,27 +154,27 @@ void tick_control_inv_menu(struct bork_play_data* d)
                 d->ammo[used_ammo] += item->ammo;
                 item->ammo = 0;
                 item->ammo_type = ammo_iter;
-                if(d->menu.inv.selection_idx == d->held_item) {
-                    d->reload_ticks = prof->reload_time;
-                    d->reload_length = prof->reload_time;
-                }
             }
         }
     }
     if(pg_check_input(kmap[BORK_CTRL_BIND1], PG_CONTROL_HIT)
-    || pg_check_gamepad(SDL_CONTROLLER_BUTTON_DPAD_UP, PG_CONTROL_HIT)) {
+    || pg_check_gamepad(gmap[BORK_CTRL_BIND1], PG_CONTROL_HIT)) {
+        pg_audio_play(&d->core->menu_sound, 0.5);
         set_quick_item(d, 0, d->menu.inv.selection_idx);
     }
     if(pg_check_input(kmap[BORK_CTRL_BIND2], PG_CONTROL_HIT)
-    || pg_check_gamepad(SDL_CONTROLLER_BUTTON_DPAD_LEFT, PG_CONTROL_HIT)) {
+    || pg_check_gamepad(gmap[BORK_CTRL_BIND2], PG_CONTROL_HIT)) {
+        pg_audio_play(&d->core->menu_sound, 0.5);
         set_quick_item(d, 1, d->menu.inv.selection_idx);
     }
     if(pg_check_input(kmap[BORK_CTRL_BIND3], PG_CONTROL_HIT)
-    || pg_check_gamepad(SDL_CONTROLLER_BUTTON_DPAD_RIGHT, PG_CONTROL_HIT)) {
+    || pg_check_gamepad(gmap[BORK_CTRL_BIND3], PG_CONTROL_HIT)) {
+        pg_audio_play(&d->core->menu_sound, 0.5);
         set_quick_item(d, 2, d->menu.inv.selection_idx);
     }
     if(pg_check_input(kmap[BORK_CTRL_BIND4], PG_CONTROL_HIT)
-    || pg_check_gamepad(SDL_CONTROLLER_BUTTON_DPAD_DOWN, PG_CONTROL_HIT)) {
+    || pg_check_gamepad(gmap[BORK_CTRL_BIND4], PG_CONTROL_HIT)) {
+        pg_audio_play(&d->core->menu_sound, 0.5);
         set_quick_item(d, 3, d->menu.inv.selection_idx);
     }
 }
@@ -197,7 +206,9 @@ static void draw_inventory_text(struct bork_play_data* d)
         struct bork_entity* item = bork_entity_get(d->inventory.data[i + inv_start]);
         if(!item) continue;
         const struct bork_entity_profile* prof = &BORK_ENT_PROFILES[item->type];
-        strncpy(text.block[ti], prof->name, 64);
+        if(item->item_quantity > 1) {
+            snprintf(text.block[ti], 32, "%s x%d", prof->name, item->item_quantity);
+        } else strncpy(text.block[ti], prof->name, 32);
         vec4_set(text.block_style[ti], 0.1, 0.2 + 0.06 * i, 0.03, 1.2);
         vec4_set(text.block_color[ti], 1, 1, 1, 0.5);
         if(i + inv_start == d->menu.inv.selection_idx) {
@@ -287,9 +298,6 @@ void draw_menu_inv(struct bork_play_data* d, float t)
             }
         }
     }
-    draw_inventory_text(d);
-    draw_quickfetch_text(d, 1, (vec4){ 1, 1, 1, 0.75 }, (vec4){ 1, 1, 1, 0.9 });
-    draw_quickfetch_items(d, (vec4){ 1, 1, 1, 0.75 }, (vec4){ 1, 1, 1, 0.9 });
     pg_shader_2d_set_light(&d->core->shader_2d, (vec2){}, (vec3){}, (vec3){ 1, 1, 1 });
     pg_shader_2d_color_mod(shader, (vec4){ 1, 1, 1, 1 }, (vec4){});
     if(d->menu.inv.scroll_idx > 0) {
@@ -302,6 +310,9 @@ void draw_menu_inv(struct bork_play_data* d, float t)
         pg_shader_2d_transform(shader, (vec2){ 0.05, 0.775 }, (vec2){ 0.04, 0.04 }, 0);
         pg_model_draw(&d->core->quad_2d_ctr, NULL);
     }
+    draw_quickfetch_items(d, (vec4){ 1, 1, 1, 0.75 }, (vec4){ 1, 1, 1, 0.9 });
+    draw_quickfetch_text(d, 1, (vec4){ 1, 1, 1, 0.75 }, (vec4){ 1, 1, 1, 0.9 });
+    draw_inventory_text(d);
 }
 
 void draw_quickfetch_items(struct bork_play_data* d,
@@ -325,10 +336,15 @@ void draw_quickfetch_items(struct bork_play_data* d,
     int current_frame = 0;
     int i;
     vec2 draw_pos[4] = {
-        { w - 0.2 + 0.015, 0.75 }, { w - 0.25 + 0.015, 0.8 },
-        { w - 0.15 + 0.015, 0.8 }, { w - 0.2 + 0.015, 0.85 } };
+        { w - 0.2 + 0.015, 0.75 }, { w - 0.26 + 0.015, 0.8 },
+        { w - 0.14 + 0.015, 0.8 }, { w - 0.2 + 0.015, 0.85 } };
+    int quick_held = -1;
     for(i = 0; i < 4; ++i) {
         if(d->quick_item[i] < 0) continue;
+        if(d->quick_item[i] == d->held_item) {
+            quick_held = i;
+            continue;
+        }
         item = bork_entity_get(d->inventory.data[d->quick_item[i]]);
         if(!item) continue;
         prof = &BORK_ENT_PROFILES[item->type];
@@ -348,6 +364,21 @@ void draw_quickfetch_items(struct bork_play_data* d,
             prof->inv_angle);
         pg_model_draw(&d->core->quad_2d_ctr, NULL);
     }
+    if(quick_held >= 0) {
+        item = bork_entity_get(d->inventory.data[d->quick_item[quick_held]]);
+        if(item) {
+            prof = &BORK_ENT_PROFILES[item->type];
+            pg_shader_2d_color_mod(shader, selected_mod, (vec4){});
+            pg_shader_2d_tex_frame(shader, prof->front_frame);
+            pg_shader_2d_add_tex_tx(shader, prof->sprite_tx, prof->sprite_tx + 2);
+            pg_shader_2d_transform(shader,
+                (vec2){ draw_pos[quick_held][0], draw_pos[quick_held][1] - 0.05 * prof->inv_height },
+                (vec2){ 0.075 * prof->sprite_tx[0], 0.075 * prof->sprite_tx[1] },
+                prof->inv_angle);
+            pg_model_draw(&d->core->quad_2d_ctr, NULL);
+        }
+    }
+
 }
 
 void draw_quickfetch_text(struct bork_play_data* d, int draw_label,
@@ -416,6 +447,7 @@ bork_entity_t remove_inventory_item(struct bork_play_data* d, int inv_idx)
         else if(d->quick_item[i] > inv_idx) --d->quick_item[i];
     }
     if(d->held_item == inv_idx) d->held_item = -1;
+    else if(d->held_item > inv_idx) --d->held_item;
     //bork_entity_init(item, item->type);
     item->flags &= ~(BORK_ENTFLAG_IN_INVENTORY | BORK_ENTFLAG_INACTIVE);
     return item_id;
@@ -425,6 +457,11 @@ void add_inventory_item(struct bork_play_data* d, bork_entity_t ent_id)
 {
     struct bork_entity* ent = bork_entity_get(ent_id);
     if(!ent) return;
+    int is_scrap = 0;
+    if(ent->flags & (BORK_ENTFLAG_IS_RAW_MATERIAL | BORK_ENTFLAG_IS_ELECTRICAL |
+                     BORK_ENTFLAG_IS_CHEMICAL | BORK_ENTFLAG_IS_FOOD)) {
+        is_scrap = 1;
+    }
     if(ent->flags & BORK_ENTFLAG_STACKS) {
         struct bork_entity* inv_ent;
         bork_entity_t inv_id;
@@ -437,18 +474,43 @@ void add_inventory_item(struct bork_play_data* d, bork_entity_t ent_id)
             return;
         }
     }
-    int inv_idx = d->inventory.len;
-    ARR_PUSH(d->inventory, ent_id);
-    if(d->held_item < 0) {
-        d->held_item = inv_idx;
-        bork_play_reset_hud_anim(d);
-    }
-    int i;
-    for(i = 0; i < 4; ++i) {
-        if(d->quick_item[i] < 0) {
-            d->quick_item[i] = inv_idx;
-            break;
+    if(!is_scrap) {
+        int inv_idx = -1;
+        struct bork_entity* inv_ent;
+        bork_entity_t inv_id;
+        int i;
+        ARR_FOREACH(d->inventory, inv_id, i) {
+            inv_ent = bork_entity_get(inv_id);
+            if(!inv_ent) continue;
+            if(inv_ent->flags & (BORK_ENTFLAG_IS_RAW_MATERIAL | BORK_ENTFLAG_IS_ELECTRICAL |
+                             BORK_ENTFLAG_IS_CHEMICAL | BORK_ENTFLAG_IS_FOOD)) {
+                ARR_INSERT(d->inventory, i, ent_id);
+                inv_idx = i;
+                inv_ent = bork_entity_get(d->inventory.data[i + 1]);
+                break;
+            }
         }
+        if(inv_idx == -1) {
+            inv_idx = d->inventory.len;
+            ARR_PUSH(d->inventory, ent_id);
+        }
+        if(d->held_item < 0) {
+            d->held_item = inv_idx;
+            bork_play_reset_hud_anim(d);
+        } else if(d->held_item >= inv_idx) {
+            ++d->held_item;
+        }
+        int quick_hit = 0;
+        for(i = 0; i < 4; ++i) {
+            if(!quick_hit && d->quick_item[i] < 0) {
+                quick_hit = 1;
+                d->quick_item[i] = inv_idx;
+            } else if(d->quick_item[i] >= inv_idx) {
+                ++d->quick_item[i];
+            }
+        }
+    } else {
+        ARR_PUSH(d->inventory, ent_id);
     }
 }
 
@@ -482,7 +544,7 @@ void next_item(struct bork_play_data* d, int n)
     }
     int num_checks = 0;
     while(num_checks < 3) {
-        current_quick_item = MOD(current_quick_item + n, 4);
+        current_quick_item = MOD(current_quick_item - n, 4);
         if(d->quick_item[current_quick_item] != -1) switch_item(d, current_quick_item);
         ++num_checks;
     }

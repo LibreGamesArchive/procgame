@@ -16,20 +16,24 @@
 void tick_doorpad(struct bork_play_data* d)
 {
     uint8_t* kmap = d->core->ctrl_map;
+    int8_t* gmap = d->core->gpad_map;
     if(d->menu.doorpad.unlocked_ticks > 0) {
         --d->menu.doorpad.unlocked_ticks;
         if(d->menu.doorpad.unlocked_ticks == 0) {
             d->menu.state = BORK_MENU_CLOSED;
             pg_mouse_mode(1);
             pg_audio_channel_pause(1, 0);
+            pg_audio_channel_pause(2, 0);
+            pg_audio_play_ch(&d->core->sounds[BORK_SND_DOOR_OPEN], 1, 1);
         }
         return;
     }
     if(pg_check_input(kmap[BORK_CTRL_MENU_BACK], PG_CONTROL_HIT)
-    || pg_check_gamepad(SDL_CONTROLLER_BUTTON_B, PG_CONTROL_HIT)) {
+    || pg_check_gamepad(gmap[BORK_CTRL_MENU_BACK], PG_CONTROL_HIT)) {
         d->menu.state = BORK_MENU_CLOSED;
         pg_mouse_mode(1);
         pg_audio_channel_pause(1, 0);
+        pg_audio_channel_pause(2, 0);
     }
     float ar = d->core->aspect_ratio;
     struct bork_map_object* door = &d->map.doors.data[d->menu.doorpad.door_idx];
@@ -52,16 +56,26 @@ void tick_doorpad(struct bork_play_data* d)
             vec2_add(diff, diff, (vec2){ 0.025, 0.02 });
             if(diff[0] < 0 || diff[1] < 0
             || diff[0] > 0.08 || diff[1] > 0.065) continue;
+            pg_audio_play_ch(&d->core->sounds[BORK_SND_SINGLEBEEP], 0.5, 1);
             if(i < 10 && d->menu.doorpad.num_chars < 4) {
                 chars[d->menu.doorpad.num_chars++] = MOD(i + 1, 10);
             } else if(i == 10) {
                 d->menu.doorpad.num_chars = MAX(0, d->menu.doorpad.num_chars - 1);
-            } else if(i == 11 && d->menu.doorpad.num_chars == 4
-            && chars[0] == door_chars[0] && chars[1] == door_chars[1]
-            && chars[2] == door_chars[2] && chars[3] == door_chars[3]) {
-                door->door.locked = 0;
-                door->door.open = 1;
-                d->menu.doorpad.unlocked_ticks = 60;
+            } else if(i == 11 && d->menu.doorpad.num_chars == 4) {
+                if(chars[0] == door_chars[0] && chars[1] == door_chars[1]
+                && chars[2] == door_chars[2] && chars[3] == door_chars[3]
+                && (door_chars[0] + door_chars[1] + door_chars[2] + door_chars[3] != 0)) {
+                    door->door.locked = 0;
+                    door->door.open = 1;
+                    d->menu.doorpad.unlocked_ticks = 60;
+                } else {
+                    pg_audio_play_ch(&d->core->sounds[BORK_SND_BUZZ], 4, 1);
+                    d->menu.doorpad.num_chars = 0;
+                    chars[0] = '\0';
+                    chars[1] = '\0';
+                    chars[2] = '\0';
+                    chars[3] = '\0';
+                }
             }
         }
     }
@@ -79,18 +93,28 @@ void tick_doorpad(struct bork_play_data* d)
             }
         }
     }
-    if(pg_check_gamepad(SDL_CONTROLLER_BUTTON_A, PG_CONTROL_HIT)) {
+    if(pg_check_gamepad(gmap[BORK_CTRL_SELECT], PG_CONTROL_HIT)) {
+        pg_audio_play_ch(&d->core->sounds[BORK_SND_SINGLEBEEP], 0.5, 1);
         int b = d->menu.doorpad.selection[0] + d->menu.doorpad.selection[1] * 3;
         if(b < 10 && d->menu.doorpad.num_chars < 4) {
             chars[d->menu.doorpad.num_chars++] = MOD(b + 1, 10);
         } else if(b == 10) {
             d->menu.doorpad.num_chars = MAX(0, d->menu.doorpad.num_chars - 1);
-        } else if(b == 11 && d->menu.doorpad.num_chars == 4
-        && chars[0] == door_chars[0] && chars[1] == door_chars[1]
-        && chars[2] == door_chars[2] && chars[3] == door_chars[3]) {
-            door->door.locked = 0;
-            door->door.open = 1;
-            d->menu.doorpad.unlocked_ticks = 60;
+        } else if(b == 11 && d->menu.doorpad.num_chars == 4) {
+            if(chars[0] == door_chars[0] && chars[1] == door_chars[1]
+            && chars[2] == door_chars[2] && chars[3] == door_chars[3]
+            && (door_chars[0] + door_chars[1] + door_chars[2] + door_chars[3] != 0)) {
+                door->door.locked = 0;
+                door->door.open = 1;
+                d->menu.doorpad.unlocked_ticks = 60;
+            } else {
+                pg_audio_play_ch(&d->core->sounds[BORK_SND_BUZZ], 4, 1);
+                d->menu.doorpad.num_chars = 0;
+                chars[0] = '\0';
+                chars[1] = '\0';
+                chars[2] = '\0';
+                chars[3] = '\0';
+            }
         }
     }
 }

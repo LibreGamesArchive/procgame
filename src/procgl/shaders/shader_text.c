@@ -32,11 +32,13 @@ static void begin(struct pg_shader* shader, struct pg_viewer* view)
     glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
     glDisable(GL_DEPTH_TEST);
     glDepthMask(0);
-    glUniform1i(d->uni_font, d->font->diffuse_slot);
-    glUniform1ui(d->uni_pitch, d->font->w / d->font->frame_w);
-    glUniform2f(d->uni_glyph,
-                (float)d->font->frame_w / (float)d->font->w,
-                (float)d->font->frame_h / (float)d->font->h);
+    if(d->uni_font) {
+        glUniform1i(d->uni_font, d->font->diffuse_slot);
+        glUniform1ui(d->uni_pitch, d->font->w / d->font->frame_w);
+        glUniform2f(d->uni_glyph,
+                    (float)d->font->frame_w / (float)d->font->w,
+                    (float)d->font->frame_h / (float)d->font->h);
+    }
     glBindVertexArray(d->dummy_vao);
 }
 

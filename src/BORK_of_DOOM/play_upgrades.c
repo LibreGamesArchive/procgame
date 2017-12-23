@@ -20,24 +20,35 @@
 static void tick_jetpack(struct bork_play_data* d, int l, int idx)
 {
     uint8_t* kmap = d->core->ctrl_map;
-    if(!(d->plr.flags & BORK_ENTFLAG_GROUND)
-    && d->jump_released && d->upgrade_counters[idx] >= 3
-    && (pg_check_input(kmap[BORK_CTRL_JUMP], PG_CONTROL_HELD)
-        || pg_check_gamepad(SDL_CONTROLLER_BUTTON_A, PG_CONTROL_HELD))) {
+    int8_t* gmap = d->core->gpad_map;
+    int max_fuel = (l == 0 ? PLAY_SECONDS(3) : PLAY_SECONDS(9));
+    int jump_ctrl = (!(d->plr.flags & BORK_ENTFLAG_GROUND) && d->jump_released &&
+        (pg_check_input(kmap[BORK_CTRL_JUMP], PG_CONTROL_HELD)
+         || pg_check_gamepad(gmap[BORK_CTRL_JUMP], PG_CONTROL_HELD)));
+    int tech_ctrl = (pg_check_input(kmap[BORK_CTRL_USE_TECH], PG_CONTROL_HELD)
+                    || pg_check_gamepad(gmap[BORK_CTRL_USE_TECH], PG_CONTROL_HELD));
+    if(d->upgrade_counters[idx] >= 3 && (jump_ctrl || tech_ctrl)) {
+        d->using_jetpack = 1;
         d->upgrade_counters[idx] -= 3;
-        if(l == 0) d->plr.vel[2] = MAX(-0.02, d->plr.vel[2]);
-        else if(d->plr.vel[2] < 0.05) d->plr.vel[2] += 0.008;
-    } else if(d->upgrade_counters[idx] < PLAY_SECONDS(10)) {
+        if(l == 0) {
+            if(d->plr.vel[2] < 0.025) d->plr.vel[2] += 0.008;
+            //d->plr.vel[2] = MAX(-0.02, d->plr.vel[2]);
+        } else if(l == 1) {
+            if(d->plr.vel[2] < 0.05) d->plr.vel[2] += 0.008;
+        }
+    } else if(d->upgrade_counters[idx] < max_fuel) {
         ++d->upgrade_counters[idx];
+        d->using_jetpack = 0;
     }
 }
 
 static void tick_doorhack(struct bork_play_data* d, int l, int idx)
 {
     uint8_t* kmap = d->core->ctrl_map;
+    int8_t* gmap = d->core->gpad_map;
     static int mouse_released = 1;
     int pressed = (pg_check_input(kmap[BORK_CTRL_USE_TECH], PG_CONTROL_HELD)
-                    || pg_check_gamepad(PG_LEFT_TRIGGER, PG_CONTROL_HELD));
+                    || pg_check_gamepad(gmap[BORK_CTRL_USE_TECH], PG_CONTROL_HELD));
     if(d->upgrade_selected != idx) return;
     if(!mouse_released && !pressed) mouse_released = 1;
     if(!mouse_released) {
@@ -46,26 +57,23 @@ static void tick_doorhack(struct bork_play_data* d, int l, int idx)
     }
     if(pressed && d->looked_obj && d->looked_obj->type == BORK_MAP_DOORPAD) {
         struct bork_map_object* door = &d->map.doors.data[d->looked_obj->doorpad.door_idx];
-        if(d->upgrade_use_level == 0 && door->door.locked == 1) {
+        if(door->door.locked == 0) {
+            hud_announce(d, "THIS DOOR IS ALREADY UNLOCKED");
             d->upgrade_counters[idx] = 0;
+            mouse_released = 0;
             return;
-        } else if(d->upgrade_use_level == 1 && door->door.locked != 1) {
+        } else if(door->door.locked == 2) {
+            hud_announce(d, "THIS DOOR HAS A SPECIAL SECURITY OVERRIDE");
             d->upgrade_counters[idx] = 0;
+            mouse_released = 0;
             return;
         }
         d->upgrade_counters[idx] += 1;
         if(d->upgrade_counters[idx] >= PLAY_SECONDS(1)) {
+            pg_audio_play_ch(&d->core->sounds[BORK_SND_HACK], 1, 1);
+            door->door.locked = 0;
             mouse_released = 0;
             d->upgrade_counters[idx] = 0;
-            if(d->upgrade_use_level == 0) {
-                if(door->door.locked == 2) door->door.locked = 0;
-                else if(door->door.locked == 0) {
-                    door->door.locked = 2;
-                    door->door.open = 0;
-                }
-            } else if(d->upgrade_use_level == 1) {
-                door->door.locked = 0;
-            }
         }
     } else d->upgrade_counters[idx] = 0;
 }
@@ -73,59 +81,66 @@ static void tick_doorhack(struct bork_play_data* d, int l, int idx)
 static void tick_bothack(struct bork_play_data* d, int l, int idx)
 {
     uint8_t* kmap = d->core->ctrl_map;
-    static int mouse_released = 1;
-    static bork_entity_t curr_enemy = -1;
-    int pressed = (pg_check_input(kmap[BORK_CTRL_USE_TECH], PG_CONTROL_HELD)
-                    || pg_check_gamepad(PG_LEFT_TRIGGER, PG_CONTROL_HELD));
+    int8_t* gmap = d->core->gpad_map;
+    int pressed = (pg_check_input(kmap[BORK_CTRL_USE_TECH], PG_CONTROL_HIT)
+                    || pg_check_gamepad(gmap[BORK_CTRL_USE_TECH], PG_CONTROL_HIT));
     if(d->upgrade_selected != idx) return;
-    if(!mouse_released && !pressed) mouse_released = 1;
-    if(!mouse_released) {
-        d->upgrade_counters[idx] = 0;
-        return;
-    }
-    if(pressed && d->looked_enemy >= 0) {
-        if(d->looked_enemy != curr_enemy) {
-            d->upgrade_counters[idx] = 0;
-            curr_enemy = d->looked_enemy;
-        }
-        struct bork_entity* vis_enemy = bork_entity_get(d->looked_enemy);
-        if(!vis_enemy || vis_enemy->HP <= 0) {
-            d->upgrade_counters[idx] = 0;
-            curr_enemy = -1;
-            return;
-        }
+    if(d->upgrade_counters[idx]) --d->upgrade_counters[idx];
+    if(d->upgrade_counters[idx] <= 0 && pressed) {
+        d->upgrade_counters[idx] = PLAY_SECONDS(8);
+        pg_audio_play_ch(&d->core->sounds[BORK_SND_HACK], 1, 1);
+        vec3 part_pos = {};
         vec3 eye, dir;
         float vis_dist, dist;
         bork_entity_get_eye(&d->plr, dir, eye);
-        vis_dist = bork_map_vis_dist(&d->map, eye, dir);
-        dist = vec3_dist(eye, vis_enemy->pos);
-        if(dist - 0.25 > vis_dist) {
-            curr_enemy = -1;
-            d->upgrade_counters[idx] = 0;
-            return;
+        vis_dist = bork_map_vis_dist(&d->map, eye, dir, 12);
+        if(d->looked_enemy == -1) {
+            vec3_set_len(dir, dir, vis_dist - 0.25);
+            vec3_add(part_pos, eye, dir);
         } else {
-            ++d->upgrade_counters[idx];
-            if(l == 1 && d->upgrade_counters[idx] >= PLAY_SECONDS(3)) {
-                mouse_released = 0;
-                d->upgrade_counters[idx] = 0;
-                vis_enemy->HP = 0;
-                vis_enemy->flags |= BORK_ENTFLAG_ON_FIRE;
-            } else if(l == 0 && d->upgrade_counters[idx] >= PLAY_SECONDS(1.5)) {
-                mouse_released = 0;
-                vis_enemy->flags |= BORK_ENTFLAG_EMP;
-                vis_enemy->emp_ticks = PLAY_SECONDS(5);
+            struct bork_entity* ent = bork_entity_get(d->looked_enemy);
+            if(!ent) {
+                vec3_set_len(dir, dir, vis_dist - 0.25);
+                vec3_add(part_pos, eye, dir);
+            } else {
+                dist = vec3_dist(eye, ent->pos);
+                if(dist - 0.25 > vis_dist) {
+                    vec3_set_len(dir, dir, vis_dist - 0.25);
+                    vec3_add(part_pos, eye, dir);
+                } else {
+                    vec3_set_len(dir, dir, dist - 0.25);
+                    vec3_add(part_pos, eye, dir);
+                    if(l == 1 && ent->type != BORK_ENEMY_LAIKA) {
+                        ent->HP = 0;
+                        ent->flags |= BORK_ENTFLAG_ON_FIRE;
+                    } else {
+                        ent->flags |= BORK_ENTFLAG_EMP;
+                        ent->emp_ticks = PLAY_SECONDS(5);
+                    }
+                }
             }
         }
-    } else {
-        d->upgrade_counters[idx] = 0;
+        struct bork_particle new_part = {
+            .flags = BORK_PARTICLE_SPRITE | BORK_PARTICLE_LIGHT | BORK_PARTICLE_LIGHT_DECAY,
+            .pos = { part_pos[0], part_pos[1], part_pos[2] },
+            .light = { 1.0, 1.0, 1.5, 2 },
+            .vel = { 0, 0, 0 },
+            .lifetime = 40,
+            .ticks_left = 40,
+            .frame_ticks = 8,
+            .current_frame = 40,
+            .start_frame = 40, .end_frame = 44,
+        };
+        ARR_PUSH(d->particles, new_part);
     }
 }
 
 static void tick_decoy(struct bork_play_data* d, int l, int idx)
 {
     uint8_t* kmap = d->core->ctrl_map;
+    int8_t* gmap = d->core->gpad_map;
     int pressed = (pg_check_input(kmap[BORK_CTRL_USE_TECH], PG_CONTROL_HIT)
-                    || pg_check_gamepad(PG_LEFT_TRIGGER, PG_CONTROL_HIT));
+                    || pg_check_gamepad(gmap[BORK_CTRL_USE_TECH], PG_CONTROL_HIT));
     if(d->upgrade_counters[idx] <= 0) {
         if(d->upgrade_selected == idx && pressed) {
             vec3 dir, pos;
@@ -133,17 +148,17 @@ static void tick_decoy(struct bork_play_data* d, int l, int idx)
             if(l == 0) {
                 vec3_dup(d->decoy_pos, d->plr.pos);
                 d->decoy_active = 1;
-                d->upgrade_counters[idx] = PLAY_SECONDS(15);
+                d->upgrade_counters[idx] = PLAY_SECONDS(11);
             } else if(l == 1) {
                 float vis_dist;
                 vec3 vis;
-                vis_dist = bork_map_vis_dist(&d->map, pos, dir);
+                vis_dist = bork_map_vis_dist(&d->map, pos, dir, 64);
                 vec3_scale(vis, dir, vis_dist);
                 vec3_sub(vis, vis, dir);
                 vec3_add(vis, vis, pos);
                 vec3_dup(d->decoy_pos, vis);
                 d->decoy_active = 1;
-                d->upgrade_counters[idx] = PLAY_SECONDS(15);
+                d->upgrade_counters[idx] = PLAY_SECONDS(12.5);
             }
             struct bork_collision coll = {};
             bork_map_collide(&d->map, &coll, d->decoy_pos, (vec3){ 0.9, 0.9, 0.9 });
@@ -152,7 +167,7 @@ static void tick_decoy(struct bork_play_data* d, int l, int idx)
         }
     } else {
         --d->upgrade_counters[idx];
-        if(d->decoy_active && d->upgrade_counters[idx] <= PLAY_SECONDS(5)) {
+        if(d->decoy_active && d->upgrade_counters[idx] <= PLAY_SECONDS(8)) {
             d->decoy_active = 0;
             bork_map_build_plr_dist(&d->map, d->plr.pos);
         }
@@ -162,56 +177,59 @@ static void tick_decoy(struct bork_play_data* d, int l, int idx)
 static void tick_healing(struct bork_play_data* d, int l, int idx)
 {
     uint8_t* kmap = d->core->ctrl_map;
+    int8_t* gmap = d->core->gpad_map;
     int pressed = (pg_check_input(kmap[BORK_CTRL_USE_TECH], PG_CONTROL_HIT)
-                    || pg_check_gamepad(PG_LEFT_TRIGGER, PG_CONTROL_HIT));
+                    || pg_check_gamepad(gmap[BORK_CTRL_USE_TECH], PG_CONTROL_HIT));
+    if(d->upgrade_counters[idx] > 0) --d->upgrade_counters[idx];
+    if(d->plr.HP >= 100) return;
     if(l == 1) {
-        ++d->upgrade_counters[idx];
-        if(d->upgrade_counters[idx] >= PLAY_SECONDS(0.5)) {
-            d->upgrade_counters[idx] = 0;
-            d->plr.HP = MIN(100, d->plr.HP + 2);
+        if(d->upgrade_counters[idx] <= 0) {
+            d->upgrade_counters[idx] = PLAY_SECONDS(0.25);
+            d->plr.HP = MIN(100, d->plr.HP + 1);
         }
     } else {
         if(d->upgrade_selected == idx && d->upgrade_counters[idx] <= 0
         && pressed) {
-            d->plr.HP += 15;
+            pg_audio_play_ch(&d->core->sounds[BORK_SND_HEAL_TECH], 1, 1);
+            d->plr.HP = MIN(100, d->plr.HP + 25);
             d->upgrade_counters[idx] = PLAY_SECONDS(8);
         }
-        if(d->upgrade_counters[idx] > 0) --d->upgrade_counters[idx];
     }
 }
 
 static void tick_defense(struct bork_play_data* d, int l, int idx)
 {
     uint8_t* kmap = d->core->ctrl_map;
+    int8_t* gmap = d->core->gpad_map;
     int pressed = (pg_check_input(kmap[BORK_CTRL_USE_TECH], PG_CONTROL_HIT)
-                    || pg_check_gamepad(PG_LEFT_TRIGGER, PG_CONTROL_HIT));
+                    || pg_check_gamepad(gmap[BORK_CTRL_USE_TECH], PG_CONTROL_HIT));
     int i;
     bork_entity_t ent_id;
     struct bork_entity* ent;
-    if(l == 1) {
-        if(d->ticks % PLAY_SECONDS(1) == 0) {
-            d->upgrade_counters[idx] = 0;
-            ARR_FOREACH(d->plr_enemy_query, ent_id, i) {
-                ent = bork_entity_get(ent_id);
-                if(!ent) continue;
-                float dist = vec3_dist(d->plr.pos, ent->pos);
-                if(dist < 5) {
-                    ent->HP -= 2;
-                    create_sparks(d, ent->pos, 0.1, 3);
-                }
-            }
-        }
+    if(d->upgrade_counters[idx] > 0) {
+        --d->upgrade_counters[idx];
+        return;
     }
-    if(d->upgrade_counters[idx] > 0) --d->upgrade_counters[idx];
     if(d->upgrade_selected == idx && d->upgrade_counters[idx] <= 0) {
         if(pressed) {
+            struct bork_particle new_part = {
+                .flags = BORK_PARTICLE_LIGHT | BORK_PARTICLE_LIGHT_DECAY,
+                .light = { 1.0, 1.0, 1.5, 6 + l * 6 },
+                .vel = { 0, 0, 0 },
+                .lifetime = 40,
+                .ticks_left = 40 };
+            vec3_dup(new_part.pos, d->plr.pos);
+            ARR_PUSH(d->particles, new_part);
+            blue_sparks(d, d->plr.pos, 0.45, rand() % 4 + 16 + (8 * l));
+            red_sparks(d, d->plr.pos, 0.45, rand() % 4 + 8 + (8 * l));
+            pg_audio_play_ch(&d->core->sounds[BORK_SND_DEFENSE_FIELD], 1, 1);
             d->upgrade_counters[idx] = PLAY_SECONDS(6);
             ARR_FOREACH(d->plr_enemy_query, ent_id, i) {
                 ent = bork_entity_get(ent_id);
                 if(!ent) continue;
                 float dist = vec3_dist(d->plr.pos, ent->pos);
-                if(dist < 5) {
-                    ent->HP -= 15;
+                if(dist < 6) {
+                    ent->HP -= (l == 1) ? 75 : 25;
                     create_sparks(d, ent->pos, 0.1, 3);
                     vec3 push;
                     vec3_sub(push, ent->pos, d->plr.pos);
@@ -227,36 +245,44 @@ static void tick_defense(struct bork_play_data* d, int l, int idx)
 static void tick_scanning(struct bork_play_data* d, int l, int idx)
 {
     uint8_t* kmap = d->core->ctrl_map;
+    int8_t* gmap = d->core->gpad_map;
     int pressed = (pg_check_input(kmap[BORK_CTRL_USE_TECH], PG_CONTROL_HIT)
-                    || pg_check_gamepad(PG_LEFT_TRIGGER, PG_CONTROL_HIT));
+                    || pg_check_gamepad(gmap[BORK_CTRL_USE_TECH], PG_CONTROL_HIT));
     if(d->upgrade_selected == idx && pressed) {
-        struct bork_entity* looked[2] = { bork_entity_get(d->looked_enemy),
-                                          bork_entity_get(d->looked_entity) };
-        float dist[2] = {
-            looked[0] ? vec3_dist2(d->plr.pos, looked[0]->pos) : 100,
-            looked[1] ? vec3_dist2(d->plr.pos, looked[1]->pos) : 100 };
-        int closest = (dist[0] < dist[1] ? 0 : 1);
+        struct bork_entity* looked[3] = { bork_entity_get(d->looked_enemy),
+                                          bork_entity_get(d->looked_entity),
+                                          bork_entity_get(d->looked_item) };
+        float dist[3] = {
+            looked[0] ? vec3_dist(d->plr.pos, looked[0]->pos) : 32,
+            looked[1] ? vec3_dist(d->plr.pos, looked[1]->pos) : 32,
+            looked[2] ? vec3_dist(d->plr.pos, looked[2]->pos) : 32 };
+        int closest = (dist[0] < dist[1] ? (dist[0] < dist[2] ? 0 : 2) : (dist[1] < dist[2] ? 1 : 2));
         float closest_dist = dist[closest];
-        float obj_dist = d->looked_obj ? vec3_dist2(d->plr.pos, d->looked_obj->pos) : 100;
+        float obj_dist = d->looked_obj ? vec3_dist(d->plr.pos, d->looked_obj->pos) : 32;
         if(obj_dist < dist[closest]) {
-            closest = 2;
+            closest = 3;
             closest_dist = obj_dist;
         }
-        if(closest_dist <= 4) {
-            if(closest == 2) {
-                switch(d->looked_obj->type) {
-                    case BORK_MAP_DOOR: strncpy(d->scanned_name, "DOOR", 32); break;
-                    case BORK_MAP_TELEPORT: strncpy(d->scanned_name, "TELEPORTER", 32); break;
-                    case BORK_MAP_DOORPAD: strncpy(d->scanned_name, "KEYPAD", 32); break;
-                    case BORK_MAP_RECYCLER: strncpy(d->scanned_name, "RECYCLER", 32); break;
-                    case BORK_MAP_GRATE: strncpy(d->scanned_name, "GRATE", 32); break;
-                }
-            } else {
-                const struct bork_entity_profile* prof = &BORK_ENT_PROFILES[looked[closest]->type];
-                strncpy(d->scanned_name, prof->name, 32);
+        if(closest_dist >= 32) return;
+        vec3 eye, dir;
+        float vis_dist;
+        bork_entity_get_eye(&d->plr, dir, eye);
+        vis_dist = bork_map_vis_dist(&d->map, eye, dir, 32);
+        if(closest_dist - vis_dist > 0.5) return;
+        if(closest == 3) {
+            switch(d->looked_obj->type) {
+                case BORK_MAP_DOOR: strncpy(d->scanned_name, "DOOR", 32); break;
+                case BORK_MAP_TELEPORT: strncpy(d->scanned_name, "TELEPORTER", 32); break;
+                case BORK_MAP_DOORPAD: strncpy(d->scanned_name, "KEYPAD", 32); break;
+                case BORK_MAP_RECYCLER: strncpy(d->scanned_name, "RECYCLER", 32); break;
+                case BORK_MAP_GRATE: strncpy(d->scanned_name, "GRATE", 32); break;
+                default: d->scanned_name[0] = '\0'; break;
             }
-        } else return;
-        d->scan_ticks = PLAY_SECONDS(5);
+        } else {
+            const struct bork_entity_profile* prof = &BORK_ENT_PROFILES[looked[closest]->type];
+            strncpy(d->scanned_name, prof->name, 32);
+        }
+        d->scan_ticks = PLAY_SECONDS(3);
     } else if(d->scan_ticks > 0) --d->scan_ticks;
 }
 
@@ -295,10 +321,11 @@ void hud_passive(struct bork_play_data* d, int l, int idx, int passive_i)
 
 void hud_jetpack(struct bork_play_data* d, int l, int idx, int passive_i)
 {
+    int max_fuel = (l == 0 ? PLAY_SECONDS(3) : PLAY_SECONDS(9));
     pg_shader_2d_transform(&d->core->shader_2d,
         (vec2){ 0.425 + passive_i * 0.125, 0.885 }, (vec2){ 0.05, 0.05 }, 0);
     pg_shader_2d_color_mod(&d->core->shader_2d,
-        (vec4){ 1, 1, 1, d->upgrade_counters[idx] / (float)PLAY_SECONDS(10) }, (vec4){});
+        (vec4){ 1, 1, 1, d->upgrade_counters[idx] / (float)max_fuel }, (vec4){});
     if(l == 1) {
         pg_shader_2d_tex_frame(&d->core->shader_2d, 14);
         pg_model_draw(&d->core->quad_2d_ctr, NULL);
@@ -328,18 +355,13 @@ void hud_doorhack(struct bork_play_data* d, int l, int idx)
 void hud_bothack(struct bork_play_data* d, int l, int idx)
 {
     if(d->upgrade_selected != idx) return;
-    float scale = 1;
+    float a = 1.0f;
     if(d->upgrade_counters[idx] > 0) {
-        float s = (l == 1) ? PLAY_SECONDS(3) : PLAY_SECONDS(1.5);
-        scale = (d->upgrade_counters[idx] / s) * 0.75 + 0.25;
+        a = (1.0f - (d->upgrade_counters[idx] / (float)PLAY_SECONDS(8))) * 0.7 + 0.05;
     }
+    pg_shader_2d_color_mod(&d->core->shader_2d, (vec4){ 1, 1, 1, a }, (vec4){});
     pg_shader_2d_transform(&d->core->shader_2d, (vec2){ 0.2, 0.75 },
-                           (vec2){ 0.1 * scale, 0.1 * scale }, 0);
-    if(d->looked_enemy == -1) {
-        pg_shader_2d_color_mod(&d->core->shader_2d, (vec4){ 1, 1, 1, 0.25 }, (vec4){});
-    } else {
-        pg_shader_2d_color_mod(&d->core->shader_2d, (vec4){ 1, 1, 1, 1 }, (vec4){});
-    }
+                           (vec2){ 0.1, 0.1 }, 0);
     if(d->upgrade_use_level == 1) {
         pg_shader_2d_tex_frame(&d->core->shader_2d, 14);
         pg_model_draw(&d->core->quad_2d_ctr, NULL);
@@ -516,6 +538,7 @@ static int can_install(struct bork_play_data* d, int up_type)
 void tick_control_upgrade_menu(struct bork_play_data* d)
 {
     uint8_t* kmap = d->core->ctrl_map;
+    int8_t* gmap = d->core->gpad_map;
     struct bork_entity* item = NULL;
     if(d->held_upgrades.len > 0 && d->menu.upgrades.selection_idx < d->held_upgrades.len) {
         item = bork_entity_get(d->held_upgrades.data[d->menu.upgrades.selection_idx]);
@@ -544,10 +567,12 @@ void tick_control_upgrade_menu(struct bork_play_data* d)
             vec2 up0_pos = { 0.2, 0.3 + (i * 0.125) };
             vec2 up1_pos = { 0.325, 0.325 + (i * 0.125) };
             if(vec2_dist(mouse_pos, up0_pos) < 0.06) {
+                pg_audio_play(&d->core->menu_sound, 0.5);
                 d->menu.upgrades.selection_idx = inv_start + i;
                 d->menu.upgrades.horiz_idx = 0;
                 d->menu.upgrades.confirm = 0;
             } else if(vec2_dist(mouse_pos, up1_pos) < 0.06) {
+                pg_audio_play(&d->core->menu_sound, 0.5);
                 d->menu.upgrades.selection_idx = inv_start + i;
                 d->menu.upgrades.horiz_idx = 1;
                 d->menu.upgrades.confirm = 0;
@@ -558,8 +583,11 @@ void tick_control_upgrade_menu(struct bork_play_data* d)
             vec2 up_pos = { ar * 0.5 + (i - 1.5) * (0.15 * ar), 0.8 };
             if(vec2_dist(up_pos, mouse_pos) < 0.075) {
                 if(i > 0 && d->menu.upgrades.confirm == MUST_REPLACE) {
+                    pg_audio_play(&d->core->menu_sound, 0.5);
                     d->menu.upgrades.replace_idx = i - 1;
+                    d->menu.upgrades.confirm = CONFIRM_REPLACE;
                 } else {
+                    pg_audio_play(&d->core->menu_sound, 0.5);
                     d->menu.upgrades.selection_idx = d->held_upgrades.len;
                     d->menu.upgrades.horiz_idx = i;
                     d->menu.upgrades.confirm = 0;
@@ -569,12 +597,15 @@ void tick_control_upgrade_menu(struct bork_play_data* d)
         if(d->menu.upgrades.confirm == 0) {
             if(vec2_dist(mouse_pos, (vec2){ 0.15, 0.2 }) < 0.04
             && d->menu.upgrades.scroll_idx > 0) {
+                pg_audio_play(&d->core->menu_sound, 0.5);
                 --d->menu.upgrades.scroll_idx;
             } else if(vec2_dist(mouse_pos, (vec2){ 0.15, 0.775 }) < 0.04
                    && d->menu.upgrades.scroll_idx + 4 < d->held_upgrades.len) {
+                pg_audio_play(&d->core->menu_sound, 0.5);
                 ++d->menu.upgrades.scroll_idx;
             } else if(fabs(mouse_pos[0] - (ar * 0.6)) < 0.2
                    && fabs(mouse_pos[1] - 0.565) < 0.02) {
+                pg_audio_play(&d->core->menu_sound, 0.5);
                 int can = can_install(d, item->counter[d->menu.upgrades.horiz_idx]);
                 d->menu.upgrades.confirm = can;
             }
@@ -584,6 +615,7 @@ void tick_control_upgrade_menu(struct bork_play_data* d)
         || d->menu.upgrades.confirm == CAN_INSTALL) {
             if(fabs(mouse_pos[0] - (ar * 0.55)) < 0.07
             && fabs(mouse_pos[1] - 0.615) < 0.03) {
+                pg_audio_play(&d->core->menu_sound, 0.5);
                 if(d->menu.upgrades.confirm == CONFIRM_REPLACE) {
                     d->upgrades[d->menu.upgrades.replace_idx] = item->counter[d->menu.upgrades.horiz_idx];
                     d->upgrade_level[d->menu.upgrades.replace_idx] = 0;
@@ -601,6 +633,7 @@ void tick_control_upgrade_menu(struct bork_play_data* d)
                 }
             } else if(fabs(mouse_pos[0] - (ar * 0.65)) < 0.05
             && fabs(mouse_pos[1] - 0.615) < 0.03) {
+                pg_audio_play(&d->core->menu_sound, 0.5);
                 d->menu.upgrades.confirm = 0;
             }
         }
@@ -628,8 +661,14 @@ void tick_control_upgrade_menu(struct bork_play_data* d)
         }
     }
     if(!d->menu.upgrades.confirm) {
-        if(pg_check_input(kmap[BORK_CTRL_DOWN], PG_CONTROL_HIT)
+        if(pg_check_input(PG_MOUSEWHEEL_UP, PG_CONTROL_HIT)) {
+            d->menu.upgrades.scroll_idx = MAX(0, d->menu.upgrades.scroll_idx - 1);
+        } else if(pg_check_input(PG_MOUSEWHEEL_DOWN, PG_CONTROL_HIT)
+               && d->held_upgrades.len > 4) {
+            d->menu.upgrades.scroll_idx = MIN(d->held_upgrades.len - 4, d->menu.upgrades.scroll_idx + 1);
+        } else if(pg_check_input(kmap[BORK_CTRL_DOWN], PG_CONTROL_HIT)
                 || stick_ctrl_y == 1) {
+            pg_audio_play(&d->core->menu_sound, 0.5);
             d->menu.upgrades.selection_idx = MIN(d->menu.upgrades.selection_idx + 1,
                                                  d->held_upgrades.len);
             if(d->menu.upgrades.selection_idx == d->held_upgrades.len)
@@ -638,49 +677,59 @@ void tick_control_upgrade_menu(struct bork_play_data* d)
                 ++d->menu.upgrades.scroll_idx;
         } else if(pg_check_input(kmap[BORK_CTRL_UP], PG_CONTROL_HIT)
                 || stick_ctrl_y == -1) {
+            pg_audio_play(&d->core->menu_sound, 0.5);
             d->menu.upgrades.selection_idx = MAX(d->menu.upgrades.selection_idx - 1, 0);
             if(d->menu.upgrades.selection_idx < d->menu.upgrades.scroll_idx)
                 --d->menu.upgrades.scroll_idx;
             d->menu.upgrades.horiz_idx = MIN(1, d->menu.upgrades.horiz_idx);
         } else if(pg_check_input(kmap[BORK_CTRL_LEFT], PG_CONTROL_HIT)
                 || stick_ctrl_x == -1) {
+            pg_audio_play(&d->core->menu_sound, 0.5);
             if(d->menu.upgrades.selection_idx == d->held_upgrades.len) {
                 d->menu.upgrades.horiz_idx = MAX(0, d->menu.upgrades.horiz_idx - 1);
             } else d->menu.upgrades.horiz_idx = 0;
         } else if(pg_check_input(kmap[BORK_CTRL_RIGHT], PG_CONTROL_HIT)
                 || stick_ctrl_x == 1) {
+            pg_audio_play(&d->core->menu_sound, 0.5);
             if(d->menu.upgrades.selection_idx == d->held_upgrades.len) {
                 d->menu.upgrades.horiz_idx = MIN(4, d->menu.upgrades.horiz_idx + 1);
                 if(d->upgrades[MOD(d->menu.upgrades.horiz_idx - 1, 4)] == -1)
                     --d->menu.upgrades.horiz_idx;
             } else d->menu.upgrades.horiz_idx = 1;
-        } else if(item && (pg_check_input(SDL_SCANCODE_SPACE, PG_CONTROL_HIT)
-               || pg_check_gamepad(SDL_CONTROLLER_BUTTON_A, PG_CONTROL_HIT))) {
+        } else if(item && (pg_check_input(kmap[BORK_CTRL_SELECT], PG_CONTROL_HIT)
+               || pg_check_gamepad(gmap[BORK_CTRL_SELECT], PG_CONTROL_HIT))) {
             int can = can_install(d, item->counter[d->menu.upgrades.horiz_idx]);
             d->menu.upgrades.confirm = can;
-        } else if(pg_check_input(SDL_SCANCODE_ESCAPE, PG_CONTROL_HIT)
-               || pg_check_gamepad(SDL_CONTROLLER_BUTTON_B, PG_CONTROL_HIT)) {
+        } else if(pg_check_input(kmap[BORK_CTRL_MENU_BACK], PG_CONTROL_HIT)
+               || pg_check_gamepad(gmap[BORK_CTRL_MENU_BACK], PG_CONTROL_HIT)) {
+            pg_audio_play(&d->core->menu_sound, 0.5);
             d->menu.state = BORK_MENU_CLOSED;
             SDL_ShowCursor(SDL_DISABLE);
             pg_mouse_mode(1);
             pg_audio_channel_pause(1, 0);
+            pg_audio_channel_pause(2, 0);
             return;
         }
     } else if(d->menu.upgrades.confirm == MUST_REPLACE) {
         if(pg_check_input(kmap[BORK_CTRL_LEFT], PG_CONTROL_HIT) || stick_ctrl_x == -1) {
+            pg_audio_play(&d->core->menu_sound, 0.5);
             d->menu.upgrades.replace_idx = MAX(0, d->menu.upgrades.replace_idx - 1);
         } else if(pg_check_input(kmap[BORK_CTRL_RIGHT], PG_CONTROL_HIT) || stick_ctrl_x == 1) {
+            pg_audio_play(&d->core->menu_sound, 0.5);
             d->menu.upgrades.replace_idx = MIN(2, d->menu.upgrades.replace_idx + 1);
-        } else if(pg_check_input(SDL_SCANCODE_SPACE, PG_CONTROL_HIT)
-               || pg_check_gamepad(SDL_CONTROLLER_BUTTON_A, PG_CONTROL_HIT)) {
+        } else if(pg_check_input(kmap[BORK_CTRL_SELECT], PG_CONTROL_HIT)
+               || pg_check_gamepad(gmap[BORK_CTRL_SELECT], PG_CONTROL_HIT)) {
+            pg_audio_play(&d->core->menu_sound, 0.5);
             d->menu.upgrades.confirm = CONFIRM_REPLACE;
-        } else if(pg_check_input(SDL_SCANCODE_ESCAPE, PG_CONTROL_HIT)
-               || pg_check_gamepad(SDL_CONTROLLER_BUTTON_B, PG_CONTROL_HIT)) {
+        } else if(pg_check_input(kmap[BORK_CTRL_MENU_BACK], PG_CONTROL_HIT)
+               || pg_check_gamepad(gmap[BORK_CTRL_MENU_BACK], PG_CONTROL_HIT)) {
+            pg_audio_play(&d->core->menu_sound, 0.5);
             d->menu.upgrades.confirm = 0;
         }
     } else if(d->menu.upgrades.confirm == CONFIRM_REPLACE) {
-        if(pg_check_input(SDL_SCANCODE_SPACE, PG_CONTROL_HIT)
-        || pg_check_gamepad(SDL_CONTROLLER_BUTTON_A, PG_CONTROL_HIT)) {
+        if(pg_check_input(kmap[BORK_CTRL_SELECT], PG_CONTROL_HIT)
+        || pg_check_gamepad(gmap[BORK_CTRL_SELECT], PG_CONTROL_HIT)) {
+            pg_audio_play(&d->core->menu_sound, 0.5);
             if(d->menu.upgrades.confirm_opt == 1) d->menu.upgrades.confirm = 0;
             else {
                 d->upgrades[d->menu.upgrades.replace_idx] = item->counter[d->menu.upgrades.horiz_idx];
@@ -690,7 +739,9 @@ void tick_control_upgrade_menu(struct bork_play_data* d)
             }
         }
     } else if(d->menu.upgrades.confirm == CAN_UPGRADE) {
-        if(pg_check_input(SDL_SCANCODE_SPACE, PG_CONTROL_HIT)) {
+        if(pg_check_input(kmap[BORK_CTRL_SELECT], PG_CONTROL_HIT)
+        || pg_check_gamepad(gmap[BORK_CTRL_SELECT], PG_CONTROL_HIT)) {
+            pg_audio_play(&d->core->menu_sound, 0.5);
             if(d->menu.upgrades.confirm_opt == 1) d->menu.upgrades.confirm = 0;
             else {
                 d->upgrade_level[d->menu.upgrades.replace_idx] = 1;
@@ -699,8 +750,9 @@ void tick_control_upgrade_menu(struct bork_play_data* d)
             }
         }
     } else if(d->menu.upgrades.confirm == CAN_INSTALL) {
-        if(pg_check_input(SDL_SCANCODE_SPACE, PG_CONTROL_HIT)
-        || pg_check_gamepad(SDL_CONTROLLER_BUTTON_A, PG_CONTROL_HIT)) {
+        if(pg_check_input(kmap[BORK_CTRL_SELECT], PG_CONTROL_HIT)
+        || pg_check_gamepad(gmap[BORK_CTRL_SELECT], PG_CONTROL_HIT)) {
+            pg_audio_play(&d->core->menu_sound, 0.5);
             if(d->menu.upgrades.confirm_opt == 1) d->menu.upgrades.confirm = 0;
             else {
                 d->upgrades[d->menu.upgrades.replace_idx] = item->counter[d->menu.upgrades.horiz_idx];
@@ -831,11 +883,12 @@ void draw_upgrade_menu(struct bork_play_data* d, float t)
     int ti = 2;
     if(selected_upgrade) {
         int len = snprintf(text.block[ti], 32, "%s", selected_upgrade->name);
-        vec4_set(text.block_style[ti], ar * 0.6 - (len * 0.04 * 1.25 * 0.5), 0.2, 0.04, 1.25);
+        vec4_set(text.block_style[ti], ar * 0.6 - (len * 0.04 * 1.25 * 0.5), 0.225, 0.04, 1.25);
         for(i = 0; i < 8; ++i) {
             if(!selected_upgrade->description[i]) break;
-            snprintf(text.block[++ti], 32, "%s", selected_upgrade->description[i]);
-            vec4_set(text.block_style[ti], ar * 0.4, 0.3 + i * 0.035, 0.02, 1.25);
+            len = snprintf(text.block[++ti], 32, "%s", selected_upgrade->description[i]);
+            vec4_set(text.block_style[ti], ar * 0.6 - (len * 0.02 * 1.25 * 0.5),
+                                           0.3 + i * 0.035, 0.02, 1.25);
         }
     } else if(d->menu.upgrades.selection_idx == d->held_upgrades.len) {
         selected_upgrade = bork_upgrade_detail(d->upgrades[MOD(d->menu.upgrades.horiz_idx - 1, 4)]);
@@ -843,8 +896,9 @@ void draw_upgrade_menu(struct bork_play_data* d, float t)
         vec4_set(text.block_style[ti], ar * 0.6 - (len * 0.04 * 1.25 * 0.5), 0.2, 0.04, 1.25);
         for(i = 0; i < 8; ++i) {
             if(!selected_upgrade->description[i]) break;
-            snprintf(text.block[++ti], 32, "%s", selected_upgrade->description[i]);
-            vec4_set(text.block_style[ti], ar * 0.4, 0.3 + i * 0.035, 0.02, 1.25);
+            len = snprintf(text.block[++ti], 32, "%s", selected_upgrade->description[i]);
+            vec4_set(text.block_style[ti], ar * 0.6 - (len * 0.02 * 1.25 * 0.5),
+                                           0.3 + i * 0.035, 0.02, 1.25);
         }
     }
     if(d->menu.upgrades.confirm == 0 && d->menu.upgrades.selection_idx < d->held_upgrades.len) {
@@ -855,7 +909,7 @@ void draw_upgrade_menu(struct bork_play_data* d, float t)
         vec4_set(text.block_style[ti], ar * 0.6 - (len * 0.03 * 1.25 * 0.5), 0.55, 0.03, 1.25);
         vec4_set(text.block_color[ti], 1, 1, 1, 1);
     } else if(d->menu.upgrades.confirm == MUST_REPLACE) {
-        int len = snprintf(text.block[++ti], 16, "SELECT TECH TO REPLACE");
+        int len = snprintf(text.block[++ti], 32, "SELECT TECH TO REPLACE");
         vec4_set(text.block_style[ti], ar * 0.6 - (len * 0.03 * 1.25 * 0.5), 0.55, 0.03, 1.25);
         vec4_set(text.block_color[ti], 1, 1, 1, 1);
     } else if(d->menu.upgrades.confirm == CONFIRM_REPLACE

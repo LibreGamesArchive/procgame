@@ -1,6 +1,6 @@
 #version 330
 
-#define VOLUME_SIZE 1.1
+#define VOLUME_SIZE 1.2
 
 const vec3 light_verts[36] = vec3[](
     vec3(-VOLUME_SIZE, -VOLUME_SIZE, -VOLUME_SIZE),

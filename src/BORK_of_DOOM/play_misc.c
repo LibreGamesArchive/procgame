@@ -80,16 +80,16 @@ bork_entity_t get_looked_item(struct bork_play_data* d)
     bork_entity_t looked_id = -1;
     bork_entity_t ent_id;
     struct bork_entity* ent = NULL;
-    float closest_angle = 0.4f, closest_dist = 2.5f;
+    float closest_angle = 0.4f, closest_dist = (32.0f * 32.0f);
     ARR_FOREACH(d->plr_item_query, ent_id, i) {
         ent = bork_entity_get(ent_id);
         if(!ent || ent->flags & BORK_ENTFLAG_NOT_INTERACTIVE) continue;
         vec3 ent_to_plr;
         vec3_sub(ent_to_plr, ent->pos, look_pos);
-        float dist = vec3_len(ent_to_plr);
+        float dist = vec3_len2(ent_to_plr);
         if(dist >= closest_dist) continue;
         vec3_normalize(ent_to_plr, ent_to_plr);
-        float angle = acosf(vec3_mul_inner(ent_to_plr, look_dir)) * dist;
+        float angle = acosf(vec3_mul_inner(ent_to_plr, look_dir)) * sqrtf(dist);
         if(angle >= closest_angle) continue;
         closest_dist = dist;
         looked_id = ent_id;
@@ -105,14 +105,16 @@ bork_entity_t get_looked_entity(struct bork_play_data* d)
     bork_entity_t looked_id = -1;
     bork_entity_t ent_id;
     struct bork_entity* ent = NULL;
-    float closest_angle = 0.3f, closest_dist = 5.0f;
+    float closest_angle = 0.3f, closest_dist = (32.0f * 32.0f);
     ARR_FOREACH(d->plr_entity_query, ent_id, i) {
         ent = bork_entity_get(ent_id);
         if(!ent || ent->flags & BORK_ENTFLAG_NOT_INTERACTIVE) continue;
         vec3 ent_to_plr;
         vec3_sub(ent_to_plr, ent->pos, look_pos);
-        float dist = vec3_len(ent_to_plr);
+        float dist = vec3_len2(ent_to_plr);
         if(dist >= closest_dist) continue;
+        closest_dist = dist;
+        dist = sqrtf(dist);
         vec3_normalize(ent_to_plr, ent_to_plr);
         float angle = acosf(vec3_mul_inner(ent_to_plr, look_dir));
         if(angle >= closest_angle) continue;
@@ -130,23 +132,23 @@ bork_entity_t get_looked_enemy(struct bork_play_data* d)
     bork_entity_t looked_id = -1;
     bork_entity_t ent_id;
     struct bork_entity* ent = NULL;
-    float closest_angle = 1.0f, closest_dist = 25.0f;
+    float closest_angle = 1.0f, closest_dist = (64.0f * 64.0f);
     ARR_FOREACH(d->plr_enemy_query, ent_id, i) {
         ent = bork_entity_get(ent_id);
         if(!ent) continue;
         vec3 ent_to_plr;
         vec3_sub(ent_to_plr, ent->pos, look_pos);
-        float dist = vec3_len(ent_to_plr);
+        float dist = vec3_len2(ent_to_plr);
         if(dist >= closest_dist) continue;
         vec3_normalize(ent_to_plr, ent_to_plr);
-        float angle = acosf(vec3_mul_inner(ent_to_plr, look_dir)) * dist;
+        float angle = acosf(vec3_mul_inner(ent_to_plr, look_dir)) * sqrtf(dist);
         if(angle >= closest_angle) continue;
         closest_dist = dist;
         looked_id = ent_id;
     }
     ent = bork_entity_get(looked_id);
-    float vis_dist = bork_map_vis_dist(&d->map, look_pos, look_dir);
-    if(vis_dist + 0.25 < closest_dist) return -1;
+    float vis_dist = bork_map_vis_dist(&d->map, look_pos, look_dir, closest_dist);
+    if(vis_dist + 0.25 < sqrtf(closest_dist)) return -1;
     else return looked_id;
 }
 
@@ -157,11 +159,11 @@ struct bork_map_object* get_looked_map_object(struct bork_play_data* d)
     int i;
     struct bork_map_object* looked_obj = NULL;
     struct bork_map_object* obj;
-    float closest_angle = 0.3f, closest_dist = 2.5f;
+    float closest_angle = 0.3f, closest_dist = (2.5f * 2.5f);
     ARR_FOREACH_PTR(d->map.doorpads, obj, i) {
         vec3 ent_to_plr;
         vec3_sub(ent_to_plr, obj->pos, look_pos);
-        float dist = vec3_len(ent_to_plr);
+        float dist = vec3_len2(ent_to_plr);
         if(dist >= closest_dist) continue;
         vec3_normalize(ent_to_plr, ent_to_plr);
         float angle = acosf(vec3_mul_inner(ent_to_plr, look_dir));
@@ -173,7 +175,7 @@ struct bork_map_object* get_looked_map_object(struct bork_play_data* d)
     ARR_FOREACH_PTR(d->map.recyclers, obj, i) {
         vec3 ent_to_plr;
         vec3_sub(ent_to_plr, obj->pos, look_pos);
-        float dist = vec3_len(ent_to_plr);
+        float dist = vec3_len2(ent_to_plr);
         if(dist >= closest_dist) continue;
         vec3_normalize(ent_to_plr, ent_to_plr);
         float angle = acosf(vec3_mul_inner(ent_to_plr, look_dir));
@@ -185,7 +187,7 @@ struct bork_map_object* get_looked_map_object(struct bork_play_data* d)
     ARR_FOREACH_PTR(d->map.grates, obj, i) {
         vec3 ent_to_plr;
         vec3_sub(ent_to_plr, obj->pos, look_pos);
-        float dist = vec3_len(ent_to_plr);
+        float dist = vec3_len2(ent_to_plr);
         if(dist >= closest_dist) continue;
         vec3_normalize(ent_to_plr, ent_to_plr);
         float angle = acosf(vec3_mul_inner(ent_to_plr, look_dir)) * 0.75;
@@ -197,7 +199,7 @@ struct bork_map_object* get_looked_map_object(struct bork_play_data* d)
     ARR_FOREACH_PTR(d->map.doors, obj, i) {
         vec3 ent_to_plr;
         vec3_sub(ent_to_plr, obj->pos, look_pos);
-        float dist = vec3_len(ent_to_plr);
+        float dist = vec3_len2(ent_to_plr);
         if(dist >= closest_dist) continue;
         vec3_normalize(ent_to_plr, ent_to_plr);
         float angle = acosf(vec3_mul_inner(ent_to_plr, look_dir));
@@ -209,7 +211,7 @@ struct bork_map_object* get_looked_map_object(struct bork_play_data* d)
     ARR_FOREACH_PTR(d->map.teleports, obj, i) {
         vec3 ent_to_plr;
         vec3_sub(ent_to_plr, (vec3){ obj->pos[0], obj->pos[1], obj->pos[2] - 0.5 }, look_pos);
-        float dist = vec3_len(ent_to_plr);
+        float dist = vec3_len2(ent_to_plr);
         if(dist >= closest_dist) continue;
         vec3_normalize(ent_to_plr, ent_to_plr);
         float angle = acosf(vec3_mul_inner(ent_to_plr, look_dir));
@@ -218,7 +220,26 @@ struct bork_map_object* get_looked_map_object(struct bork_play_data* d)
         closest_angle = angle;
         looked_obj = obj;
     }
-    return looked_obj;
+    /*  The escape pod  */
+    vec3 ent_to_plr;
+    vec3_sub(ent_to_plr, d->map.escape_pod.pos, look_pos);
+    float dist = vec3_len2(ent_to_plr);
+    if(dist >= closest_dist) return looked_obj;
+    vec3_normalize(ent_to_plr, ent_to_plr);
+    float angle = acosf(vec3_mul_inner(ent_to_plr, look_dir)) * 0.25;
+    if(angle >= closest_angle) return looked_obj;
+    else return &d->map.escape_pod;
+}
+
+void hurt_player(struct bork_play_data* d, int damage, int can_block)
+{
+    if(can_block) {
+        int defense = get_upgrade_level(d, BORK_UPGRADE_DEFENSE);
+        if(defense == 0) damage = ceil((float)damage * 0.9f);
+        else if(defense == 1) damage = ceil((float)damage * 0.6f);
+    }
+    d->plr.HP -= damage;
+    d->plr.pain_ticks += damage * 2;
 }
 
 void get_plr_pos_for_ai(struct bork_play_data* d, vec3 out)
@@ -247,6 +268,9 @@ void game_explosion(struct bork_play_data* d, vec3 pos, float intensity)
     ARR_FOREACH(surr, surr_ent_id, i) {
         surr_ent = bork_entity_get(surr_ent_id);
         if(!surr_ent) continue;
+        if(surr_ent->flags & BORK_ENTFLAG_STATIONARY) continue;
+        surr_ent->flags &= ~BORK_ENTFLAG_INACTIVE;
+        surr_ent->still_ticks = 0;
         float dist = vec3_dist(pos, surr_ent->pos);
         if(dist > 5.0f) continue;
         dist = (1 - (dist / 5.0f)) * 0.5 + 0.5;
@@ -254,20 +278,26 @@ void game_explosion(struct bork_play_data* d, vec3 pos, float intensity)
         create_sparks(d, surr_ent->pos, 0.1, 3);
         vec3 push;
         vec3_sub(push, surr_ent->pos, pos);
-        vec3_set_len(push, push, 0.25 * intensity * dist);
-        push[2] += 0.025 * intensity;
+        vec3_set_len(push, push, 0.25 * dist);
+        push[2] += 0.01;
         vec3_add(surr_ent->vel, surr_ent->vel, push);
     }
     /*  Apply explosion to the player   */
     float dist = vec3_dist(d->plr.pos, pos);
     if(dist <= 5.0f) {
         dist = (1 - (dist / 5.0f)) * 0.5 + 0.5;
-        d->plr.HP -= 50 * intensity * dist;
+        hurt_player(d, 50 * intensity * dist, 1);
         vec3 push;
         vec3_sub(push, d->plr.pos, pos);
-        vec3_set_len(push, push, 0.2 * intensity * dist);
-        push[2] += 0.02 * intensity;
+        vec3_set_len(push, push, 0.1 * dist);
+        push[2] += 0.01;
         vec3_add(d->plr.vel, d->plr.vel, push);
     }
     create_explosion(d, pos, intensity);
+}
+
+void hud_announce(struct bork_play_data* d, char* str)
+{
+    strncpy(d->hud_announce, str, 64);
+    d->hud_announce_ticks = PLAY_SECONDS(3.5);
 }

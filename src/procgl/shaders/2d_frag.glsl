@@ -29,10 +29,12 @@ void main()
     float light = max(0, dot(-light_dir, norm));
     float spec = max(0, pow(dot(-light_dir, norm), 32)) * tex_norm.a;
     light += spec;
-    if(tex_norm.w == 1) frag_color = tex_color;
+    vec4 final;
+    if(tex_norm.w == 1) final = tex_color;
     else {
-        frag_color = vec4(tex_color.rgb *
+        final = vec4(tex_color.rgb *
             (light_color * light + ambient_color), tex_color.a);
     }
+    frag_color = clamp(final, 0, 1);
 }
 

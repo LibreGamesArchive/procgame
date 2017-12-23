@@ -61,8 +61,8 @@ enum bork_tile_type {
     BORK_TILE_PIPES,
     BORK_TILE_WINDOW,
     BORK_TILE_CARGO_YELLOW,
-    BORK_TILE_PLACEHOLD_2,
-    BORK_TILE_PLACEHOLD_3,
+    BORK_TILE_ESCAPE_POD,
+    BORK_TILE_ESCAPE_POD_USED,
     BORK_TILE_PLACEHOLD_4,
     BORK_TILE_EDITOR_FIRE_LOW,
     BORK_TILE_EDITOR_FIRE_MID,
@@ -97,6 +97,7 @@ struct bork_map_object {
         BORK_MAP_TEXT,
         BORK_MAP_GRATE,
         BORK_MAP_TELEPORT,
+        BORK_MAP_ESCAPE_POD,
         BORK_MAP_FIRE
     } type;
     int dead;
@@ -151,6 +152,7 @@ struct bork_fire {
 
 struct bork_sound_emitter {
     int handle;
+    int next_play;
     enum bork_sound snd;
     vec3 pos;
     float volume, area;
@@ -171,6 +173,7 @@ struct bork_map {
     ARR_T(struct bork_map_object) grates;
     ARR_T(struct bork_map_object) teleports;
     ARR_T(struct bork_map_object) fire_objs;
+    struct bork_map_object escape_pod;
     ARR_T(struct bork_map_light_fixture) light_fixtures;
     ARR_T(struct bork_fire) fires;
     ARR_T(struct pg_light) lights;

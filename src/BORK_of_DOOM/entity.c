@@ -96,47 +96,51 @@ void bork_entity_update(struct bork_entity* ent, struct bork_play_data* d)
     float start_vertical = fabs(ent->vel[2]);
     int start_ground = ent->flags & BORK_ENTFLAG_GROUND;
     vec3_dup(ent_pos, ent->pos);
-    bork_entity_move(ent, map);
+    bork_entity_move(ent, d);
     vec3_sub(move, ent_pos, ent->pos);
     int end_ground = ent->flags & BORK_ENTFLAG_GROUND;
     if(start_vertical > 0.10001 && end_ground && !start_ground) {
         if(ent->flags & BORK_ENTFLAG_PLAYER) {
-            if(start_vertical > 0.25) {
-                float fall_damage = (start_vertical - 0.225) / 0.25 * 100;
+            vec3_set(ent->vel, 0, 0, 0);
+            if(start_vertical > 0.2) {
+                float fall_damage = (start_vertical - 0.2) / 0.25 * 100;
                 ent->HP -= (int)fall_damage;
                 ent->pain_ticks = (int)fall_damage * 5;
                 pg_audio_play(&d->core->sounds[BORK_SND_HURT], fall_damage / 100);
             } else pg_audio_play(&d->core->sounds[BORK_SND_PLAYER_LAND], 0.25);
-        } else {
-            float dist = vec3_dist(ent->pos, d->plr.pos);
-            if(dist) {
-                dist = 1 - (dist / 16);
-                if(ent->flags & BORK_ENTFLAG_ITEM) {
-                    pg_audio_play(&d->core->sounds[BORK_SND_ITEM_LAND], dist * 0.5);
-                }
-            }
+        } else if(ent->flags & BORK_ENTFLAG_ITEM) {
+            vec3 sound_pos;
+            vec3_mul(sound_pos, ent->pos, (vec3){ 1, 1, 2 });
+            pg_audio_emit_once(&d->core->sounds[BORK_SND_ITEM_LAND], 0.5, 16, sound_pos, 1);
         }
     }
-    if((ent->flags & BORK_ENTFLAG_ITEM) && vec3_len(move) < 0.01) {
+    if((ent->flags & (BORK_ENTFLAG_ITEM | BORK_ENTFLAG_ENTITY)) && vec3_len2(move) < (0.01 * 0.01)) {
         ++ent->still_ticks;
-        if(ent->still_ticks >= 10) ent->flags |= BORK_ENTFLAG_INACTIVE;
+        if(ent->still_ticks >= 10) {
+            ent->flags |= BORK_ENTFLAG_INACTIVE;
+        }
     } else {
         ent->still_ticks = 0;
-        ent->flags &= ~BORK_ENTFLAG_INACTIVE;
+        //ent->flags &= ~BORK_ENTFLAG_INACTIVE;
     }
 }
 
-void bork_entity_move(struct bork_entity* ent, struct bork_map* map)
+void bork_entity_move(struct bork_entity* ent, struct bork_play_data* d)
 {
+    struct bork_map* map = &d->map;
     const struct bork_entity_profile* prof = &BORK_ENT_PROFILES[ent->type];
     vec3 coll_size;
     vec3_dup(coll_size, prof->size);
-    if(ent->flags & BORK_ENTFLAG_CROUCH) {
-        coll_size[2] *= 0.5;
+    if(ent->flags & BORK_ENTFLAG_PLAYER) {
+        if(ent->HP <= 0) {
+            coll_size[2] *= 0.2;
+        } else if(ent->flags & BORK_ENTFLAG_CROUCH) {
+            coll_size[2] *= 0.5;
+        }
     }
     ent->flags &= ~BORK_ENTFLAG_GROUND;
-    if(!(ent->flags & BORK_ENTFLAG_FLIES))
-        vec3_add(ent->vel, ent->vel, (vec3){ 0, 0, -0.005 });
+    if(ent->flags & BORK_ENTFLAG_FLIES) vec3_scale(ent->vel, ent->vel, 0.9);
+    else vec3_add(ent->vel, ent->vel, (vec3){ 0, 0, -0.005 });
     struct bork_collision coll = {};
     float curr_move = 0;
     float max_move = vec3_vmin(coll_size);
@@ -160,8 +164,20 @@ void bork_entity_move(struct bork_entity* ent, struct bork_map* map)
         vec3_add(new_pos, new_pos, max_move_dir);
         steps = 0;
         while(bork_map_collide(map, &coll, new_pos, coll_size) && (steps++ < 4)) {
-            float face_down_angle = vec3_angle_diff(coll.face_norm, PG_DIR_VEC[PG_UP]);
-            float down_angle = vec3_angle_diff(coll.push, PG_DIR_VEC[PG_UP]);
+            float face_down_angle = vec3_mul_inner(coll.face_norm, PG_DIR_VEC[PG_UP]);
+            vec3 ell_norm = {
+                coll.push[0] / (coll_size[0] * coll_size[0]),
+                coll.push[1] / (coll_size[1] * coll_size[1]),
+                coll.push[2] / (coll_size[2] * coll_size[2]) };
+            vec3_normalize(ell_norm, ell_norm);
+            float down_angle = vec3_mul_inner(ell_norm, coll.face_norm);
+            /*
+            if(ent->flags & BORK_ENTFLAG_PLAYER && d->log_colls) {
+                fprintf(d->logfile, "Player collide: face norm: %f %f %f\n"
+                       "coll push: %f %f %f\n",
+                       coll.face_norm[0], coll.face_norm[1], coll.face_norm[2],
+                       coll.push[0], coll.push[1], coll.push[2]);
+            }*/
             if(ent->flags & BORK_ENTFLAG_BOUNCE) {
                 vec3 bounce_dir;
                 vec3 vel_norm;
@@ -171,14 +187,23 @@ void bork_entity_move(struct bork_entity* ent, struct bork_map* map)
                 vec3_reflect(bounce_dir, vel_norm, push_norm);
                 float vel_len = vec3_len(ent->vel);
                 vec3_set_len(ent->vel, bounce_dir, vel_len * 0.5);
+                if(vel_len > 0.05) {
+                    vec3 sound_pos;
+                    vec3_mul(sound_pos, ent->pos, (vec3){ 1, 1, 2 });
+                    pg_audio_emit_once(&d->core->sounds[BORK_SND_BULLET_HIT], 0.5, 16, sound_pos, 1);
+                }
                 return;
-            } else if(down_angle <= 0.1 && face_down_angle < 0.1) {
+            } else if(down_angle >= 0.8 && face_down_angle >= 0.9) {
+                //if(ent->flags & BORK_ENTFLAG_PLAYER) printf("Fuck off 1\n");
                 ent->flags |= BORK_ENTFLAG_GROUND;
-            } else if(down_angle <= slope_threshold && face_down_angle < 1 && face_down_angle > 0.1) {
-                ent->flags |= BORK_ENTFLAG_GROUND;
-                if(!(ent->flags & BORK_ENTFLAG_SLIDE)) {
-                    vec3_set(coll.push, 0, 0, coll.push[2]);
-                    slope = 1;
+            } else if(down_angle >= 0.8 && face_down_angle > 0.75 && face_down_angle < 0.9) {
+                //if(ent->flags & BORK_ENTFLAG_PLAYER) printf("Fuck off 2\n");
+                if(vec3_mul_inner(ell_norm, coll.face_norm) > 0.9) {
+                    ent->flags |= BORK_ENTFLAG_GROUND;
+                    if(!(ent->flags & BORK_ENTFLAG_SLIDE)) {
+                        vec3_set(coll.push, 0, 0, coll.push[2]);
+                        slope = 1;
+                    }
                 }
             }
             vec3_add(push, push, coll.push);
@@ -188,15 +213,23 @@ void bork_entity_move(struct bork_entity* ent, struct bork_map* map)
         }
     }
     if(!slope && vec3_len2(push) != 0) {
-        vec3 push_norm;
-        vec3_normalize(push_norm, push);
-        float dot = vec3_mul_inner(ent->vel, push_norm);
-        vec3_scale(push_norm, push_norm, dot);
-        vec3_sub(ent->vel, ent->vel, push_norm);
+        vec3 vel_norm;
+        vec3 ell_norm = {
+            push[0] / (coll_size[0] * coll_size[0]),
+            push[1] / (coll_size[1] * coll_size[1]),
+            push[2] / (coll_size[2] * coll_size[2]) };
+        vec3_normalize(ell_norm, ell_norm);
+        vec3_normalize(vel_norm, ent->vel);
+        float dot_norm = vec3_mul_inner(vel_norm, ell_norm);
+        //if(dot_norm < -0.9) {
+            float dot = vec3_mul_inner(ent->vel, ell_norm);
+            vec3_scale(ell_norm, ell_norm, dot);
+            vec3_sub(ent->vel, ent->vel, ell_norm);
+        //}
     }
     vec3_dup(ent->pos, new_pos);
     int friction = 0;
-    if(ladder) {
+    if((ent->flags & BORK_ENTFLAG_PLAYER) && ladder) {
         if(ent->dir[1] >= -0.75) ent->vel[2] = 0.05;
         else ent->vel[2] = -0.05;
         friction = 1;

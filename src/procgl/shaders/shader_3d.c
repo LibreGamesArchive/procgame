@@ -38,8 +38,10 @@ static void begin(struct pg_shader* shader, struct pg_viewer* view)
     pg_shader_set_matrix(shader, PG_PROJECTIONVIEW_MATRIX, projview);
     /*  Set the uniforms    */
     if(d->unis_dirty) {
-        glUniform1i(d->unis.tex_unit, d->state.tex->diffuse_slot);
-        glUniform1i(d->unis.norm_unit, d->state.tex->light_slot);
+        if(d->state.tex) {
+            glUniform1i(d->unis.tex_unit, d->state.tex->diffuse_slot);
+            glUniform1i(d->unis.norm_unit, d->state.tex->light_slot);
+        }
         glUniform4fv(d->unis.tex_tx, 1, d->state.tex_tx);
         d->unis_dirty = 0;
     }

@@ -20,7 +20,14 @@ void bork_use_door_override(struct bork_entity* ent, struct bork_play_data* d)
     if(!obj) return;
     if(obj->type == BORK_MAP_DOORPAD) {
         struct bork_map_object* door = &d->map.doors.data[d->looked_obj->doorpad.door_idx];
-        if(door->door.locked != 1) return;
+        if(door->door.locked == 0) {
+            hud_announce(d, "THIS DOOR IS ALREADY UNLOCKED");
+            return;
+        } else if(door->door.locked == 2) {
+            hud_announce(d, "THIS DOOR HAS A SPECIAL SECURITY OVERRIDE");
+            return;
+        }
+        pg_audio_play_ch(&d->core->sounds[BORK_SND_HACK], 1, 1);
         door->door.locked = 0;
         vec3 pos;
         vec3_sub(pos, d->plr.pos, obj->pos);
@@ -82,16 +89,21 @@ void bork_use_pistol(struct bork_entity* ent, struct bork_play_data* d)
     d->hud_anim_active = 2;
     /*  Gunshot effect  */
     struct bork_particle new_part = {
-        .flags = BORK_PARTICLE_LIGHT | BORK_PARTICLE_LIGHT_DECAY,
+        .flags = BORK_PARTICLE_SPRITE | BORK_PARTICLE_LIGHT | BORK_PARTICLE_LIGHT_DECAY,
         .pos = { gun_pos[0] + bullet_dir[0], gun_pos[1] + bullet_dir[1],
                  gun_pos[2] + bullet_dir[2] },
         .light = { 1.5, 1.5, 1, 4.0f },
         .vel = { 0, 0, 0 },
-        .lifetime = 8,
-        .ticks_left = 8,
+        .lifetime = 4,
+        .ticks_left = 4,
+        .frame_ticks = 1,
+        .start_frame = 0, .end_frame = 5
     };
     ARR_PUSH(d->particles, new_part);
     pg_audio_play(&d->core->sounds[BORK_SND_PISTOL], 0.5f);
+    d->recoil_time = 15;
+    d->recoil_ticks = 15;
+    vec2_set(d->recoil, (RANDF - 0.5) * 0.0075, (RANDF * 0.5 + 0.5) * 0.0075);
 }
 
 void bork_hud_pistol(struct bork_entity* ent, struct bork_play_data* d)
@@ -167,16 +179,21 @@ void bork_use_shotgun(struct bork_entity* ent, struct bork_play_data* d)
     d->hud_anim_active = 3;
     /*  Gunshot effect  */
     struct bork_particle new_part = {
-        .flags = BORK_PARTICLE_LIGHT | BORK_PARTICLE_LIGHT_DECAY,
+        .flags = BORK_PARTICLE_SPRITE | BORK_PARTICLE_LIGHT | BORK_PARTICLE_LIGHT_DECAY,
         .pos = { gun_pos[0] + bullet_dir[0][0], gun_pos[1] + bullet_dir[0][1],
                  gun_pos[2] + bullet_dir[0][2] },
         .light = { 1.5, 1.5, 1, 4.0f },
         .vel = { 0, 0, 0 },
         .lifetime = 4,
         .ticks_left = 4,
+        .frame_ticks = 1,
+        .start_frame = 0, .end_frame = 5
     };
     ARR_PUSH(d->particles, new_part);
     pg_audio_play(&d->core->sounds[BORK_SND_SHOTGUN], 0.5f);
+    d->recoil_time = 25;
+    d->recoil_ticks = 25;
+    vec2_set(d->recoil, (RANDF - 0.5) * 0.015, (RANDF * 0.5 + 0.5) * 0.015);
 }
 
 void bork_hud_shotgun(struct bork_entity* ent, struct bork_play_data* d)
@@ -225,16 +242,21 @@ void bork_use_machinegun(struct bork_entity* ent, struct bork_play_data* d)
     d->hud_anim_active = 2;
     /*  Gunshot effect  */
     struct bork_particle new_part = {
-        .flags = BORK_PARTICLE_LIGHT | BORK_PARTICLE_LIGHT_DECAY,
+        .flags = BORK_PARTICLE_SPRITE | BORK_PARTICLE_LIGHT | BORK_PARTICLE_LIGHT_DECAY,
         .pos = { gun_pos[0] + bullet_dir[0], gun_pos[1] + bullet_dir[1],
                  gun_pos[2] + bullet_dir[2] },
         .light = { 1.5, 1.5, 1, 4.0f },
         .vel = { 0, 0, 0 },
         .lifetime = 4,
         .ticks_left = 4,
+        .frame_ticks = 1,
+        .start_frame = 0, .end_frame = 5
     };
     ARR_PUSH(d->particles, new_part);
     pg_audio_play(&d->core->sounds[BORK_SND_MACHINEGUN], 0.5f);
+    d->recoil_time = 15;
+    d->recoil_ticks = 15;
+    vec2_set(d->recoil, (RANDF - 0.5) * 0.01, (RANDF * 0.5 + 0.5) * 0.01);
 }
 
 void bork_hud_machinegun(struct bork_entity* ent, struct bork_play_data* d)
@@ -285,6 +307,7 @@ void bork_use_plazgun(struct bork_entity* ent, struct bork_play_data* d)
     d->hud_anim_speed = 0.015;
     d->hud_anim_active = 3;
     /*  Gunshot effect  */
+    vec3_set_len(bullet_dir, bullet_dir, 1);
     struct bork_particle new_part = {
         .flags = BORK_PARTICLE_LIGHT | BORK_PARTICLE_LIGHT_DECAY,
         .pos = { gun_pos[0] + bullet_dir[0], gun_pos[1] + bullet_dir[1],
@@ -296,7 +319,15 @@ void bork_use_plazgun(struct bork_entity* ent, struct bork_play_data* d)
     };
     if(ent->ammo_type == 2) vec4_set(new_part.light, 0.5, 0.5, 1.5, 8.0);
     ARR_PUSH(d->particles, new_part);
+    if(ent->ammo_type < 2) {
+        red_sparks(d, new_part.pos, 0.25, rand() % 4 + 4);
+    } else {
+        blue_sparks(d, new_part.pos, 0.25, rand() % 4 + 4);
+    }
     pg_audio_play(&d->core->sounds[BORK_SND_PLAZGUN], 0.5f);
+    d->recoil_time = 25;
+    d->recoil_ticks = 25;
+    vec2_set(d->recoil, (RANDF - 0.5) * 0.015, (RANDF * 0.5 + 0.5) * 0.015);
 }
 
 void bork_hud_plazgun(struct bork_entity* ent, struct bork_play_data* d)
@@ -316,7 +347,7 @@ void bork_use_firstaid(struct bork_entity* ent, struct bork_play_data* d)
 {
     if(d->hud_anim_active && d->hud_anim_destroy_when_finished) return;
     bork_play_reset_hud_anim(d);
-    d->plr.HP = MIN(100, d->plr.HP + 20);
+    d->plr.HP = MIN(100, d->plr.HP + 50);
     vec3_set(d->hud_anim[1], -0.3, -0.3, 0);
     vec3_set(d->hud_anim[2], 0, 0, 0);
     vec3_set(d->hud_anim[3], 0, 0, 0);
@@ -325,6 +356,7 @@ void bork_use_firstaid(struct bork_entity* ent, struct bork_play_data* d)
     if(--ent->item_quantity == 0) {
         d->hud_anim_destroy_when_finished = 1;
     }
+    pg_audio_play_ch(&d->core->sounds[BORK_SND_HEAL_TECH], 0.5, 1);
 }
 
 static void melee_callback(struct bork_entity* item, struct bork_play_data* d)
@@ -336,11 +368,14 @@ static void melee_callback(struct bork_entity* item, struct bork_play_data* d)
     vec3 bullet_dir = { -0.25, 0, 0 };
     mat3_mul_vec3(bullet_dir, view, bullet_dir);
     mat4_mul_vec4(gun_pos, view, gun_pos);
+    int damage = item_prof->damage;
+    int str = get_upgrade_level(d, BORK_UPGRADE_STRENGTH);
+    if(str == 0) damage *= 2;
+    else if(str == 1) damage *= 4;
     struct bork_bullet new_bullet =
         { .type = (item->type == BORK_ITEM_BEAMSWORD) ? 30 : 31,
           .flags = BORK_BULLET_HURTS_ENEMY,
-          .damage = item_prof->damage +
-                    item_prof->damage * (get_upgrade_level(d, BORK_UPGRADE_STRENGTH) + 1),
+          .damage = damage,
           .range = 2.25 };
     vec3_dup(new_bullet.pos, gun_pos);
     vec3_dup(new_bullet.dir, bullet_dir);
@@ -361,6 +396,62 @@ void bork_use_melee(struct bork_entity* ent, struct bork_play_data* d)
     d->hud_anim_active = 3;
     d->hud_anim_callback = melee_callback;
     d->hud_callback_frame = 2;
+}
+
+static void prod_callback(struct bork_entity* item, struct bork_play_data* d)
+{
+    const struct bork_entity_profile* item_prof = &BORK_ENT_PROFILES[item->type];
+    mat4 view;
+    bork_entity_get_view(&d->plr, view);
+    vec4 gun_pos = { 0, 0, 0, 1 };
+    vec3 bullet_dir = { -0.25, 0, 0 };
+    mat3_mul_vec3(bullet_dir, view, bullet_dir);
+    mat4_mul_vec4(gun_pos, view, gun_pos);
+    struct bork_bullet new_bullet = {
+        .type = 29,
+        .flags = BORK_BULLET_HURTS_ENEMY,
+        .damage = item_prof->damage,
+        .range = 2.25 };
+    vec3_dup(new_bullet.pos, gun_pos);
+    vec3_dup(new_bullet.dir, bullet_dir);
+    ARR_PUSH(d->bullets, new_bullet);
+    ++item->counter[0];
+    if(item->counter[0] >= 10) {
+        item->type = BORK_ITEM_SHOCK_PROD_USED;
+    }
+    float vis_dist = bork_map_vis_dist(&d->map, gun_pos, bullet_dir, 2);
+    vis_dist = MIN(vis_dist, 1.5);
+    vec3_set_len(bullet_dir, bullet_dir, vis_dist);
+    vec3_add(gun_pos, gun_pos, bullet_dir);
+    struct bork_particle new_part = {
+        .flags = BORK_PARTICLE_LIGHT,
+        .light = { 1.5, 0.5, 0.5, 2 },
+        .pos = { gun_pos[0], gun_pos[1], gun_pos[2] },
+        .vel = { 0, 0, 0 },
+        .ticks_left = 30,
+        .lifetime = 30
+    };
+    ARR_PUSH(d->particles, new_part);
+    red_sparks(d, gun_pos, 0.25, rand() % 4 + 4);
+    float dist = vec3_dist(gun_pos, d->plr.pos);
+    if(dist < 12) {
+        dist = 1 - (dist / 12);
+        pg_audio_play(&d->core->sounds[BORK_SND_PLAZMA_HIT], dist);
+    }
+}
+
+void bork_use_prod(struct bork_entity* ent, struct bork_play_data* d)
+{
+    if(d->hud_anim_active) return;
+    bork_play_reset_hud_anim(d);
+    vec3_set(d->hud_anim[1], -0.75, -0.2, 0);
+    vec3_set(d->hud_anim[2], 0, 0, 0);
+    d->hud_angle[1] = 0;
+    d->hud_angle[2] = -0.75;
+    d->hud_anim_speed = 0.01;
+    d->hud_anim_active = 2;
+    d->hud_anim_callback = prod_callback;
+    d->hud_callback_frame = 1;
 }
 
 static void grenade_callback(struct bork_entity* item, struct bork_play_data* d)
@@ -384,7 +475,6 @@ static void grenade_callback(struct bork_entity* item, struct bork_play_data* d)
 void bork_use_grenade(struct bork_entity* ent, struct bork_play_data* d)
 {
     if(d->hud_anim_active) return;
-    const struct bork_entity_profile* item_prof = &BORK_ENT_PROFILES[ent->type];
     bork_play_reset_hud_anim(d);
     vec3_set(d->hud_anim[1], 0.3, 0, 0);
     vec3_set(d->hud_anim[2], -0.6, 0, 0.25);
@@ -399,11 +489,10 @@ void bork_use_grenade(struct bork_entity* ent, struct bork_play_data* d)
 
 void bork_tick_grenade(struct bork_entity* ent, struct bork_play_data* d)
 {
-    static bork_entity_arr_t surr = {};
     if(ent->flags & BORK_ENTFLAG_DEAD) return;
     --ent->dead_ticks;
     if(ent->dead_ticks <= 0) {
-        game_explosion(d, ent->pos, 1);
+        game_explosion(d, ent->pos, 4);
         ent->flags |= BORK_ENTFLAG_DEAD;
     }
 }
@@ -477,7 +566,7 @@ void bork_tick_grenade_inc(struct bork_entity* ent, struct bork_play_data* d)
 void bork_barrel_explode(struct bork_entity* ent, struct bork_play_data* d)
 {
     if(ent->counter[0] == 1) {
-        game_explosion(d, ent->pos, 1);
+        game_explosion(d, ent->pos, 2);
         int i;
         for(i = 0; i < 6; ++i) {
             int f = rand() % 3;
@@ -486,7 +575,7 @@ void bork_barrel_explode(struct bork_entity* ent, struct bork_play_data* d)
                 (float)rand() / RAND_MAX - 0.5,
                 (float)rand() / RAND_MAX };
             struct bork_particle new_part = {
-                .flags = BORK_PARTICLE_GRAVITY,
+                .flags = BORK_PARTICLE_GRAVITY | BORK_PARTICLE_SPRITE,
                 .pos = { ent->pos[0] + off[0], ent->pos[1] + off[1], ent->pos[2] + off[2] },
                 .vel = { off[0] * 0.15, off[1] * 0.15, off[2] * 0.15, },
                 .ticks_left = 50,
@@ -501,4 +590,49 @@ void bork_barrel_explode(struct bork_entity* ent, struct bork_play_data* d)
     } else {
         --ent->counter[0];
     }
+}
+
+void bork_electronic_die(struct bork_entity* ent, struct bork_play_data* d)
+{
+    create_sparks(d, ent->pos, 0.025, rand() % 2 + 2);
+    bork_entity_t new_id = bork_entity_new(1);
+    struct bork_entity* new_item = bork_entity_get(new_id);
+    bork_entity_init(new_item, BORK_ITEM_WIRES);
+    vec3_dup(new_item->pos, ent->pos);
+    vec3_set(new_item->vel, (RANDF - 0.5) * 0.1, (RANDF - 0.5) * 0.1, (RANDF - 0.2) * 0.1);
+    new_item->counter[3] = 240;
+    new_item->flags |= BORK_ENTFLAG_SMOKING;
+    bork_map_add_item(&d->map, new_id);
+    new_id = bork_entity_new(1);
+    new_item = bork_entity_get(new_id);
+    bork_entity_init(new_item, BORK_ITEM_SCRAPMETAL);
+    vec3_dup(new_item->pos, ent->pos);
+    vec3_set(new_item->vel, (RANDF - 0.5) * 0.1, (RANDF - 0.5) * 0.1, (RANDF - 0.2) * 0.1);
+    new_item->counter[3] = 240;
+    new_item->flags |= BORK_ENTFLAG_SMOKING;
+    bork_map_add_item(&d->map, new_id);
+    ent->flags |= BORK_ENTFLAG_DEAD;
+
+}
+
+void bork_stool_die(struct bork_entity* ent, struct bork_play_data* d)
+{
+    create_sparks(d, ent->pos, 0.025, rand() % 2 + 2);
+    bork_entity_t new_id = bork_entity_new(1);
+    struct bork_entity* new_item = bork_entity_get(new_id);
+    bork_entity_init(new_item, BORK_ITEM_STEELPLATE);
+    vec3_dup(new_item->pos, ent->pos);
+    vec3_set(new_item->vel, (RANDF - 0.5) * 0.1, (RANDF - 0.5) * 0.1, (RANDF - 0.2) * 0.1);
+    new_item->counter[3] = 60;
+    new_item->flags |= BORK_ENTFLAG_SMOKING;
+    bork_map_add_item(&d->map, new_id);
+    new_id = bork_entity_new(1);
+    new_item = bork_entity_get(new_id);
+    bork_entity_init(new_item, BORK_ITEM_SCRAPMETAL);
+    vec3_dup(new_item->pos, ent->pos);
+    vec3_set(new_item->vel, (RANDF - 0.5) * 0.1, (RANDF - 0.5) * 0.1, (RANDF - 0.2) * 0.1);
+    new_item->counter[3] = 60;
+    new_item->flags |= BORK_ENTFLAG_SMOKING;
+    bork_map_add_item(&d->map, new_id);
+    ent->flags |= BORK_ENTFLAG_DEAD;
 }

@@ -318,6 +318,33 @@ struct bork_tile_detail BORK_TILE_DETAILS[] = {
         .tex_tile = { [PG_LEFT] = 48, [PG_RIGHT] = 48,
                       [PG_FRONT] = 48, [PG_BACK] = 48 },
         .add_model = tile_model_basic },
+    [BORK_TILE_ESCAPE_POD] = { .name = "ESCAPE POD",
+        .tile_flags = BORK_TILE_HAS_ORIENTATION | BORK_TILE_FACE_ORIENTED,
+        .face_flags = { BORK_FACE_HAS_SURFACE | BORK_FACE_HAS_BACKFACE,
+                        BORK_FACE_HAS_SURFACE | BORK_FACE_HAS_BACKFACE,
+                        BORK_FACE_HAS_SURFACE | BORK_FACE_HAS_BACKFACE,
+                        BORK_FACE_HAS_SURFACE | BORK_FACE_HAS_BACKFACE },
+        .tex_tile = { [PG_LEFT] = 85, [PG_RIGHT] = 85,
+                      [PG_FRONT] = 85, [PG_BACK] = 85 },
+        .add_model = tile_model_basic },
+    [BORK_TILE_ESCAPE_POD_USED] = { .name = "USED ESCAPE POD",
+        .tile_flags = BORK_TILE_HAS_ORIENTATION | BORK_TILE_FACE_ORIENTED,
+        .face_flags = { BORK_FACE_HAS_SURFACE | BORK_FACE_HAS_BACKFACE,
+                        BORK_FACE_HAS_SURFACE | BORK_FACE_HAS_BACKFACE,
+                        BORK_FACE_HAS_SURFACE | BORK_FACE_HAS_BACKFACE,
+                        BORK_FACE_HAS_SURFACE | BORK_FACE_HAS_BACKFACE },
+        .tex_tile = { [PG_LEFT] = 101, [PG_RIGHT] = 101,
+                      [PG_FRONT] = 101, [PG_BACK] = 101 },
+        .add_model = tile_model_basic },
+    [BORK_TILE_EDITOR_FIRE_LOW] = { .name = "LOW FIRE",
+        .face_flags = { BORK_FACE_TRAVEL, BORK_FACE_TRAVEL, BORK_FACE_TRAVEL,
+                        BORK_FACE_TRAVEL, BORK_FACE_TRAVEL, BORK_FACE_TRAVEL } },
+    [BORK_TILE_EDITOR_FIRE_MID] = { .name = "MID FIRE",
+        .face_flags = { BORK_FACE_TRAVEL, BORK_FACE_TRAVEL, BORK_FACE_TRAVEL,
+                        BORK_FACE_TRAVEL, BORK_FACE_TRAVEL, BORK_FACE_TRAVEL } },
+    [BORK_TILE_EDITOR_FIRE_HIGH] = { .name = "HIGH FIRE",
+        .face_flags = { BORK_FACE_TRAVEL, BORK_FACE_TRAVEL, BORK_FACE_TRAVEL,
+                        BORK_FACE_TRAVEL, BORK_FACE_TRAVEL, BORK_FACE_TRAVEL } },
     [BORK_TILE_EDITOR_DOOR] = { .name = "DOOR",
         .tile_flags = BORK_TILE_HAS_ORIENTATION },
     [BORK_TILE_EDITOR_RECYCLER] = { .name = "RECYCLER",
@@ -530,6 +557,12 @@ void bork_map_deinit(struct bork_map* map)
     ARR_FOREACH_PTR(map->sounds, emitter, i) {
         pg_audio_emitter_remove(emitter->handle);
     }
+    struct bork_fire* fire;
+    ARR_FOREACH_PTR(map->fires, fire, i) {
+        if(fire->audio_handle >= 0) {
+            pg_audio_emitter_remove(fire->audio_handle);
+        }
+    }
     for(i = 0; i < 4; ++i) for(j = 0; j < 4; ++j) for(k = 0; k < 4; ++k) {
         ARR_DEINIT(map->enemies[i][j][k]);
         ARR_DEINIT(map->entities[i][j][k]);
@@ -603,10 +636,10 @@ void bork_map_update(struct bork_map* map, struct bork_play_data* d)
             vec3 fire_ctr = {
                 obj->pos[0] + obj->fire.dir[0] * 2,
                 obj->pos[1] + obj->fire.dir[1] * 2,
-                obj->pos[2] + 0.75 };
+                obj->pos[2] + 0.5};
             vec3 fire_box = {
-                MAX(obj->fire.dir[0] * 2, 0.75),
-                MAX(obj->fire.dir[1] * 2, 0.75), 1.5 };
+                MAX(fabs(obj->fire.dir[0]) * 2, 0.75),
+                MAX(fabs(obj->fire.dir[1]) * 2, 0.75), 1.5 };
             if(fabs(fire_ctr[0] - plr->pos[0]) < fire_box[0]
             && fabs(fire_ctr[1] - plr->pos[1]) < fire_box[1]
             && fabs(fire_ctr[2] - plr->pos[2]) < fire_box[2]) {
@@ -668,6 +701,30 @@ void bork_map_update(struct bork_map* map, struct bork_play_data* d)
             bork_map_add_item(map, new_id);
             ARR_SWAPSPLICE(map->grates, i, 1);
             --i;
+        }
+    }
+    struct bork_map_light_fixture* lfix;
+    ARR_FOREACH_PTR(map->light_fixtures, lfix, i) {
+        vec3 lfix_pos;
+        vec3_mul(lfix_pos, lfix->pos, (vec3){ 1, 1, 2 });
+        if(vec3_dist2(lfix->pos, d->plr.pos) > (16 * 16)) continue;
+        if(lfix->flags & 1) {
+            float flicker = -(perlin1(((float)d->play_ticks + (i * 5000)) / 60.0f) + 0.3);
+            if(flicker < 0 && flicker > -0.05 && rand() % 3 == 0) {
+                vec3 sound_pos;
+                vec3_mul(sound_pos, lfix->pos, (vec3){ 1, 1, 2 });
+                pg_audio_emit_once(&d->core->sounds[BORK_SND_BUZZ], 1, 8, sound_pos, 1);
+                float angle = RANDF * M_PI * 2;
+                vec3 off = { cos(angle), sin(angle), RANDF * 0.1 - 0.05 };
+                struct bork_particle new_part = {
+                    .flags = BORK_PARTICLE_SPRITE | BORK_PARTICLE_GRAVITY | BORK_PARTICLE_COLLIDE_DIE,
+                    .pos = { lfix->pos[0], lfix->pos[1], lfix->pos[2] },
+                    .vel = { off[0] * 0.075, off[1] * 0.075, off[2] },
+                    .ticks_left = 50,
+                    .frame_ticks = 0,
+                    .start_frame = 0, .end_frame = 0 };
+                ARR_PUSH(d->particles, new_part);
+            }
         }
     }
 }
@@ -773,21 +830,10 @@ void bork_map_draw(struct bork_map* map, struct bork_play_data* d)
         int frame = lfix->type + 160;
         if(lfix->flags & (1 << 2)) shining = 0;
         else if(lfix->flags & 1) {
-            float flicker = perlin1(((float)d->play_ticks + (i * 5000)) / 60.0f) + 0.3;
-            flicker *= -1;
+            float flicker = -(perlin1(((float)d->play_ticks + (i * 5000)) / 60.0f) + 0.3);
             if(flicker < 0) {
                 shining = 0;
                 if(flicker > -0.05) {
-                    float angle = RANDF * M_PI * 2;
-                    vec3 off = { cos(angle), sin(angle), RANDF * 0.1 - 0.05 };
-                    struct bork_particle new_part = {
-                        .flags = BORK_PARTICLE_SPRITE | BORK_PARTICLE_GRAVITY | BORK_PARTICLE_COLLIDE_DIE,
-                        .pos = { lfix->pos[0], lfix->pos[1], lfix->pos[2] },
-                        .vel = { off[0] * 0.075, off[1] * 0.075, off[2] },
-                        .ticks_left = 50,
-                        .frame_ticks = 0,
-                        .start_frame = 0, .end_frame = 0 };
-                    ARR_PUSH(d->particles, new_part);
                 }
             }
         }
@@ -933,12 +979,12 @@ int bork_map_check_vis(struct bork_map* map, vec3 const start, vec3 const end)
     vec3 full_vec = {}, part_vec = {}, curr_point = {};
     vec3_sub(full_vec, end, start);
     float full_dist = vec3_len(full_vec);
-    float part_dist = 0.25;
+    float part_dist = 0.2;
     float curr_dist = 0;
     vec3_set_len(part_vec, full_vec, part_dist);
     vec3_dup(curr_point, start);
     while(curr_dist <= full_dist) {
-        if(bork_map_check_sphere(map, NULL, curr_point, 0.25)) return 0;
+        if(bork_map_check_sphere(map, NULL, curr_point, 0.2)) return 0;
         if(curr_dist + part_dist > full_dist) vec3_dup(curr_point, end);
         else vec3_add(curr_point, curr_point, part_vec);
         curr_dist += part_dist;
@@ -964,18 +1010,15 @@ float bork_map_vis_dist(struct bork_map* map, vec3 const start, vec3 const dir, 
 
 void bork_map_build_plr_dist(struct bork_map* map, vec3 pos)
 {
-    memset(map->plr_dist, 0, sizeof(map->plr_dist));
     int plr_x = floor(pos[0] / 2);
     int plr_y = floor(pos[1] / 2);
     int plr_z = floor(pos[2] / 2);
     /*  Start the queue with the player's current tile  */
     struct bork_tile* opp = NULL;
     struct bork_tile* tile = bork_map_tile_ptri(map, plr_x, plr_y, plr_z);
-    while(plr_z > 0 && !(tile->travel_flags & (1 << 6))) {
-        --plr_z;
-        tile = bork_map_tile_ptri(map, plr_x, plr_y, plr_z);
-    }
-    if(plr_z == 0) return;
+    const struct bork_tile_detail* tile_d = &BORK_TILE_DETAILS[tile->type];
+    if(!(tile->travel_flags & (1 << 6))) return;
+    memset(map->plr_dist, 0, sizeof(map->plr_dist));
     map->plr_dist[plr_x][plr_y][plr_z] = 16;
     uint8_t queue[128][3] = { { plr_x, plr_y, plr_z } };
     int queue_idx[2] = { 0, 1 };
@@ -1242,15 +1285,16 @@ static void bork_map_generate_model(struct bork_map* map, struct bork_editor_map
     pg_model_reset(&map->model);
     map->model.components = PG_MODEL_COMPONENT_POSITION | PG_MODEL_COMPONENT_UV;
     struct bork_tile* tile;
+    struct bork_editor_tile* ed_tile;
     int x, y, z;
     for(x = 0; x < 32; ++x) {
         for(y = 0; y < 32; ++y) {
             for(z = 0; z < 32; ++z) {
                 tile = &map->data[x][y][z];
-                struct bork_tile_detail* detail = &BORK_TILE_DETAILS[tile->type];
+                ed_tile = &ed_map->tiles[x][y][z];
+                struct bork_tile_detail* detail = &BORK_TILE_DETAILS[ed_tile->type];
                 tile->model_tri_idx = map->model.tris.len;
                 tile->num_tris = 0;
-                struct bork_editor_tile* ed_tile = &ed_map->tiles[x][y][z];
                 if(ed_tile->alt_type == BORK_TILE_DUCT) {
                     tile->num_tris += tile_model_duct(map, ed_map, env_atlas, tile, x, y, z);
                 } else if(ed_tile->alt_type == BORK_TILE_PIPES) {

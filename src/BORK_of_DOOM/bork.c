@@ -3,12 +3,11 @@
 #include <limits.h>
 #include <time.h>
 #include "procgl/procgl.h"
+
+#define TINYFILES_IMPL
 #include "bork.h"
 #include "entity.h"
 #include "map_area.h"
-
-#define TINYFILES_IMPL
-#include "tinyfiles.h"
 
 static const uint8_t control_defaults[BORK_CTRL_COUNT] = {
     [BORK_CTRL_UP] =            SDL_SCANCODE_W,
@@ -36,8 +35,31 @@ static const uint8_t control_defaults[BORK_CTRL_COUNT] = {
     [BORK_CTRL_SELECT] =        SDL_SCANCODE_SPACE,
 };
 
-
-void bork_read_saves(struct bork_game_core* core);
+static const int8_t gamepad_defaults[BORK_CTRL_COUNT] = {
+    [BORK_CTRL_UP] =            -1,
+    [BORK_CTRL_DOWN] =          -1,
+    [BORK_CTRL_LEFT] =          -1,
+    [BORK_CTRL_RIGHT] =         -1,
+    [BORK_CTRL_JUMP] =          SDL_CONTROLLER_BUTTON_A,
+    [BORK_CTRL_CROUCH] =        SDL_CONTROLLER_BUTTON_LEFTSTICK,
+    [BORK_CTRL_FLASHLIGHT] =    SDL_CONTROLLER_BUTTON_Y,
+    [BORK_CTRL_FIRE] =          PG_RIGHT_TRIGGER,
+    [BORK_CTRL_RELOAD] =        SDL_CONTROLLER_BUTTON_RIGHTSHOULDER,
+    [BORK_CTRL_DROP] =          SDL_CONTROLLER_BUTTON_RIGHTSTICK,
+    [BORK_CTRL_INTERACT] =      SDL_CONTROLLER_BUTTON_X,
+    [BORK_CTRL_USE_TECH] =      PG_LEFT_TRIGGER,
+    [BORK_CTRL_NEXT_TECH] =     SDL_CONTROLLER_BUTTON_LEFTSHOULDER,
+    [BORK_CTRL_PREV_TECH] =     -1,
+    [BORK_CTRL_NEXT_ITEM] =     -1,
+    [BORK_CTRL_PREV_ITEM] =     -1,
+    [BORK_CTRL_BIND1] =         SDL_CONTROLLER_BUTTON_DPAD_UP,
+    [BORK_CTRL_BIND2] =         SDL_CONTROLLER_BUTTON_DPAD_LEFT,
+    [BORK_CTRL_BIND3] =         SDL_CONTROLLER_BUTTON_DPAD_RIGHT,
+    [BORK_CTRL_BIND4] =         SDL_CONTROLLER_BUTTON_DPAD_DOWN,
+    [BORK_CTRL_MENU] =          SDL_CONTROLLER_BUTTON_START,
+    [BORK_CTRL_MENU_BACK] =     SDL_CONTROLLER_BUTTON_B,
+    [BORK_CTRL_SELECT] =        SDL_CONTROLLER_BUTTON_A,
+};
 
 void bork_init(struct bork_game_core* core, char* base_path)
 {
@@ -57,6 +79,8 @@ void bork_init(struct bork_game_core* core, char* base_path)
         core->free_base_path = 0;
     }
     bork_load_options(core);
+    core->music_volume = 1;
+    core->sfx_volume = 1;
     /*  Set up the gbuffer for deferred shading */
     pg_gbuffer_init(&core->gbuf, sw, sh);
     pg_gbuffer_bind(&core->gbuf, 22, 23, 24, 25);
@@ -69,18 +93,35 @@ void bork_init(struct bork_game_core* core, char* base_path)
     pg_shader_text(&core->shader_text);
     pg_ppbuffer_init(&core->ppbuf, sw, sh, 27, 28);
     pg_postproc_blur(&core->post_blur, PG_BLUR7);
+    pg_postproc_gamma(&core->post_gamma);
     pg_postproc_screen(&core->post_screen);
     /*  Get the models, textures, sounds, etc.*    */
     bork_load_assets(core);
     /*  Attach the font texture to the text shader  */
     pg_shader_text_font(&core->shader_text, &core->font);
-    pg_shader_3d_texture(&core->shader_3d, &core->env_atlas);
-    pg_shader_2d_texture(&core->shader_2d, &core->editor_atlas);
-    pg_shader_sprite_texture(&core->shader_sprite, &core->bullet_tex);
-    pg_shader_sprite_tex_frame(&core->shader_sprite, 0);
-    pg_gamepad_config(0.125, 0.6, 0.125, 0.75);
-    if(SDL_NumJoysticks()) pg_use_gamepad(0);
+    pg_gamepad_config(0.125, 0.65, 0.125, 0.75);
+    core->gpad_idx = -1;
     bork_read_saves(core);
+}
+
+void bork_set_gamma(struct bork_game_core* core, float gamma)
+{
+    core->gamma = gamma;
+    pg_postproc_gamma_set(&core->post_gamma, gamma);
+}
+
+void bork_set_music_volume(struct bork_game_core* core, float vol)
+{
+    core->music_volume = MAX(0, vol);
+    pg_audio_channel_volume(3, core->music_volume);
+}
+
+void bork_set_sfx_volume(struct bork_game_core* core, float vol)
+{
+    core->sfx_volume = MAX(0, vol);
+    pg_audio_channel_volume(0, core->sfx_volume);
+    pg_audio_channel_volume(1, core->sfx_volume);
+    pg_audio_channel_volume(2, core->sfx_volume);
 }
 
 void bork_deinit(struct bork_game_core* core)
@@ -165,10 +206,20 @@ static void load_wav_from_base_dir(struct bork_game_core* core,
     pg_audio_load_wav(audio, f);
 }
 
+static void load_ogg_from_base_dir(struct bork_game_core* core,
+                                   struct pg_audio_chunk* audio,
+                                   const char* filename)
+{
+    char f[1024];
+    snprintf(f, 1024, "%s%s", core->base_path, filename);
+    pg_audio_load_ogg(audio, f);
+}
+
+
 void bork_load_assets(struct bork_game_core* core)
 {
     /*  Loading the textures and setting the atlas dimensions   */
-    load_from_base_dir(core, &core->font, "font_8x8.png", NULL);
+    load_from_base_dir(core, &core->font, "res/font_8x8.png", NULL);
     pg_texture_set_atlas(&core->font, 8, 8);
     pg_texture_bind(&core->font, 3, 4);
     load_from_base_dir(core, &core->env_atlas, "res/env_atlas.png", "res/env_atlas_lightmap.png");
@@ -308,8 +359,22 @@ void bork_load_assets(struct bork_game_core* core)
     load_wav_from_base_dir(core, &core->sounds[BORK_SND_FIRE], "res/audio/Fire.wav");
     load_wav_from_base_dir(core, &core->sounds[BORK_SND_EXPLOSION], "res/audio/Explosion1.wav");
     load_wav_from_base_dir(core, &core->sounds[BORK_SND_HURT], "res/audio/Hurt.wav");
+    load_wav_from_base_dir(core, &core->sounds[BORK_SND_HACK], "res/audio/Hack.wav");
+    load_wav_from_base_dir(core, &core->sounds[BORK_SND_HEAL_TECH], "res/audio/Heal_tech.wav");
+    load_wav_from_base_dir(core, &core->sounds[BORK_SND_CHARGE], "res/audio/tincanine_charge.wav");
+    load_wav_from_base_dir(core, &core->sounds[BORK_SND_FASTBEEPS], "res/audio/Fast_beeps.wav");
+    load_wav_from_base_dir(core, &core->sounds[BORK_SND_SINGLEBEEP], "res/audio/Single_beep.wav");
+    load_wav_from_base_dir(core, &core->sounds[BORK_SND_RELOAD_START], "res/audio/reload_start.wav");
+    load_wav_from_base_dir(core, &core->sounds[BORK_SND_RELOAD_END], "res/audio/reload_end.wav");
     load_wav_from_base_dir(core, &core->sounds[BORK_SND_HUM], "res/audio/Ambient_hum_loop.wav");
+    load_wav_from_base_dir(core, &core->sounds[BORK_SND_HUM2], "res/audio/hum2.wav");
+    load_wav_from_base_dir(core, &core->sounds[BORK_SND_HUM3], "res/audio/hum3.wav");
+    load_wav_from_base_dir(core, &core->sounds[BORK_SND_BUZZ], "res/audio/Light_buzz.wav");
     load_wav_from_base_dir(core, &core->sounds[BORK_SND_HISS], "res/audio/Ambient_hiss.wav");
+    load_wav_from_base_dir(core, &core->sounds[BORK_SND_COMPUTERS], "res/audio/Ambient_computers.wav");
+    load_ogg_from_base_dir(core, &core->sounds[BORK_MUS_MAINMENU], "res/music/Eric Matyas - The March of the Broken Robots.ogg");
+    load_ogg_from_base_dir(core, &core->sounds[BORK_MUS_BOSSFIGHT], "res/music/Eric Matyas - Light Years.ogg");
+    load_ogg_from_base_dir(core, &core->sounds[BORK_MUS_ENDGAME], "res/music/Eric Matyas - Faltering Circuits.ogg");
 }
 
 static void list_save(tfFILE* f, void* udata)
@@ -317,14 +382,24 @@ static void list_save(tfFILE* f, void* udata)
     struct bork_game_core* core = udata;
     struct bork_save save;
     strncpy(save.name, f->name, 32);
+    tfGetFileTime(f->path, &save.time);
     ARR_PUSH(core->save_files, save);
+}
+
+int save_compare(const void* a, const void* b)
+{
+    const struct bork_save* a_ = a;
+    const struct bork_save* b_ = b;
+    return -tfCompareFileTimes(&a_->time, &b_->time);
 }
 
 void bork_read_saves(struct bork_game_core* core)
 {
+    ARR_TRUNCATE_CLEAR(core->save_files, 0);
     char filename[1024];
     snprintf(filename, 1024, "%ssaves", core->base_path);
     tfTraverse(filename, list_save, core);
+    ARR_SORT(core->save_files, save_compare);
 }
 
 void bork_delete_save(struct bork_game_core* core, int save_idx)
@@ -333,12 +408,17 @@ void bork_delete_save(struct bork_game_core* core, int save_idx)
     snprintf(filename, 1024, "%ssaves/%s", core->base_path, core->save_files.data[save_idx].name);
     remove(filename);
     ARR_SPLICE(core->save_files, save_idx, 1);
-    printf("%s\n", filename);
+    //printf("%s\n", filename);
 }
 
 void bork_reset_keymap(struct bork_game_core* core)
 {
     memcpy(core->ctrl_map, control_defaults, BORK_CTRL_COUNT);
+}
+
+void bork_reset_gamepad_map(struct bork_game_core* core)
+{
+    memcpy(core->gpad_map, gamepad_defaults, BORK_CTRL_COUNT);
 }
 
 void bork_load_options(struct bork_game_core* core)
@@ -349,9 +429,11 @@ void bork_load_options(struct bork_game_core* core)
     if(!f) {
         printf("Could not find keymap file, using defaults.\n");
         memcpy(core->ctrl_map, control_defaults, BORK_CTRL_COUNT);
+        memcpy(core->gpad_map, gamepad_defaults, BORK_CTRL_COUNT);
         return;
     }
     fread(&core->ctrl_map, sizeof(core->ctrl_map), 1, f);
+    fread(&core->gpad_map, sizeof(core->gpad_map), 1, f);
     fclose(f);
 }
 
@@ -361,14 +443,16 @@ void bork_save_options(struct bork_game_core* core)
     snprintf(filename, 1024, "%sbork_keymap", core->base_path);
     FILE* f = fopen(filename, "wb");
     fwrite(&core->ctrl_map, sizeof(core->ctrl_map), 1, f);
+    fwrite(&core->gpad_map, sizeof(core->gpad_map), 1, f);
     fclose(f);
     snprintf(filename, 1024, "%soptions.txt", core->base_path);
     f = fopen(filename, "wb");
-    fprintf(f, "x:%d\ny:%d\nfullscreen:%d\nmouse:%f",
+    fprintf(f, "x:%d\ny:%d\nfullscreen:%d\ngamma:%f\nmouse:%f\njoy:%f\n"
+               "invert_mouse:%d\nmusic_vol:%f\nsfx_vol:%f\nshow_fps:%d",
         (int)core->screen_size[0], (int)core->screen_size[1],
-        core->fullscreen, core->mouse_sensitivity);
+        core->fullscreen, core->gamma, core->mouse_sensitivity, core->joy_sensitivity,
+        core->invert_y, core->music_volume, core->sfx_volume, core->show_fps);
     fclose(f);
-
 }
 
 static const char* bork_ctrl_names[] = {

@@ -101,7 +101,7 @@ int tfGetFileTime( const char* path, tfFILETIME* time );
 
 // Compares file last write times. -1 if time_a was modified earlier than path_b.
 // 0 if they are equal. 1 if time_b was modified earlier than path_a.
-int tfCompareFileTimes( tfFILETIME* time_a, tfFILETIME* time_b );
+int tfCompareFileTimes( const tfFILETIME* time_a, const tfFILETIME* time_b );
 
 // Returns 1 of file exists, otherwise returns 0.
 int tfFileExists( const char* path );
@@ -173,6 +173,7 @@ int tfFileExists( const char* path );
 
 #ifdef TINYFILES_IMPL
 
+#define TF_SGN(a)  (a < 0 ? -1 : 1)
 #define tfSafeStrCpy( dst, src, n, max ) tfSafeStrCopy_internal( dst, src, n, max, __FILE__, __LINE__ )
 static int tfSafeStrCopy_internal( char* dst, const char* src, int n, int max, const char* file, int line )
 {
@@ -328,7 +329,7 @@ void tfTraverse( const char* path, tfCallback cb, void* udata )
 		return 0;
 	}
 
-	int tfCompareFileTimes( tfFILETIME* time_a, tfFILETIME* time_b )
+	int tfCompareFileTimes( const tfFILETIME* time_a, const tfFILETIME* time_b )
 	{
 		return CompareFileTime( &time_a->time, &time_b->time );
 	}
@@ -416,7 +417,7 @@ void tfTraverse( const char* path, tfCallback cb, void* udata )
 		time_a = info.st_mtime;
 		if ( stat( path_b, &info ) ) return 0;
 		time_a = info.st_mtime;
-		return (int)difftime( time_a, time_b );
+		return TF_SGN(difftime( time_a, time_b ));
 	}
 
 	// Warning : untested code! (let me know if it breaks)
@@ -429,9 +430,9 @@ void tfTraverse( const char* path, tfCallback cb, void* udata )
 	}
 
 	// Warning : untested code! (let me know if it breaks)
-	int tfCompareFileTimes( tfFILETIME* time_a, tfFILETIME* time_b )
+	int tfCompareFileTimes( const tfFILETIME* time_a, const tfFILETIME* time_b )
 	{
-		return (int)difftime( time_a->time, time_b->time );
+		return TF_SGN(difftime( time_a->time, time_b->time ));
 	}
 
 	// Warning : untested code! (let me know if it breaks)

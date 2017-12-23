@@ -1,18 +1,25 @@
 CC := gcc
-CC_WINDOWS := i686-w64-mingw32-gcc
-CFLAGS_DEBUG := -Wall -g -O0
-CFLAGS_RELEASE := -Wall -g -O3 -flto
+CC_WIN32 := i686-w64-mingw32-gcc
+CC_WIN64 := x86_64-w64-mingw32-gcc
+CFLAGS_DEBUG := -Wall -g -O0 -std=c11
+CFLAGS_RELEASE := -Wall -g -O3 -flto -std=c11
 INCLUDES := -Isrc
 # On Linux, only static link with my custom libcurl
-LIBS_LINUX := -l:src/libs/linux/libcurl/libcurl.a \
- -lcrypto -lssl -lSDL2 -lGL -lGLEW -lm
+LIBS_LINUX := -l:src/libs/linux/GL/libGLEW.a \
+ -lcrypto -lssl -lSDL2 -lGL -lm
 # On Windows, static link with custom libcurl, GLEW, and SDL2
-LIBS_WINDOWS := -lmingw32 -l:src/libs/win32/GL/libglew32.a \
+LIBS_WIN32 := -lmingw32 \
+ -l:src/libs/win32/GL/libglew32.a \
  -l:src/libs/win32/SDL2/libSDL2.a \
  -l:src/libs/win32/SDL2/libSDL2main.a \
- -l:src/libs/win32/libcurl/libcurl.a \
  -lmingw32 -lgdi32 -lwinmm -limm32 -lole32 -loleaut32 -lversion \
- -lopengl32 -lws2_32 -lcrypt32
+ -lopengl32 -lws2_32 -limagehlp
+LIBS_WIN64 := -lmingw32 \
+ -l:src/libs/win64/GL/libglew32.a \
+ -l:src/libs/win64/SDL2/libSDL2.a \
+ -l:src/libs/win64/SDL2/libSDL2main.a \
+ -lmingw32 -lgdi32 -lwinmm -limm32 -lole32 -loleaut32 -lversion \
+ -lopengl32 -lws2_32 -limagehlp
 
 TARGET := procgame
 
@@ -21,35 +28,49 @@ GAME := obj/game_state.o obj/bork.o obj/map_area.o obj/physics.o \
  obj/upgrades.o obj/game_effects.o \
  obj/state_play.o obj/play_misc.o obj/play_inventory.o obj/play_menu_doorpad.o \
  obj/play_upgrades.o obj/play_recycler.o obj/play_datapads.o obj/play_game_menu.o \
+ obj/play_intro.o obj/play_outro.o \
  obj/state_menu.o obj/state_edit.o
 PROCGL := obj/procgl_base.o \
  obj/viewer.o obj/postproc.o obj/shader.o obj/gbuffer.o \
  obj/model.o obj/model_prims.o obj/marching_cubes.o \
  obj/shader_2d.o obj/shader_3d.o obj/shader_sprite.o obj/shader_cubetex.o obj/shader_text.o \
- obj/postproc_blur.o \
+ obj/postproc_blur.o obj/postproc_gamma.o \
  obj/wave.o obj/heightmap.o obj/texture.o obj/audio.o \
  obj/sdf.o obj/sdf_functions.o
-PROCGL_LIBS := obj/lodepng.o obj/noise1234.o obj/wavfile.o obj/easing.o
+PROCGL_LIBS := obj/lodepng.o obj/noise1234.o obj/wavfile.o
 
 debug_linux: INCLUDES += -Isrc/libs/linux
 debug_linux: LIBS := $(LIBS_LINUX)
-debug_linux: CFLAGS := $(CFLAGS_DEBUG) -DSHADER_BASE_DIR='"${CURDIR}/src/procgl/shaders/"'
+debug_linux: CFLAGS := $(CFLAGS_DEBUG) -rdynamic \
+                       -DSHADER_BASE_DIR='"${CURDIR}/src/procgl/shaders/"' \
+                       -D_POSIX_C_SOURCE=200809L -DGLEW_STATIC
 debug_linux: procgame
 
 release_linux: INCLUDES += -Isrc/libs/linux
 release_linux: LIBS := $(LIBS_LINUX)
-release_linux: CFLAGS := $(CFLAGS_RELEASE) -DPROCGL_STATIC_SHADERS
+release_linux: CFLAGS := $(CFLAGS_RELEASE) -rdynamic \
+                         -DPROCGL_STATIC_SHADERS \
+                         -D_POSIX_C_SOURCE=200809L -DGLEW_STATIC
 release_linux: clean dump_shaders procgame
 
 release_win32: INCLUDES += -Isrc/libs/win32
-release_win32: CC := $(CC_WINDOWS)
-release_win32: LIBS := $(LIBS_WINDOWS)
-release_win32: CFLAGS := $(CFLAGS_RELEASE) -DPROCGL_STATIC_SHADERS -DGLEW_STATIC
+release_win32: CC := $(CC_WIN32)
+release_win32: LIBS := $(LIBS_WIN32)
+release_win32: CFLAGS := $(CFLAGS_RELEASE) -Wl,--export-all-symbols -mwindows \
+                         -DPROCGL_STATIC_SHADERS -DGLEW_STATIC
 release_win32: TARGET := $(TARGET).exe
 release_win32: clean dump_shaders procgame
 
+release_win64: INCLUDES += -Isrc/libs/win64
+release_win64: CC := $(CC_WIN64)
+release_win64: LIBS := $(LIBS_WIN64)
+release_win64: CFLAGS := $(CFLAGS_RELEASE) -Wl,--export-all-symbols -mwindows \
+                         -DPROCGL_STATIC_SHADERS -DGLEW_STATIC
+release_win64: TARGET := $(TARGET).exe
+release_win64: clean dump_shaders procgame
+
 procgame: obj/main.o
-	$(CC) -o $(TARGET) obj/main.o $(GAME) $(PROCGL) $(PROCGL_LIBS) $(LIBS)
+	$(CC) $(CFLAGS) -o $(TARGET) obj/main.o $(GAME) $(PROCGL) $(PROCGL_LIBS) $(LIBS)
 
 obj/main.o: src/main.c $(GAME) $(PROCGL) $(PROCGL_LIBS)
 	$(CC) $(CFLAGS) -o obj/main.o -c src/main.c $(INCLUDES)
@@ -76,6 +97,14 @@ obj/game_effects.o: src/BORK_of_DOOM/game_effects.c src/BORK_of_DOOM/bork.h \
  src/BORK_of_DOOM/game_states.h src/BORK_of_DOOM/map_area.h src/BORK_of_DOOM/entity.h \
  $(PROCGL) $(PROCGL_LIBS)
 	$(CC) $(CFLAGS) -o obj/game_effects.o -c src/BORK_of_DOOM/game_effects.c $(INCLUDES)
+obj/play_outro.o: src/BORK_of_DOOM/play_outro.c src/BORK_of_DOOM/bork.h \
+ src/BORK_of_DOOM/game_states.h src/BORK_of_DOOM/map_area.h src/BORK_of_DOOM/entity.h \
+ $(PROCGL) $(PROCGL_LIBS)
+	$(CC) $(CFLAGS) -o obj/play_outro.o -c src/BORK_of_DOOM/play_outro.c $(INCLUDES)
+obj/play_intro.o: src/BORK_of_DOOM/play_intro.c src/BORK_of_DOOM/bork.h \
+ src/BORK_of_DOOM/game_states.h src/BORK_of_DOOM/map_area.h src/BORK_of_DOOM/entity.h \
+ $(PROCGL) $(PROCGL_LIBS)
+	$(CC) $(CFLAGS) -o obj/play_intro.o -c src/BORK_of_DOOM/play_intro.c $(INCLUDES)
 obj/play_inventory.o: src/BORK_of_DOOM/play_inventory.c src/BORK_of_DOOM/bork.h \
  src/BORK_of_DOOM/game_states.h src/BORK_of_DOOM/map_area.h src/BORK_of_DOOM/entity.h \
  $(PROCGL) $(PROCGL_LIBS)
@@ -175,6 +204,9 @@ obj/shader_text.o: src/procgl/shaders/shader_text.c src/procgl/ext/linmath.h \
 obj/postproc_blur.o: src/procgl/shaders/postproc_blur.c src/procgl/ext/linmath.h \
  src/procgl/postproc.h
 	$(CC) $(CFLAGS) -o obj/postproc_blur.o -c src/procgl/shaders/postproc_blur.c $(INCLUDES)
+obj/postproc_gamma.o: src/procgl/shaders/postproc_gamma.c src/procgl/ext/linmath.h \
+ src/procgl/postproc.h
+	$(CC) $(CFLAGS) -o obj/postproc_gamma.o -c src/procgl/shaders/postproc_gamma.c $(INCLUDES)
 obj/wave.o: src/procgl/wave.c src/procgl/wave.h
 	$(CC) $(CFLAGS) -o obj/wave.o -c src/procgl/wave.c $(INCLUDES)
 obj/audio.o: src/procgl/audio.c src/procgl/audio.h \
@@ -219,6 +251,7 @@ dump_shaders: src/procgl/shaders/*.glsl
     xxd -i post_blur3_frag.glsl >> post_blur.glsl.h && \
     xxd -i post_blur5_frag.glsl >> post_blur.glsl.h && \
     xxd -i post_blur7_frag.glsl >> post_blur.glsl.h && \
+    xxd -i post_gamma_frag.glsl >> post_gamma.glsl.h && \
     xxd -i deferred_spot_vert.glsl >> deferred.glsl.h && \
     xxd -i deferred_vert.glsl >> deferred.glsl.h && \
     xxd -i deferred_frag.glsl >> deferred.glsl.h && \

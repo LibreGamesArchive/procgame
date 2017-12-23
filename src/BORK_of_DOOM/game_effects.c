@@ -143,6 +143,9 @@ void create_explosion(struct bork_play_data* d, vec3 pos, float intensity)
     };
     ARR_PUSH(d->particles, new_part);
     create_sparks(d, pos, 0.15, 5);
+    vec3 sound_pos;
+    vec3_mul(sound_pos, pos, (vec3){ 1, 1, 2 });
+    pg_audio_emit_once(&d->core->sounds[BORK_SND_EXPLOSION], 1, 32, sound_pos, 1);
 }
 
 void create_elec_explosion(struct bork_play_data* d, vec3 pos)
@@ -160,6 +163,9 @@ void create_elec_explosion(struct bork_play_data* d, vec3 pos)
     };
     ARR_PUSH(d->particles, new_part);
     create_elec_sparks(d, pos, 0.2, 5);
+    vec3 sound_pos;
+    vec3_mul(sound_pos, pos, (vec3){ 1, 1, 2 });
+    pg_audio_emit_once(&d->core->sounds[BORK_SND_DEFENSE_FIELD], 1, 32, sound_pos, 1);
 }
 
 void create_smoke(struct bork_play_data* d, vec3 pos, vec3 dir, int lifetime)
@@ -176,18 +182,13 @@ void create_smoke(struct bork_play_data* d, vec3 pos, vec3 dir, int lifetime)
     ARR_PUSH(d->particles, new_part);
 }
 
-void robot_explosion(struct bork_play_data* d, vec3 pos)
+void robot_explosion(struct bork_play_data* d, vec3 pos, int num_parts)
 {
     vec3 pos_ = { pos[0], pos[1], pos[2] };
-    create_explosion(d, pos, 1);
+    create_explosion(d, pos, 3);
     float dist = vec3_dist(d->plr.pos, pos);
-    if(dist < 32) {
-        dist = 1 - (dist / 32);
-        pg_audio_play(&d->core->sounds[BORK_SND_EXPLOSION], dist);
-    }
-    int num_scraps = 3 + rand() % 3;
     int i;
-    for(i = 0; i < num_scraps; ++i) {
+    for(i = 0; i < num_parts; ++i) {
         bork_entity_t new_id = bork_entity_new(1);
         struct bork_entity* new_item = bork_entity_get(new_id);
         if(!new_item) continue;

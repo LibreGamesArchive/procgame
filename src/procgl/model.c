@@ -688,7 +688,7 @@ int pg_model_collide_sphere_sub(struct pg_model* model, vec3 out, vec3 const pos
     int sub_end = sub_i + sub_len;
     int i;
     int hits = 0;
-    vec3 tri_push;
+    vec3 tri_push = {};
     for(i = sub_i; i < sub_end; ++i) {
         struct pg_tri* tri = &model->tris.data[i];
         vec3 p0, p1, p2;
@@ -728,12 +728,12 @@ int pg_model_collide_ellipsoid(struct pg_model* model, vec3 out, vec3 const pos,
 int pg_model_collide_ellipsoid_sub(struct pg_model* model, vec3 out, vec3 const pos,
                                    vec3 const r, int n, unsigned sub_i, unsigned sub_len)
 {
-    float deepest = 0;
+    float deepest = 1;
     int tri_idx = -1;
     int sub_end = sub_i + sub_len;
     int i;
     int hits = 0;
-    vec3 sphere_pos, tri_push;
+    vec3 sphere_pos, tri_push = {};
     vec3_div(sphere_pos, pos, r);
     for(i = sub_i; i < sub_end; ++i) {
         struct pg_tri* tri = &model->tris.data[i];
@@ -747,24 +747,29 @@ int pg_model_collide_ellipsoid_sub(struct pg_model* model, vec3 out, vec3 const 
         vec3 pos_to_tri;
         int on_tri = nearest_on_triangle(pos_to_tri, sphere_pos, p0, p1, p2);
         vec3_sub(pos_to_tri, sphere_pos, pos_to_tri);
-        if(on_tri) {
-            vec3 norm;
-            pg_model_get_face_normal(model, i, norm);
-            if(vec3_mul_inner(pos_to_tri, norm) <= 0) continue;
-        }
+        vec3 norm, pos_norm;
+        vec3_normalize(pos_norm, pos_to_tri);
+        pg_model_get_face_normal(model, i, norm);
+        if(vec3_mul_inner(pos_norm, norm) < 0) continue;
         float dist = vec3_len(pos_to_tri);
-        if(dist < 1) {
+        if(dist <= 1) {
             /*  If this collision has the greatest depth so far, then
                 set the result to this one  */
-            float depth = 1 - dist;
-            if(depth <= deepest) continue;
-            deepest = depth;
-            vec3_set_len(tri_push, pos_to_tri, depth);
+            if(dist > deepest) continue;
+            deepest = dist;
+            //vec3_set_len(pos_to_tri, pos_to_tri, 1 - dist);
+            //vec3_add(tri_push, tri_push, pos_to_tri);
+            vec3_set_len(tri_push, pos_to_tri, 1 - dist);
             tri_idx = i;
+            ++hits;
             if(++hits >= n) break;
         }
     }
+    if(!hits) return -1;
+    vec3 r2 = { r[0] * r[0], r[1] * r[1], r[2] * r[2] };
     vec3_mul(out, tri_push, r);
+    //vec3_scale(out, out, 1 / hits);
+    //vec3_div(out, tri_push, r2);
     return tri_idx;
 }
 

@@ -53,7 +53,7 @@ void main()
 {
     f_light = light[gl_VertexID / 36];
     f_color = color[gl_VertexID / 36];
-    vec3 pos_ws = (light_verts[gl_VertexID % 36]) * f_light.w * 1.1 + f_light.xyz;
+    vec3 pos_ws = (light_verts[gl_VertexID % 36]) * f_light.w + f_light.xyz;
     gl_Position = projview_matrix * vec4(pos_ws, 1.0);
     pos_cs = gl_Position;
     view_ray = eye_pos - pos_ws;

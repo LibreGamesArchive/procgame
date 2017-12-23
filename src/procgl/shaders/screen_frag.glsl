@@ -14,5 +14,6 @@ void main()
         frag_color = texture(color, f_tex_coord);
     frag_color += vec4(texture(color, f_tex_coord).rgb *
         (texture(light, f_tex_coord).rgb + ambient_light), 1);
+    //frag_color = texture(norm, f_tex_coord);
 }
 

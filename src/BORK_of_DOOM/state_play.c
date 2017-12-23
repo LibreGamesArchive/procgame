@@ -1,4 +1,5 @@
 #include <stdlib.h>
+#include <string.h>
 #include <stdio.h>
 #include <limits.h>
 #include "procgl/procgl.h"
@@ -15,22 +16,6 @@
 
 #define RANDF   ((float)rand() / RAND_MAX)
 
-/*  The Big Orbital Nonhuman Zone or "BONZ" consists of some main parts:
-    Microgravity Utility Transit Tunnel (MUTT)
-    Command Station
-    Offices
-    Warehouse
-    Union Hall
-    Infirmary
-    Recreation Center   (dog park)
-    Science labs
-    Cafeteria/kitchens
-    Pump/Electrical/Thrust Section (PETS)
-
-    they are arranged vertically on top of one another, with varying
-    widths based on the shape of the overall station, except for the MUTT
-    which runs all the way along the length of the station on the inside. */
-
 static void bork_play_update(struct pg_game_state* state);
 static void bork_play_tick(struct pg_game_state* state);
 static void bork_play_draw(struct pg_game_state* state);
@@ -38,6 +23,9 @@ static void bork_play_draw(struct pg_game_state* state);
 void bork_play_deinit(void* data)
 {
     struct bork_play_data* d = data;
+    if(d->fire_audio_handle >= 0) pg_audio_emitter_remove(d->fire_audio_handle);
+    if(d->jp_audio_handle >= 0) pg_audio_emitter_remove(d->jp_audio_handle);
+    if(d->music_audio_handle >= 0) pg_audio_emitter_remove(d->music_audio_handle);
     bork_map_deinit(&d->map);
     ARR_DEINIT(d->particles);
     ARR_DEINIT(d->plr_enemy_query);
@@ -49,6 +37,26 @@ void bork_play_deinit(void* data)
     ARR_DEINIT(d->bullets);
     bork_entpool_clear();
     free(d);
+}
+
+void bork_play_reset(struct bork_play_data* d)
+{
+    d->scan_ticks = 0;
+    d->hud_datapad_id = -1;
+    d->hud_datapad_ticks = 0;
+    d->hud_announce_ticks = 0;
+    if(d->fire_audio_handle >= 0) pg_audio_emitter_remove(d->fire_audio_handle);
+    if(d->jp_audio_handle >= 0) pg_audio_emitter_remove(d->jp_audio_handle);
+    if(d->music_audio_handle >= 0) pg_audio_emitter_remove(d->music_audio_handle);
+    ARR_TRUNCATE_CLEAR(d->particles, 0);
+    ARR_TRUNCATE_CLEAR(d->plr_enemy_query, 0);
+    ARR_TRUNCATE_CLEAR(d->plr_item_query, 0);
+    ARR_TRUNCATE_CLEAR(d->plr_entity_query, 0);
+    ARR_TRUNCATE_CLEAR(d->lights_buf, 0);
+    ARR_TRUNCATE_CLEAR(d->spotlights, 0);
+    ARR_TRUNCATE_CLEAR(d->inventory, 0);
+    ARR_TRUNCATE_CLEAR(d->bullets, 0);
+    bork_entpool_clear();
 }
 
 void bork_play_start(struct pg_game_state* state, struct bork_game_core* core)
@@ -65,6 +73,10 @@ void bork_play_start(struct pg_game_state* state, struct bork_game_core* core)
         .held_item = -1,
         .quick_item = { -1, -1, -1, -1 },
     };
+    /*  Crash   */
+    //int* bill_gates_please_die = NULL;
+    //bill_gates_please_die[4] = 1000;
+    /*  After crash */
     bork_entity_init(&d->plr, BORK_ENTITY_PLAYER);
     /*  Initialize the player   */
     ARR_INIT(d->bullets);
@@ -81,15 +93,26 @@ void bork_play_start(struct pg_game_state* state, struct bork_game_core* core)
     d->upgrade_level[1] = 0;
     d->upgrade_level[2] = 0;
     d->upgrade_level[3] = 0;
+    d->fire_audio_handle = -1;
+    d->jp_audio_handle = -1;
+    d->music_audio_handle = -1;
+    d->music_id = -1;
+    d->draw_ui = 1;
+    d->draw_weapon = 1;
     /*  Generate the BONZ station   */
     bork_map_init(&d->map);
     struct bork_editor_map ed_map = {};
     char filename[1024];
-    snprintf(filename, 1024, "%stest.bork_map", core->base_path);
+    snprintf(filename, 1024, "%sbork_map", core->base_path);
     bork_editor_load_map(&ed_map, filename);
     d->map.plr = &d->plr;
     bork_editor_complete_map(&d->map, &ed_map, 1);
     bork_map_init_model(&d->map, &ed_map, core);
+    SDL_ShowCursor(SDL_DISABLE);
+    pg_mouse_mode(0);
+    d->menu.state = BORK_MENU_INTRO;
+    d->menu.intro.slide = 0;
+    d->menu.intro.ticks = PLAY_SECONDS(9);
     /*  Initialize the player data  */
     /*  Assign all the pointers, and it's finished  */
     state->data = d;
@@ -97,7 +120,6 @@ void bork_play_start(struct pg_game_state* state, struct bork_game_core* core)
     state->tick = bork_play_tick;
     state->draw = bork_play_draw;
     state->deinit = bork_play_deinit;
-    pg_mouse_mode(1);
 }
 
 static void bork_play_update(struct pg_game_state* state)
@@ -108,15 +130,19 @@ static void bork_play_update(struct pg_game_state* state)
         vec2 mouse_motion;
         pg_mouse_motion(mouse_motion);
         vec2_scale(mouse_motion, mouse_motion, d->core->mouse_sensitivity);
-        vec2_sub(d->mouse_motion, d->mouse_motion, mouse_motion);
-        if(pg_have_gamepad()) {
+        if(d->core->invert_y) vec2_add(d->mouse_motion, d->mouse_motion, mouse_motion);
+        else vec2_sub(d->mouse_motion, d->mouse_motion, mouse_motion);
+        if(d->core->gpad_idx >= 0) {
             vec2 stick;
             pg_gamepad_stick(1, stick);
-            vec2_scale(stick, stick, 0.05);
-            vec2_sub(d->mouse_motion, d->mouse_motion, stick);
+            vec2_scale(stick, stick, 0.05 * d->core->joy_sensitivity);
+            if(d->core->invert_y) vec2_add(d->mouse_motion, d->mouse_motion, stick);
+            else vec2_sub(d->mouse_motion, d->mouse_motion, stick);
         }
     }
-    if(pg_user_exit()) state->running = 0;
+    if(pg_user_exit()) {
+        state->running = 0;
+    }
 }
 
 /*  Gameplay functions  */
@@ -132,14 +158,21 @@ static void tick_entities(struct bork_play_data* d);
 static void tick_bullets(struct bork_play_data* d);
 static void tick_particles(struct bork_play_data* d);
 static void tick_fires(struct bork_play_data* d);
+static void tick_music(struct bork_play_data* d);
 static void tick_ambient_sound(struct bork_play_data* d);
 
 void bork_play_tick(struct pg_game_state* state)
 {
     struct bork_play_data* d = state->data;
+    uint8_t* kmap = d->core->ctrl_map;
+    int8_t* gmap = d->core->gpad_map;
+    float ar = d->core->aspect_ratio;
     ++d->ticks;
+    tick_music(d);
     /*  Handle input    */
-    if(d->menu.state != BORK_MENU_CLOSED && d->menu.state < BORK_MENU_DOORPAD) {
+    if(d->menu.state != BORK_MENU_CLOSED
+    && !(d->menu.state == BORK_MENU_GAME && d->menu.game.mode == GAME_MENU_SHOW_OPTIONS)
+    && d->menu.state < BORK_MENU_DOORPAD) {
         tick_menu_base(d);
     }
     if(d->menu.state == BORK_MENU_INVENTORY) tick_control_inv_menu(d);
@@ -148,8 +181,9 @@ void bork_play_tick(struct pg_game_state* state)
     else if(d->menu.state == BORK_MENU_DATAPADS) tick_datapad_menu(d);
     else if(d->menu.state == BORK_MENU_GAME) tick_game_menu(d, state);
     else if(d->menu.state == BORK_MENU_DOORPAD) tick_doorpad(d);
-    else if(d->menu.state == BORK_MENU_PLAYERDEAD) {
-        if(pg_check_input(SDL_SCANCODE_RETURN, PG_CONTROL_HIT)) {
+    else if(d->menu.state == BORK_MENU_INTRO) tick_intro(d);
+    else if(d->menu.state == BORK_MENU_OUTRO) {
+        if(d->menu.intro.slide == 9) {
             struct bork_game_core* core = d->core;
             bork_play_deinit(d);
             bork_menu_start(state, core);
@@ -157,22 +191,81 @@ void bork_play_tick(struct pg_game_state* state)
             SDL_ShowCursor(SDL_ENABLE);
             pg_flush_input();
             return;
+        } else tick_outro(d);
+    } else if(d->menu.state == BORK_MENU_PLAYERDEAD) {
+        int stick_ctrl_x = 0, stick_ctrl_y = 0;
+        if(pg_check_gamepad(PG_LEFT_STICK, PG_CONTROL_HIT)) {
+            vec2 stick;
+            pg_gamepad_stick(0, stick);
+            if(fabsf(stick[1]) > 0.6) stick_ctrl_y = SGN(stick[1]);
+            else if(fabsf(stick[0]) > 0.6) stick_ctrl_x = SGN(stick[0]);
+        }
+        vec2 mouse_pos;
+        int click;
+        int clicked_option = 0;
+        pg_mouse_pos(mouse_pos);
+        vec2_mul(mouse_pos, mouse_pos, (vec2){ ar / d->core->screen_size[0], 1 / d->core->screen_size[1] });
+        click = pg_check_input(PG_LEFT_MOUSE, PG_CONTROL_HIT);
+        if(fabs(mouse_pos[0] - (ar * 0.5)) < 0.5 && fabs(mouse_pos[1] - 0.595) < 0.03) {
+            d->menu.gameover.opt_idx = 0;
+            if(click) clicked_option = 1;
+        } else if(fabs(mouse_pos[0] - (ar * 0.5)) < 0.5 && fabs(mouse_pos[1] - 0.695) < 0.03
+               && d->core->save_files.len) {
+            d->menu.gameover.opt_idx = 1;
+            if(click) clicked_option = 1;
+        }
+        if((pg_check_input(kmap[BORK_CTRL_DOWN], PG_CONTROL_HIT) || stick_ctrl_y == 1)
+        && d->core->save_files.len) {
+            d->menu.gameover.opt_idx = 1;
+        } else if(pg_check_input(kmap[BORK_CTRL_UP], PG_CONTROL_HIT) || stick_ctrl_y == -1) {
+            d->menu.gameover.opt_idx = 0;
+        }
+        if(pg_check_input(kmap[BORK_CTRL_SELECT], PG_CONTROL_HIT)
+        || pg_check_gamepad(gmap[BORK_CTRL_SELECT], PG_CONTROL_HIT)
+        || clicked_option) {
+            if(d->menu.gameover.opt_idx == 0) {
+                struct bork_game_core* core = d->core;
+                bork_play_deinit(d);
+                bork_menu_start(state, core);
+                pg_mouse_mode(0);
+                SDL_ShowCursor(SDL_ENABLE);
+                pg_flush_input();
+                return;
+            } else {
+                struct bork_save* save = &d->core->save_files.data[0];
+                load_game(d, save->name);
+                d->menu.game.mode = BORK_MENU_CLOSED;
+                return;
+            }
         }
     } else if(d->menu.state == BORK_MENU_CLOSED) {
         ++d->play_ticks;
+        /*
+        if(d->log_colls) {
+            fprintf(d->logfile, "Tick %d, pos %f %f %f\n", d->play_ticks,
+                    d->plr.pos[0], d->plr.pos[1], d->plr.pos[2]);
+        }*/
         if(d->plr.pain_ticks > 0) --d->plr.pain_ticks;
         if(d->teleport_ticks > 0) --d->teleport_ticks;
         vec3 surr_start, surr_end;
-        vec3_sub(surr_start, d->plr.pos, (vec3){ 32, 32, 32 });
-        vec3_add(surr_end, d->plr.pos, (vec3){ 32, 32, 32 });
+        vec3_sub(surr_start, d->plr.pos, (vec3){ 32, 32, 8 });
+        vec3_add(surr_end, d->plr.pos, (vec3){ 32, 32, 8 });
         ARR_TRUNCATE(d->plr_enemy_query, 0);
         ARR_TRUNCATE(d->plr_item_query, 0);
         ARR_TRUNCATE(d->plr_entity_query, 0);
         bork_map_query_enemies(&d->map, &d->plr_enemy_query, surr_start, surr_end);
         bork_map_query_items(&d->map, &d->plr_item_query, surr_start, surr_end);
-        vec3_sub(surr_start, d->plr.pos, (vec3){ 3, 3, 3 });
-        vec3_add(surr_end, d->plr.pos, (vec3){ 3, 3, 3 });
         bork_map_query_entities(&d->map, &d->plr_entity_query, surr_start, surr_end);
+        if(d->recoil_ticks > 0) {
+            float r = (float)d->recoil_ticks / d->recoil_time;
+            int strength = get_upgrade_level(d, BORK_UPGRADE_STRENGTH);
+            if(strength == 0) r *= 0.5;
+            else if(strength == 1) r *= 0.2;
+            vec2 recoil;
+            vec2_scale(recoil, d->recoil, r);
+            vec2_add(d->plr.dir, d->plr.dir, recoil);
+            --d->recoil_ticks;
+        }
         tick_control_play(d);
         tick_held_item(d);
         tick_player(d);
@@ -186,6 +279,7 @@ void bork_play_tick(struct pg_game_state* state)
         tick_particles(d);
         tick_datapad(d);
         tick_ambient_sound(d);
+        if(d->hud_announce_ticks) --d->hud_announce_ticks;
         d->looked_item = get_looked_item(d);
         d->looked_enemy = get_looked_enemy(d);
         d->looked_entity = get_looked_entity(d);
@@ -210,7 +304,7 @@ static void reset_menus(struct bork_play_data* d)
     d->menu.datapads.selection_idx = 0;
     d->menu.datapads.scroll_idx = 0;
     d->menu.datapads.text_scroll = 0;
-    d->menu.datapads.side = 0;
+    d->menu.datapads.viewing_dp = -1;
     d->menu.game.selection_idx = 0;
     d->menu.game.save_idx = 0;
 }
@@ -229,6 +323,7 @@ static void tick_menu_base(struct bork_play_data* d)
             vec2 button_pos = { ar * 0.75 + ((i - 2) * ar * 0.08), 0.125 };
             float dist = vec2_dist(mouse_pos, button_pos);
             if(dist < 0.06) {
+                pg_audio_play(&d->core->menu_sound, 0.5);
                 d->menu.state = i + 1;
             }
         }
@@ -237,41 +332,107 @@ static void tick_menu_base(struct bork_play_data* d)
     && pg_check_input(SDL_SCANCODE_LSHIFT, PG_CONTROL_HELD)) {
         if(pg_check_input(SDL_SCANCODE_D, PG_CONTROL_HIT)
         || pg_check_input(SDL_SCANCODE_RIGHT, PG_CONTROL_HIT)) {
+            pg_audio_play(&d->core->menu_sound, 0.5);
             ++d->menu.state;
             if(d->menu.state > 5) d->menu.state = 1;
             pg_flush_input();
         } else if(pg_check_input(SDL_SCANCODE_A, PG_CONTROL_HIT)
         || pg_check_input(SDL_SCANCODE_LEFT, PG_CONTROL_HIT)) {
+            pg_audio_play(&d->core->menu_sound, 0.5);
             --d->menu.state;
             if(d->menu.state == 0) d->menu.state = 5;
             pg_flush_input();
         }
     }
     if(pg_check_gamepad(SDL_CONTROLLER_BUTTON_RIGHTSHOULDER, PG_CONTROL_HIT)) {
+        pg_audio_play(&d->core->menu_sound, 0.5);
         ++d->menu.state;
         if(d->menu.state > 5) d->menu.state = 1;
         pg_flush_input();
     } else if(pg_check_gamepad(SDL_CONTROLLER_BUTTON_LEFTSHOULDER, PG_CONTROL_HIT)) {
+        pg_audio_play(&d->core->menu_sound, 0.5);
         --d->menu.state;
         if(d->menu.state == 0) d->menu.state = 5;
         pg_flush_input();
     }
 }
 
+static void tick_music(struct bork_play_data* d)
+{
+    /*  Music logic */
+    if(d->ticks % 10 == 0) {
+        if(d->music_audio_handle != -1) {
+            if(d->music_fade_dir) {
+                float fade_vol = (float)d->music_fade_ticks / 360.0f;
+                pg_audio_channel_volume(3, fade_vol * d->core->music_volume * 0.5);
+                d->music_fade_ticks += d->music_fade_dir * 10;
+                if(d->music_fade_ticks == 360) d->music_fade_dir = 0;
+                if(d->music_fade_ticks <= 0 && d->music_fade_dir == -1) {
+                    pg_audio_emitter_remove(d->music_audio_handle);
+                    d->music_audio_handle = -1;
+                }
+            }
+        }
+        if(d->music_id != -1 && d->music_fade_ticks == 0
+        && d->music_audio_handle == -1) {
+            pg_audio_channel_volume(3, 0);
+            d->music_audio_handle =
+                pg_audio_emitter(&d->core->sounds[d->music_id], 1, 1, (vec3){}, 3);
+            d->music_fade_dir = 1;
+        }
+        if(d->plr.pos[2] > 52) {
+            if(d->plr.pos[1] > 52) {
+                if(d->music_id != BORK_MUS_ENDGAME) {
+                    d->music_id = BORK_MUS_ENDGAME;
+                    if(d->music_fade_ticks) d->music_fade_dir = -1;
+                    else d->music_fade_dir = 1;
+                }
+            } else {
+                if(d->music_id != BORK_MUS_BOSSFIGHT) {
+                    d->music_id = BORK_MUS_BOSSFIGHT;
+                    if(d->music_fade_ticks) d->music_fade_dir = -1;
+                    else d->music_fade_dir = 1;
+                }
+            }
+        } else if(d->music_id != -1) {
+            d->music_id = -1;
+            d->music_fade_dir = -1;
+        }
+    }
+}
+
 static void tick_ambient_sound(struct bork_play_data* d)
 {
-    pg_audio_set_listener(1, d->plr.pos);
+    vec3 plr_pos;
+    vec3_mul(plr_pos, d->plr.pos, (vec3){ 1, 1, 2 });
+    pg_audio_set_listener(1, plr_pos);
     int i;
     struct bork_sound_emitter* snd;
     ARR_FOREACH_PTR(d->map.sounds, snd, i) {
-        float dist = vec3_dist(snd->pos, d->plr.pos);
-        if(dist < snd->area) {
+        vec3 snd_pos;
+        vec3_mul(snd_pos, snd->pos, (vec3){ 1, 1, 2 });
+        float dist = vec3_dist2(snd_pos, plr_pos);
+        if(dist < (snd->area * snd->area)) {
+            if(snd->snd == BORK_SND_HISS) {
+                if(d->play_ticks >= snd->next_play) {
+                    snd->next_play = d->play_ticks + (RANDF * PLAY_SECONDS(5) + PLAY_SECONDS(5));
+                    pg_audio_emit_once(&d->core->sounds[snd->snd], snd->volume, snd->area, snd_pos, 1);
+                }
+                continue;
+            }
             if(snd->handle >= 0) continue;
             else snd->handle = pg_audio_emitter(&d->core->sounds[snd->snd], snd->volume,
-                                                snd->area, snd->pos, 1);
+                                                snd->area, snd_pos, 1);
         } else if(snd->handle >= 0) {
             pg_audio_emitter_remove(snd->handle);
             snd->handle = -1;
+        }
+    }
+    if((d->plr.flags & BORK_ENTFLAG_GROUND) && vec2_len(d->plr.vel) > 0.01) {
+        if(d->walk_input_ticks % 90 == 10) {
+            pg_audio_play(&d->core->sounds[BORK_SND_FOOTSTEP1], 0.25);
+        } else if(d->walk_input_ticks % 90 == 55) {
+            pg_audio_play(&d->core->sounds[BORK_SND_FOOTSTEP2], 0.25);
         }
     }
 }
@@ -279,6 +440,7 @@ static void tick_ambient_sound(struct bork_play_data* d)
 static void tick_control_play(struct bork_play_data* d)
 {
     uint8_t* kmap = d->core->ctrl_map;
+    int8_t* gmap = d->core->gpad_map;
     /*
     if(pg_check_input(SDL_SCANCODE_M, PG_CONTROL_HIT)) {
         if(pg_check_input(SDL_SCANCODE_LSHIFT, PG_CONTROL_HELD)) {
@@ -288,35 +450,58 @@ static void tick_control_play(struct bork_play_data* d)
             pg_mouse_mode(1);
             SDL_ShowCursor(SDL_DISABLE);
         }
+    }
+    if(pg_check_input(SDL_SCANCODE_F10, PG_CONTROL_HIT)) {
+        d->log_colls = !d->log_colls;
+        if(d->log_colls) hud_announce(d, "COLLISION LOGGING: ON");
+        else hud_announce(d, "COLLISION LOGGING: OFF");
+    }
+    if(pg_check_input(SDL_SCANCODE_GRAVE, PG_CONTROL_HIT)) {
+        vec3 push = { RANDF - 0.5, RANDF - 0.5, RANDF * -0.5 };
+        vec3_scale(push, push, 0.1);
+        //vec3_add(d->plr.vel, d->plr.vel, push);
+        d->plr.vel[2] += push[2];
     }*/
+    if(d->plr.HP <= 0) return;
+    if(pg_check_input(SDL_SCANCODE_F12, PG_CONTROL_HIT)) {
+        d->draw_ui = !d->draw_ui;
+    }
+    if(pg_check_input(SDL_SCANCODE_F11, PG_CONTROL_HIT)) {
+        d->draw_weapon = !d->draw_weapon;
+    }
     if(pg_check_input(kmap[BORK_CTRL_MENU], PG_CONTROL_HIT)
-    || pg_check_gamepad(SDL_CONTROLLER_BUTTON_START, PG_CONTROL_HIT)) {
+    || pg_check_gamepad(gmap[BORK_CTRL_MENU], PG_CONTROL_HIT)) {
         d->menu.state = BORK_MENU_INVENTORY;
         pg_audio_channel_pause(1, 1);
+        pg_audio_channel_pause(2, 1);
         reset_menus(d);
         SDL_ShowCursor(SDL_ENABLE);
         pg_mouse_mode(0);
     }
     if(pg_check_input(kmap[BORK_CTRL_NEXT_TECH], PG_CONTROL_HIT)
-    || pg_check_gamepad(SDL_CONTROLLER_BUTTON_LEFTSHOULDER, PG_CONTROL_HIT)) {
+    || pg_check_gamepad(gmap[BORK_CTRL_NEXT_TECH], PG_CONTROL_HIT)) {
         select_next_upgrade(d, 1);
-    } else if(pg_check_input(kmap[BORK_CTRL_PREV_TECH], PG_CONTROL_HIT)) {
+    } else if(pg_check_input(kmap[BORK_CTRL_PREV_TECH], PG_CONTROL_HIT)
+    || pg_check_gamepad(gmap[BORK_CTRL_PREV_TECH], PG_CONTROL_HIT)) {
         select_next_upgrade(d, -1);
     }
-    if(pg_check_input(kmap[BORK_CTRL_NEXT_ITEM], PG_CONTROL_HIT)) {
+    if(pg_check_input(kmap[BORK_CTRL_NEXT_ITEM], PG_CONTROL_HIT)
+    || pg_check_gamepad(gmap[BORK_CTRL_NEXT_ITEM], PG_CONTROL_HIT)) {
         next_item(d, 1);
-    } else if(pg_check_input(kmap[BORK_CTRL_PREV_ITEM], PG_CONTROL_HIT)) {
+    } else if(pg_check_input(kmap[BORK_CTRL_PREV_ITEM], PG_CONTROL_HIT)
+    || pg_check_gamepad(gmap[BORK_CTRL_PREV_ITEM], PG_CONTROL_HIT)) {
         next_item(d, -1);
     }
-    if(pg_check_input(kmap[BORK_CTRL_DROP], PG_CONTROL_HIT)) {
+    if(pg_check_input(kmap[BORK_CTRL_DROP], PG_CONTROL_HIT)
+    || pg_check_gamepad(gmap[BORK_CTRL_DROP], PG_CONTROL_HIT)) {
         drop_item(d);
     }
     if(pg_check_input(kmap[BORK_CTRL_INTERACT], PG_CONTROL_HIT)
-    || pg_check_gamepad(SDL_CONTROLLER_BUTTON_X, PG_CONTROL_HIT)) {
+    || pg_check_gamepad(gmap[BORK_CTRL_INTERACT], PG_CONTROL_HIT)) {
         struct bork_entity* item = bork_entity_get(d->looked_item);
-        vec3 eye_pos = { d->plr.pos[0], d->plr.pos[1], d->plr.pos[2] };
-        if(d->plr.flags & BORK_ENTFLAG_CROUCH) eye_pos[2] += 0.2;
-        else eye_pos[2] += 0.8;
+        vec3 eye_pos, eye_dir;
+        bork_entity_get_eye(&d->plr, eye_dir, eye_pos);
+        eye_pos[2] -= 0.2;
         if(item && vec3_dist(item->pos, eye_pos) <= 2.5
         && bork_map_check_vis(&d->map, eye_pos, item->pos)) {
             const struct bork_entity_profile* prof = &BORK_ENT_PROFILES[item->type];
@@ -326,8 +511,7 @@ static void tick_control_play(struct bork_play_data* d)
                 item->flags |= BORK_ENTFLAG_DEAD;
             } else if(item->type == BORK_ITEM_DATAPAD) {
                 d->hud_datapad_id = item->counter[0];
-                d->hud_datapad_ticks = 5 * 60;
-                d->hud_datapad_line = 0;
+                d->hud_datapad_ticks = -500;
                 d->held_datapads[d->num_held_datapads++] = item->counter[0];
                 item->flags |= BORK_ENTFLAG_DEAD;
             } else if(item->type == BORK_ITEM_UPGRADE) {
@@ -343,24 +527,35 @@ static void tick_control_play(struct bork_play_data* d)
             pg_audio_play(&d->core->sounds[BORK_SND_PICKUP], 0.5);
         } else if(d->looked_obj) {
             if(d->looked_obj->type == BORK_MAP_DOORPAD) {
-                struct bork_map_object* door = &d->map.doors.data[d->looked_obj->doorpad.door_idx];
-                if(door->door.locked == 1) {
-                    d->menu.doorpad.unlocked_ticks = 0;
-                    d->menu.doorpad.selection[0] = -1;
-                    d->menu.doorpad.selection[1] = 0;
-                    d->menu.doorpad.num_chars = 0;
-                    d->menu.doorpad.door_idx = d->looked_obj->doorpad.door_idx;
-                    d->menu.state = BORK_MENU_DOORPAD;
-                    SDL_ShowCursor(SDL_ENABLE);
-                    pg_mouse_mode(0);
-                    pg_audio_channel_pause(1, 1);
-                } else {
-                    if(!door->door.open) {
-                        pg_audio_play(&d->core->sounds[BORK_SND_DOOR_OPEN], 0.5);
+                vec3 eye_to_pad;
+                vec3_sub(eye_to_pad, d->looked_obj->pos, eye_pos);
+                float dist = vec3_dist(eye_pos, d->looked_obj->pos);
+                float vis_dist = bork_map_vis_dist(&d->map, eye_pos, eye_to_pad, 2);
+                if(dist - vis_dist < 0.75) {
+                    struct bork_map_object* door = &d->map.doors.data[d->looked_obj->doorpad.door_idx];
+                    if(door->door.locked && d->looked_obj->doorpad.locked_side) {
+                        d->menu.doorpad.unlocked_ticks = 0;
+                        d->menu.doorpad.selection[0] = -1;
+                        d->menu.doorpad.selection[1] = 0;
+                        d->menu.doorpad.num_chars = 0;
+                        d->menu.doorpad.door_idx = d->looked_obj->doorpad.door_idx;
+                        d->menu.state = BORK_MENU_DOORPAD;
+                        SDL_ShowCursor(SDL_ENABLE);
+                        pg_mouse_mode(0);
                     } else {
-                        pg_audio_play(&d->core->sounds[BORK_SND_DOOR_CLOSE], 0.5);
+                        if(!door->door.open) {
+                            pg_audio_play_ch(&d->core->sounds[BORK_SND_DOOR_OPEN], 0.5, 1);
+                            door->door.locked = 0;
+                            door->door.open = 1;
+                        } else {
+                            if(vec2_dist2(door->pos, d->plr.pos) < (0.7 * 0.7)) {
+                                pg_audio_play_ch(&d->core->sounds[BORK_SND_BUZZ], 2, 1);
+                            } else {
+                                pg_audio_play_ch(&d->core->sounds[BORK_SND_DOOR_CLOSE], 0.5, 1);
+                                door->door.open = 0;
+                            }
+                        }
                     }
-                    door->door.open = 1 - door->door.open;
                 }
             } else if(d->looked_obj->type == BORK_MAP_RECYCLER) {
                 reset_menus(d);
@@ -369,12 +564,18 @@ static void tick_control_play(struct bork_play_data* d)
                 SDL_ShowCursor(SDL_ENABLE);
                 pg_mouse_mode(0);
                 pg_audio_channel_pause(1, 1);
+                pg_audio_channel_pause(2, 1);
+            } else if(d->looked_obj->type == BORK_MAP_ESCAPE_POD) {
+                pg_mouse_mode(0);
+                d->menu.state = BORK_MENU_OUTRO;
+                d->menu.intro.ticks = 0;
+                d->menu.intro.slide = 0;
             }
         }
     }
-    if(d->held_item >= 0
+    if(d->held_item >= 0 && !d->switch_ticks
     && (pg_check_input(kmap[BORK_CTRL_RELOAD], PG_CONTROL_HIT)
-        || pg_check_gamepad(SDL_CONTROLLER_BUTTON_RIGHTSHOULDER, PG_CONTROL_HIT))) {
+        || pg_check_gamepad(gmap[BORK_CTRL_RELOAD], PG_CONTROL_HIT))) {
         struct bork_entity* ent = bork_entity_get(d->inventory.data[d->held_item]);
         const struct bork_entity_profile* prof = &BORK_ENT_PROFILES[ent->type];
         if(ent->flags & BORK_ENTFLAG_IS_GUN) {
@@ -382,62 +583,66 @@ static void tick_control_play(struct bork_play_data* d)
             int ammo_missing = prof->ammo_capacity - ent->ammo;
             int ammo_held = MIN(d->ammo[ammo_type], ammo_missing);
             if(ammo_held > 0) {
+                pg_audio_play_ch(&d->core->sounds[BORK_SND_RELOAD_START], 1, 2);
                 d->reload_ticks = prof->reload_time;
                 d->reload_length = prof->reload_time;
             }
         }
     }
     if((pg_check_input(kmap[BORK_CTRL_JUMP], PG_CONTROL_HIT)
-        || pg_check_gamepad(SDL_CONTROLLER_BUTTON_A, PG_CONTROL_HIT))
+        || pg_check_gamepad(gmap[BORK_CTRL_JUMP], PG_CONTROL_HIT))
     && d->plr.flags & BORK_ENTFLAG_GROUND) {
-        d->plr.vel[2] = 0.15;
+        if(d->plr.flags & BORK_ENTFLAG_CROUCH) d->plr.vel[2] = 0.11;
+        else d->plr.vel[2] = 0.15;
         d->plr.flags &= ~BORK_ENTFLAG_GROUND;
         d->jump_released = 0;
         pg_audio_play(&d->core->sounds[BORK_SND_JUMP], 0.1);
     }
-    if(pg_check_input(kmap[BORK_CTRL_JUMP], PG_CONTROL_RELEASED)) {
+    if(pg_check_input(kmap[BORK_CTRL_JUMP], PG_CONTROL_RELEASED)
+    || pg_check_gamepad(gmap[BORK_CTRL_JUMP], PG_CONTROL_RELEASED)) {
         d->jump_released = 1;
     }
     if(pg_check_input(kmap[BORK_CTRL_CROUCH], PG_CONTROL_HELD)
-    || pg_check_gamepad(SDL_CONTROLLER_BUTTON_LEFTSTICK, PG_CONTROL_HELD)) {
+    || pg_check_gamepad(gmap[BORK_CTRL_CROUCH], PG_CONTROL_HELD)) {
         d->plr.flags |= BORK_ENTFLAG_CROUCH;
     } else if(d->plr.flags & BORK_ENTFLAG_CROUCH) {
         vec3 check_pos;
         vec3_sub(check_pos, d->plr.pos, (vec3){ 0, 0, 0.1 });
-        if(bork_map_vis_dist(&d->map, check_pos, (vec3){ 0, 0, 1 }, 1) >= 0.75) {
+        if(bork_map_vis_dist(&d->map, check_pos, (vec3){ 0, 0, 1 }, 1.5) >= 1) {
+            //fprintf(d->logfile, "Can uncrouch\n");
             d->plr.flags &= ~BORK_ENTFLAG_CROUCH;
         }
     }
     int kbd_input = 0;
     float move_speed = d->player_speed * (d->plr.flags & BORK_ENTFLAG_GROUND ? 1 : 0.1);
+    if(d->plr.flags & BORK_ENTFLAG_CROUCH) move_speed *= 0.6;
+    vec2 move_dir = {};
     d->plr.flags &= ~BORK_ENTFLAG_SLIDE;
     if(pg_check_input(kmap[BORK_CTRL_LEFT], PG_CONTROL_HIT | PG_CONTROL_HELD)) {
-        d->plr.vel[0] -= move_speed * sin(d->plr.dir[0]);
-        d->plr.vel[1] += move_speed * cos(d->plr.dir[0]);
+        move_dir[0] -= sin(d->plr.dir[0]);
+        move_dir[1] += cos(d->plr.dir[0]);
         kbd_input = 1;
     }
     if(pg_check_input(kmap[BORK_CTRL_RIGHT], PG_CONTROL_HIT | PG_CONTROL_HELD)) {
-        d->plr.vel[0] += move_speed * sin(d->plr.dir[0]);
-        d->plr.vel[1] -= move_speed * cos(d->plr.dir[0]);
+        move_dir[0] += sin(d->plr.dir[0]);
+        move_dir[1] -= cos(d->plr.dir[0]);
         kbd_input = 1;
     }
     if(pg_check_input(kmap[BORK_CTRL_UP], PG_CONTROL_HIT | PG_CONTROL_HELD)) {
-        d->plr.vel[0] += move_speed * cos(d->plr.dir[0]);
-        d->plr.vel[1] += move_speed * sin(d->plr.dir[0]);
+        move_dir[0] += cos(d->plr.dir[0]);
+        move_dir[1] += sin(d->plr.dir[0]);
         kbd_input = 1;
     }
     if(pg_check_input(kmap[BORK_CTRL_DOWN], PG_CONTROL_HIT | PG_CONTROL_HELD)) {
-        d->plr.vel[0] -= move_speed * cos(d->plr.dir[0]);
-        d->plr.vel[1] -= move_speed * sin(d->plr.dir[0]);
+        move_dir[0] -= cos(d->plr.dir[0]);
+        move_dir[1] -= sin(d->plr.dir[0]);
         kbd_input = 1;
     }
-    if(vec2_len(d->plr.vel) > 0.1) vec2_set_len(d->plr.vel, d->plr.vel, 0.1);
-    if((d->plr.flags & BORK_ENTFLAG_GROUND) && vec2_len(d->plr.vel) > 0.01) {
-        if(d->walk_input_ticks % 90 == 10)
-            pg_audio_play(&d->core->sounds[BORK_SND_FOOTSTEP1], 0.1);
-        else if(d->walk_input_ticks % 90 == 55)
-            pg_audio_play(&d->core->sounds[BORK_SND_FOOTSTEP2], 0.1);
+    if(kbd_input) {
+        vec2_set_len(move_dir, move_dir, move_speed);
+        vec2_add(d->plr.vel, d->plr.vel, move_dir);
     }
+    if(vec2_len(d->plr.vel) > 0.1) vec2_set_len(d->plr.vel, d->plr.vel, 0.1);
     if(!kbd_input) {
         vec2 stick;
         pg_gamepad_stick(0, stick);
@@ -447,10 +652,13 @@ static void tick_control_play(struct bork_play_data* d)
             vec2 stick_rot = {
                 stick[0] * s - stick[1] * c,
                 stick[0] * c + stick[1] * s };
-            vec2_normalize(stick_rot, stick_rot);
-            if(vec2_len(stick_rot) > 0.5) kbd_input = 1;
-            d->plr.vel[0] += move_speed * stick_rot[0];
-            d->plr.vel[1] -= move_speed * stick_rot[1];
+            float len = vec2_len(stick_rot);
+            if(len > 0.0001) {
+                if(len > 1) vec2_set_len(stick_rot, stick_rot, 1);
+                d->plr.vel[0] += move_speed * stick_rot[0];
+                d->plr.vel[1] -= move_speed * stick_rot[1];
+                kbd_input = 1;
+            }
         }
     }
     if(kbd_input) ++d->walk_input_ticks;
@@ -462,7 +670,7 @@ static void tick_control_play(struct bork_play_data* d)
             pg_audio_play(&d->core->sounds[BORK_SND_FOOTSTEP2], 0.1);
     }
     if(pg_check_input(kmap[BORK_CTRL_FLASHLIGHT], PG_CONTROL_HIT)
-    || pg_check_gamepad(SDL_CONTROLLER_BUTTON_Y, PG_CONTROL_HIT)) {
+    || pg_check_gamepad(gmap[BORK_CTRL_FLASHLIGHT], PG_CONTROL_HIT)) {
         d->flashlight_on = 1 - d->flashlight_on;
     }
     if(d->held_item != -1) {
@@ -470,37 +678,55 @@ static void tick_control_play(struct bork_play_data* d)
         struct bork_entity* held_ent = bork_entity_get(held_id);
         if(held_ent) {
             const struct bork_entity_profile* prof = &BORK_ENT_PROFILES[held_ent->type];
-            if(!d->reload_ticks && prof->use_ctrl
+            if(!d->reload_ticks && !d->switch_ticks && prof->use_ctrl
             && (pg_check_input(kmap[BORK_CTRL_FIRE], prof->use_ctrl)
-            || pg_check_gamepad(PG_RIGHT_TRIGGER, prof->use_ctrl))) {
+            || pg_check_gamepad(gmap[BORK_CTRL_FIRE], prof->use_ctrl))) {
                 prof->use_func(held_ent, d);
             }
         }
     }
     if(pg_check_input(kmap[BORK_CTRL_BIND1], PG_CONTROL_HIT)
-    || pg_check_gamepad(SDL_CONTROLLER_BUTTON_DPAD_UP, PG_CONTROL_HIT)) {
-        switch_item(d, d->quick_item[0]);
+    || pg_check_gamepad(gmap[BORK_CTRL_BIND1], PG_CONTROL_HIT)) {
+        switch_item(d, 0);
     } else if(pg_check_input(kmap[BORK_CTRL_BIND2], PG_CONTROL_HIT)
-    || pg_check_gamepad(SDL_CONTROLLER_BUTTON_DPAD_LEFT, PG_CONTROL_HIT)) {
-        switch_item(d, d->quick_item[1]);
+    || pg_check_gamepad(gmap[BORK_CTRL_BIND2], PG_CONTROL_HIT)) {
+        switch_item(d, 1);
     } else if(pg_check_input(kmap[BORK_CTRL_BIND3], PG_CONTROL_HIT)
-    || pg_check_gamepad(SDL_CONTROLLER_BUTTON_DPAD_RIGHT, PG_CONTROL_HIT)) {
-        switch_item(d, d->quick_item[2]);
+    || pg_check_gamepad(gmap[BORK_CTRL_BIND3], PG_CONTROL_HIT)) {
+        switch_item(d, 2);
     } else if(pg_check_input(kmap[BORK_CTRL_BIND4], PG_CONTROL_HIT)
-    || pg_check_gamepad(SDL_CONTROLLER_BUTTON_DPAD_DOWN, PG_CONTROL_HIT)) {
-        switch_item(d, d->quick_item[3]);
+    || pg_check_gamepad(gmap[BORK_CTRL_BIND4], PG_CONTROL_HIT)) {
+        switch_item(d, 3);
     }
-    /*
-    if(d->play_ticks % 10 == 0) {
-        float dist_ctr = 1 - (vec2_dist(d->plr.pos, (vec2){ 32, 32 }) / 16);
-        float loop_time = 10.0f / 120.0f;
-        float loop_origin = d->play_ticks / 120.0f;
-        pg_audio_loop(&d->core->sounds[BORK_SND_FIRE], dist_ctr * 0.25, loop_origin, loop_time);
-    }*/
+    if(d->using_jetpack) {
+        if(d->play_ticks % 10 == 0) {
+            struct bork_particle new_part = {
+                .flags = BORK_PARTICLE_SPRITE | BORK_PARTICLE_BOUYANT,
+                .pos = { d->plr.pos[0] + (RANDF * 0.25 - 0.125),
+                         d->plr.pos[1] + (RANDF * 0.25 - 0.125),
+                         d->plr.pos[2] - 0.4 },
+                .vel = { RANDF * 0.08 - 0.04, RANDF * 0.08 - 0.04, RANDF * -0.1 },
+                .ticks_left = 240 + (RANDF * 20),
+                .frame_ticks = 0,
+                .current_frame = 24 + rand() % 4,
+            };
+            ARR_PUSH(d->particles, new_part);
+        }
+        if(d->jp_audio_handle == -1) {
+            d->jp_audio_handle =
+                pg_audio_emitter(&d->core->sounds[BORK_SND_FIRE], 0.5, 1, (vec3){}, 2);
+        }
+    } else if(d->jp_audio_handle >= -1) {
+        pg_audio_emitter_remove(d->jp_audio_handle);
+        d->jp_audio_handle = -1;
+    }
 }
 
 static void tick_player(struct bork_play_data* d)
 {
+    //d->plr.HP = 100;
+    /*  Check for auto-reload   */
+
     int plr_x = floor(d->plr.pos[0] / 2);
     int plr_y = floor(d->plr.pos[1] / 2);
     int plr_z = floor(d->plr.pos[2] / 2);
@@ -551,25 +777,40 @@ static void tick_player(struct bork_play_data* d)
             vec3_set_len(push, push, (full - dist));
             vec2_add(d->plr.vel, d->plr.vel, push);
             vec3_sub(surr_ent->vel, surr_ent->vel, push);
+            surr_ent->still_ticks = 0;
+            surr_ent->flags &= ~BORK_ENTFLAG_INACTIVE;
         }
     }
     if(d->plr.flags & BORK_ENTFLAG_ON_FIRE) {
         entity_on_fire(d, &d->plr);
+        if(d->plr.fire_ticks && d->fire_audio_handle == -1) {
+            d->fire_audio_handle =
+                pg_audio_emitter(&d->core->sounds[BORK_SND_FIRE], 0.5, 1, (vec3){}, 2);
+        } else if(!d->plr.fire_ticks && d->fire_audio_handle >= 0) {
+            pg_audio_emitter_remove(d->fire_audio_handle);
+            d->fire_audio_handle = -1;
+        }
         if(d->play_ticks % 10 == 0) {
             int fire_ticks = d->plr.fire_ticks;
             float vol = 2.5;
             if(fire_ticks < 120) vol *= (float)fire_ticks / 120;
             float loop_time = 10.0f / 120.0f;
             float loop_origin = (float)d->play_ticks / 120.0f;
-            pg_audio_loop(&d->core->sounds[BORK_SND_FIRE], vol, loop_origin, loop_time);
         }
     }
-    vec2_set(d->plr.dir, d->plr.dir[0] + d->mouse_motion[0],
-                         d->plr.dir[1] + d->mouse_motion[1]);
-    vec2_set(d->mouse_motion, 0, 0);
-    d->plr.dir[0] = fmodf(d->plr.dir[0], M_PI * 2.0f);
     bork_entity_update(&d->plr, d);
-    if(d->plr.HP <= 0) d->menu.state = BORK_MENU_PLAYERDEAD;
+    if(d->plr.dead_ticks >= 120) {
+        d->menu.state = BORK_MENU_PLAYERDEAD;
+        pg_mouse_mode(0);
+        SDL_ShowCursor(SDL_ENABLE);
+    } else if(d->plr.HP <= 0) ++d->plr.dead_ticks;
+    else {
+        vec2_set(d->plr.dir, d->plr.dir[0] + d->mouse_motion[0],
+                             d->plr.dir[1] + d->mouse_motion[1]);
+        vec2_set(d->mouse_motion, 0, 0);
+        d->plr.dir[0] = fmodf(d->plr.dir[0], M_PI * 2.0f);
+        d->plr.dir[1] = CLAMP(d->plr.dir[1], -M_PI * 0.5, M_PI * 0.5);
+    }
 }
 
 static void tick_held_item(struct bork_play_data* d)
@@ -579,7 +820,8 @@ static void tick_held_item(struct bork_play_data* d)
     const struct bork_entity_profile* prof = &BORK_ENT_PROFILES[item->type];
     if(d->reload_ticks) {
         --d->reload_ticks;
-        if(d->reload_ticks == d->reload_length / 2) {
+        if(d->reload_ticks == 60) {
+            pg_audio_play_ch(&d->core->sounds[BORK_SND_RELOAD_END], 1, 2);
             int ammo_type = prof->use_ammo[item->ammo_type] - BORK_ITEM_BULLETS;
             int ammo_missing = prof->ammo_capacity - item->ammo;
             int ammo_held = MIN(d->ammo[ammo_type], ammo_missing);
@@ -589,6 +831,8 @@ static void tick_held_item(struct bork_play_data* d)
             }
         }
         return;
+    } else if(d->switch_ticks) {
+        --d->switch_ticks;
     } else if(d->hud_anim_active) {
         d->hud_anim_progress += d->hud_anim_speed;
         int anim_idx = floor(d->hud_anim_progress * 4.0f);
@@ -604,6 +848,14 @@ static void tick_held_item(struct bork_play_data* d)
             }
             bork_play_reset_hud_anim(d);
         }
+    } else if(!d->hud_anim_active && item->flags & BORK_ENTFLAG_IS_GUN && item->ammo == 0) {
+        int ammo_type = prof->use_ammo[item->ammo_type] - BORK_ITEM_BULLETS;
+        int ammo_held = d->ammo[ammo_type];
+        if(ammo_held > 0) {
+            pg_audio_play_ch(&d->core->sounds[BORK_SND_RELOAD_START], 1, 2);
+            d->reload_ticks = prof->reload_time;
+            d->reload_length = prof->reload_time;
+        }
     }
 }
 
@@ -611,16 +863,22 @@ static void tick_datapad(struct bork_play_data* d)
 {
     if(d->hud_datapad_id < 0) return;
     const struct bork_datapad* dp = &BORK_DATAPADS[d->hud_datapad_id];
-    --d->hud_datapad_ticks;
-    if(d->hud_datapad_ticks == 0) {
-        d->hud_datapad_line += 2;
-        if(d->hud_datapad_line >= dp->lines) d->hud_datapad_id = -1;
-        else d->hud_datapad_ticks = 5 * 60;
+    int scan_level = get_upgrade_level(d, BORK_UPGRADE_SCANNING);
+    int translate = 0;
+    if(dp->lines_translated && scan_level == 1) translate = 1;
+    ++d->hud_datapad_ticks;
+    float text_line = (float)d->hud_datapad_ticks / 190.0f;
+    int lines = translate ? dp->lines_translated : dp->lines;
+    if(text_line > lines) {
+        d->hud_datapad_ticks = 0;
+        d->hud_datapad_id = -1;
     }
 }
 
 static void tick_enemies(struct bork_play_data* d)
 {
+    vec3 plr_pos;
+    vec3_mul(plr_pos, d->plr.pos, (vec3){ 1, 1, 3 });
     int x, y, z, i;
     for(x = 0; x < 4; ++x)
     for(y = 0; y < 4; ++y)
@@ -634,12 +892,16 @@ static void tick_enemies(struct bork_play_data* d)
                 --i;
                 continue;
             }
-            if(ent->last_tick == d->ticks) continue;
+            if(ent->last_tick == d->play_ticks) continue;
+            vec3 ent_pos;
+            vec3_mul(ent_pos, ent->pos, (vec3){ 1, 1, 3 });
+            if(vec3_dist2(ent_pos, plr_pos) > (48 * 48)) continue;
+            if(!ent->aware_ticks && ((d->play_ticks + ent_id) % 20)) continue;
             const struct bork_entity_profile* prof = &BORK_ENT_PROFILES[ent->type];
             if(ent->pos[0] >= (x * 16.0f) && ent->pos[0] <= ((x + 1) * 16.0f)
             && ent->pos[1] >= (y * 16.0f) && ent->pos[1] <= ((y + 1) * 16.0f)
             && ent->pos[2] >= (z * 16.0f) && ent->pos[2] <= ((z + 1) * 16.0f)) {
-                ent->last_tick = d->ticks;
+                ent->last_tick = d->play_ticks;
                 if(prof->tick_func) prof->tick_func(ent, d);
                 ent = bork_entity_get(ent_id);
                 if(!ent) {
@@ -652,7 +914,7 @@ static void tick_enemies(struct bork_play_data* d)
                 --i;
                 bork_map_add_enemy(&d->map, ent_id);
             }
-            if(d->play_ticks % 30 == 0) {
+            if((ent_id + d->play_ticks) % 30 == 0) {
                 int j;
                 struct bork_fire* fire;
                 ARR_FOREACH_PTR(d->map.fires, fire, j) {
@@ -674,6 +936,8 @@ static void tick_enemies(struct bork_play_data* d)
 
 static void tick_entities(struct bork_play_data* d)
 {
+    vec3 plr_pos;
+    vec3_mul(plr_pos, d->plr.pos, (vec3){ 1, 1, 4 });
     static bork_entity_arr_t surr = {};
     int x, y, z, i;
     for(x = 0; x < 4; ++x)
@@ -687,35 +951,41 @@ static void tick_entities(struct bork_play_data* d)
                 ARR_SWAPSPLICE(d->map.entities[x][y][z], i, 1);
                 continue;
             }
-            if(ent->last_tick == d->ticks) continue;
+            vec3 ent_pos;
+            vec3_mul(ent_pos, ent->pos, (vec3){ 1, 1, 4 });
+            if(vec3_dist2(ent_pos, plr_pos) > (32 * 32)) continue;
+            if(ent->last_tick == d->play_ticks) continue;
             else if(ent->pos[0] >= (x * 16.0f) && ent->pos[0] <= ((x + 1) * 16.0f)
             && ent->pos[1] >= (y * 16.0f) && ent->pos[1] <= ((y + 1) * 16.0f)
             && ent->pos[2] >= (z * 16.0f) && ent->pos[2] <= ((z + 1) * 16.0f)) {
                 const struct bork_entity_profile* prof = &BORK_ENT_PROFILES[ent->type];
-                ent->last_tick = d->ticks;
+                ent->last_tick = d->play_ticks;
                 bork_entity_update(ent, d);
-                ARR_TRUNCATE(surr, 0);
-                vec3 start, end;
-                vec3_sub(start, ent->pos, (vec3){ 2, 2, 2 });
-                vec3_add(end, ent->pos, (vec3){ 2, 2, 2 });
-                bork_map_query_entities(&d->map, &surr, start, end);
-                /*  Do basic physics    */
-                bork_entity_move(ent, &d->map);
-                /*  Physics against other enemies   */
-                int j;
-                struct bork_entity* surr_ent;
-                bork_entity_t surr_id;
-                ARR_FOREACH(surr, surr_id, j) {
-                    surr_ent = bork_entity_get(surr_id);
-                    if(!surr_ent) continue;
-                    const struct bork_entity_profile* surr_prof = &BORK_ENT_PROFILES[surr_ent->type];
-                    vec3 push;
-                    vec3_sub(push, ent->pos, surr_ent->pos);
-                    float full = prof->size[0] + surr_prof->size[0];
-                    float dist = vec3_len(push);
-                    if(dist < full) {
-                        vec3_set_len(push, push, (full - dist) * 0.5);
-                        vec3_add(ent->vel, ent->vel, push);
+                if(((d->play_ticks + ent_id) & 16) == 0) {
+                    ARR_TRUNCATE(surr, 0);
+                    vec3 start, end;
+                    vec3_sub(start, ent->pos, (vec3){ 2, 2, 2 });
+                    vec3_add(end, ent->pos, (vec3){ 2, 2, 2 });
+                    bork_map_query_entities(&d->map, &surr, start, end);
+                    /*  Physics against other enemies   */
+                    int j;
+                    struct bork_entity* surr_ent;
+                    bork_entity_t surr_id;
+                    ARR_FOREACH(surr, surr_id, j) {
+                        if(surr_id == ent_id) continue;
+                        surr_ent = bork_entity_get(surr_id);
+                        if(!surr_ent) continue;
+                        const struct bork_entity_profile* surr_prof = &BORK_ENT_PROFILES[surr_ent->type];
+                        vec3 push;
+                        vec3_sub(push, ent->pos, surr_ent->pos);
+                        float full = prof->size[0] + surr_prof->size[0];
+                        float dist = vec3_len(push);
+                        if(dist < full) {
+                            vec3_set_len(push, push, (full - dist) * 0.5);
+                            vec3_add(ent->vel, ent->vel, push);
+                            ent->still_ticks = 0;
+                            ent->flags &= ~BORK_ENTFLAG_INACTIVE;
+                        }
                     }
                 }
                 if(ent->flags & BORK_ENTFLAG_ACTIVE_FUNC) {
@@ -765,11 +1035,12 @@ static void tick_items(struct bork_play_data* d)
                 --i;
                 continue;
             }
-            if(ent->last_tick == d->ticks) continue;
+            if(vec3_dist2(ent->pos, d->plr.pos) > (32 * 32)) continue;
+            if(ent->last_tick == d->play_ticks) continue;
             else if(ent->pos[0] >= (x * 16.0f) && ent->pos[0] <= ((x + 1) * 16.0f)
             && ent->pos[1] >= (y * 16.0f) && ent->pos[1] <= ((y + 1) * 16.0f)
             && ent->pos[2] >= (z * 16.0f) && ent->pos[2] <= ((z + 1) * 16.0f)) {
-                ent->last_tick = d->ticks;
+                ent->last_tick = d->play_ticks;
                 tick_item(d, ent);
                 if((ent->flags & BORK_ENTFLAG_ITEM) && (ent->flags & BORK_ENTFLAG_ACTIVE_FUNC)) {
                     const struct bork_entity_profile* prof = &BORK_ENT_PROFILES[ent->type];
@@ -806,6 +1077,10 @@ static void tick_particles(struct bork_play_data* d)
     struct bork_particle* part;
     int i;
     ARR_FOREACH_PTR_REV(d->particles, part, i) {
+        if(vec3_dist2(part->pos, d->plr.pos) > (32 * 32)) {
+            ARR_SWAPSPLICE(d->particles, i, 1);
+            continue;
+        }
         if(part->ticks_left <= 0) {
             ARR_SWAPSPLICE(d->particles, i, 1);
             continue;
@@ -850,8 +1125,10 @@ static void tick_fires(struct bork_play_data* d)
             continue;
         }
         if(fire->audio_handle == -1 && !(fire->flags & BORK_FIRE_MOVES)) {
+            vec3 audio_pos;
+            vec3_mul(audio_pos, fire->pos, (vec3){ 1, 1, 2 });
             fire->audio_handle =
-                pg_audio_emitter(&d->core->sounds[BORK_SND_FIRE], 1, 6, fire->pos, 1);
+                pg_audio_emitter(&d->core->sounds[BORK_SND_FIRE], 1, 6, audio_pos, 1);
         }
         if(fire->flags & BORK_FIRE_MOVES) {
             vec3_add(fire->pos, fire->pos, fire->vel);
@@ -859,8 +1136,6 @@ static void tick_fires(struct bork_play_data* d)
             struct bork_collision coll;
             int hit = bork_map_collide(&d->map, &coll, fire->pos, (vec3){ 0.3, 0.3, 0.3 });
             if(hit) {
-                fire->audio_handle =
-                    pg_audio_emitter(&d->core->sounds[BORK_SND_FIRE], 1, 6, fire->pos, 2);
                 vec3_set(fire->vel, 0, 0, 0);
                 fire->flags &= ~BORK_FIRE_MOVES;
             }
@@ -896,7 +1171,8 @@ static void tick_fires(struct bork_play_data* d)
             struct bork_entity* surr_ent;
             ARR_FOREACH(surr, surr_ent_id, j) {
                 surr_ent = bork_entity_get(surr_ent_id);
-                if(!surr_ent || surr_ent->last_fire_tick == d->play_ticks) continue;
+                if(!surr_ent || surr_ent->flags & BORK_ENTFLAG_FIREPROOF
+                || surr_ent->last_fire_tick == d->play_ticks) continue;
                 surr_ent->last_fire_tick = d->play_ticks;
                 surr_ent->HP -= 5;
                 if(rand() % 3 == 0) {
@@ -905,7 +1181,7 @@ static void tick_fires(struct bork_play_data* d)
                 }
             }
             if(plr_heatshield_lvl < 1 && d->plr.last_fire_tick != d->play_ticks
-            && vec2_dist(fire->pos, d->plr.pos) < 1
+            && vec2_dist(fire->pos, d->plr.pos) < 1.5
             && fabs((fire->pos[2] + 1.5) - d->plr.pos[2]) < 2) {
                 d->plr.last_fire_tick = d->play_ticks;
                 d->plr.HP -= fire_damage;
@@ -916,7 +1192,7 @@ static void tick_fires(struct bork_play_data* d)
                 }
             }
         }
-        if(fire->lifetime == 0) {
+        if(fire->lifetime <= 0) {
             if(fire->audio_handle >= 0) {
                 pg_audio_emitter_remove(fire->audio_handle);
             }
@@ -946,25 +1222,44 @@ static void bork_play_draw(struct pg_game_state* state)
     struct bork_play_data* d = state->data;
     /*  Interpolation   */
     float t = d->menu.state == BORK_MENU_CLOSED ? state->tick_over : 0;
-    vec3 vel_lerp, draw_pos;
+    vec3 vel_lerp = {}, draw_pos;
     vec2 draw_dir;
     vec3_scale(vel_lerp, d->plr.vel, t);
     vec3_add(draw_pos, d->plr.pos, vel_lerp);
     vec3 draw_coll_size;
     vec3_dup(draw_coll_size, BORK_ENT_PROFILES[BORK_ENTITY_PLAYER].size);
-    if(d->plr.flags & BORK_ENTFLAG_CROUCH) draw_coll_size[2] *= 0.5;
-    struct bork_collision draw_collision = {};
-    bork_map_collide(&d->map, &draw_collision, draw_pos, draw_coll_size);
-    vec3_add(draw_pos, draw_pos, draw_collision.push);
+    if(d->plr.HP <= 0) draw_coll_size[2] *= 0.2;
+    else if(d->plr.flags & BORK_ENTFLAG_CROUCH) draw_coll_size[2] *= 0.5;
+    struct bork_collision coll = {};
+    bork_map_collide(&d->map, &coll, draw_pos, draw_coll_size);
+    if(coll.push[0] != 0 || coll.push[1] != 0 || coll.push[2] != 0) {
+        float face_down_angle = vec3_mul_inner(coll.face_norm, PG_DIR_VEC[PG_UP]);
+        vec3 ell_norm = {
+            coll.push[0] / (draw_coll_size[0] * draw_coll_size[0]),
+            coll.push[1] / (draw_coll_size[1] * draw_coll_size[1]),
+            coll.push[2] / (draw_coll_size[2] * draw_coll_size[2]) };
+        vec3_normalize(ell_norm, ell_norm);
+        float down_angle = vec3_mul_inner(ell_norm, coll.face_norm);
+        if(down_angle >= 0.9 && face_down_angle > 0.75 && face_down_angle < 0.9) {
+            //vec3_set(coll.push, 0, 0, coll.push[2]);
+            vec3_sub(draw_pos, draw_pos, (vec3){ 0, 0, vel_lerp[2] });
+        } else vec3_add(draw_pos, draw_pos, coll.push);
+    }
     vec3_add(draw_pos, draw_pos, (vec3){ 0, 0, draw_coll_size[2] * 0.9 });
-    vec2_add(draw_dir, d->plr.dir, d->mouse_motion);
+    if(d->plr.HP > 0) {
+        if(d->core->invert_y) vec2_sub(draw_dir, d->plr.dir, d->mouse_motion);
+        else vec2_add(draw_dir, d->plr.dir, d->mouse_motion);
+    } else vec2_dup(draw_dir, d->plr.dir);
     pg_viewer_set(&d->core->view, draw_pos, draw_dir);
     /*  Drawing */
     pg_gbuffer_dst(&d->core->gbuf);
     //glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
-    pg_shader_begin(&d->core->shader_3d, &d->core->view);
-    draw_weapon(d, d->hud_anim_progress + (d->hud_anim_speed * state->tick_over),
-                draw_pos, draw_dir);
+    if(d->draw_weapon) {
+        pg_shader_3d_texture(&d->core->shader_3d, &d->core->item_tex);
+        pg_shader_begin(&d->core->shader_3d, &d->core->view);
+        draw_weapon(d, d->hud_anim_progress + (d->hud_anim_speed * t),
+                    draw_pos, draw_dir);
+    }
     pg_shader_begin(&d->core->shader_sprite, &d->core->view);
     draw_enemies(d, t);
     if(d->decoy_active) draw_decoy(d);
@@ -980,20 +1275,6 @@ static void bork_play_draw(struct pg_game_state* state)
     draw_particles(d);
     pg_shader_3d_texture(&d->core->shader_3d, &d->core->env_atlas);
     bork_map_draw(&d->map, d);
-    /*  Test 3d text    */
-    pg_shader_begin(&d->core->shader_text, NULL);
-    pg_shader_text_3d(&d->core->shader_text, &d->core->view);
-    mat4 text_tx;
-    mat4_translate(text_tx, 8, 46, 5.5);
-    mat4_rotate_X(text_tx, text_tx, M_PI * -0.5);
-    mat4_rotate_X(text_tx, text_tx, (float)d->ticks / 120);
-    pg_shader_text_transform_3d(&d->core->shader_text, text_tx);
-    struct pg_shader_text test_text = {
-        .use_blocks = 2,
-        .block = { "3D TEXT!", "ANOTHER LINE" },
-        .block_style = { { 0, -0.5, 1, 1.2 }, { 0, 0.6, 1, 1.2 }},
-        .block_color = { { 1, 1, 1, 0.5 }, { 1, 1, 1, 0.5 }} };
-    pg_shader_text_write(&d->core->shader_text, &test_text);
     glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
     /*  End text    */
     draw_map_lights(d);
@@ -1007,34 +1288,58 @@ static void bork_play_draw(struct pg_game_state* state)
         if(d->plr.flags & BORK_ENTFLAG_CROUCH) flash_pos[2] -= 0.2;
         else flash_pos[2] -= 0.4;
         pg_light_spotlight(&flashlight, flash_pos, 12, (vec3){ 1, 1, 1 },
-                           look_dir, 0.35);
+                           look_dir, 0.45);
         ARR_PUSH(d->spotlights, flashlight);
     }
+    if(d->using_jetpack) {
+        int jp_idx = 0;
+        if(d->upgrades[0] == BORK_UPGRADE_JETPACK) jp_idx = 0;
+        else if(d->upgrades[1] == BORK_UPGRADE_JETPACK) jp_idx = 1;
+        else if(d->upgrades[2] == BORK_UPGRADE_JETPACK) jp_idx = 2;
+        struct pg_light jp_light;
+        vec3 light_pos;
+        vec3_dup(light_pos, draw_pos);
+        light_pos[2] -= 1.5;
+        float strength = (float)d->upgrade_counters[jp_idx] / PLAY_SECONDS(10) + 0.1;
+        strength = MIN(0.3, strength) * 10;
+        pg_light_pointlight(&jp_light, light_pos, strength, (vec3){ 1.5, 1.5, 1 });
+        ARR_PUSH(d->lights_buf, jp_light);
+    }
     draw_lights(d);
+    pg_ppbuffer_dst(&d->core->ppbuf);
+    pg_gbuffer_finish(&d->core->gbuf, (vec3){ 0.025, 0.025, 0.025 });
     if(d->menu.state == BORK_MENU_CLOSED) {
-        pg_screen_dst();
-        pg_gbuffer_finish(&d->core->gbuf, (vec3){ 0.05, 0.05, 0.05 });
-        draw_hud_overlay(d);
-        draw_datapad(d);
+        //pg_ppbuffer_swapdst(&d->core->ppbuf);
+        if(d->draw_ui) {
+            draw_hud_overlay(d);
+            draw_datapad(d);
+        }
     } else {
         /*  Finish to the post-process buffer so we can do the blur effect  */
-        pg_ppbuffer_dst(&d->core->ppbuf);
-        pg_gbuffer_finish(&d->core->gbuf, (vec3){ 0.05, 0.05, 0.05 });
-        pg_postproc_blur_scale(&d->core->post_blur, (vec2){ 3, 3 });
-        pg_postproc_blur_dir(&d->core->post_blur, 1);
-        pg_ppbuffer_swapdst(&d->core->ppbuf);
-        pg_postproc_apply(&d->core->post_blur, &d->core->ppbuf);
-        pg_postproc_blur_dir(&d->core->post_blur, 0);
-        pg_ppbuffer_swap(&d->core->ppbuf);
-        pg_screen_dst();
-        pg_postproc_apply(&d->core->post_blur, &d->core->ppbuf);
-        bork_draw_backdrop(d->core, (vec4){ 1.5, 1.5, 1.5, 0.75 },
-                           (float)state->ticks / (float)state->tick_rate);
-        bork_draw_linear_vignette(d->core, (vec4){ 0, 0, 0, 0.9 });
+        if(d->menu.state != BORK_MENU_INTRO && d->menu.state != BORK_MENU_OUTRO) {
+            pg_postproc_blur_scale(&d->core->post_blur, (vec2){ 3, 3 });
+            pg_postproc_blur_dir(&d->core->post_blur, 1);
+            pg_ppbuffer_swapdst(&d->core->ppbuf);
+            pg_postproc_apply(&d->core->post_blur, &d->core->ppbuf);
+            pg_postproc_blur_dir(&d->core->post_blur, 0);
+            pg_ppbuffer_swapdst(&d->core->ppbuf);
+            pg_postproc_apply(&d->core->post_blur, &d->core->ppbuf);
+            bork_draw_backdrop(d->core, (vec4){ 2, 2, 2, 0.5 },
+                               (float)state->ticks / (float)state->tick_rate);
+            bork_draw_linear_vignette(d->core, (vec4){ 0, 0, 0, 0.9 });
+        }
         pg_shader_begin(&d->core->shader_2d, NULL);
-        if(d->menu.state < BORK_MENU_DOORPAD) draw_active_menu(d);
+        if(d->menu.state < BORK_MENU_DOORPAD
+        && !(d->menu.state == BORK_MENU_GAME
+          && d->menu.game.mode == GAME_MENU_SHOW_OPTIONS)) draw_active_menu(d);
         switch(d->menu.state) {
         default: break;
+        case BORK_MENU_OUTRO:
+            draw_outro(d, (float)state->ticks / (float)state->tick_rate);
+            break;
+        case BORK_MENU_INTRO:
+            draw_intro(d, (float)state->ticks / (float)state->tick_rate);
+            break;
         case BORK_MENU_INVENTORY:
             draw_menu_inv(d, (float)state->ticks / (float)state->tick_rate);
             break;
@@ -1058,6 +1363,9 @@ static void bork_play_draw(struct pg_game_state* state)
             break;
         }
     }
+    pg_ppbuffer_swapdst(&d->core->ppbuf);
+    pg_screen_dst();
+    pg_postproc_apply(&d->core->post_gamma, &d->core->ppbuf);
     pg_shader_begin(&d->core->shader_text, NULL);
     bork_draw_fps(d->core);
 }
@@ -1129,6 +1437,17 @@ void draw_active_menu(struct bork_play_data* d)
                                (vec2){ 0.06, 0.06 }, 0);
         pg_model_draw(&d->core->quad_2d_ctr, NULL);
     }
+    if(d->core->gpad_idx != -1) {
+        pg_shader_2d_color_mod(shader, (vec4){ 1, 1, 1, 0.75 }, (vec4){});
+        pg_shader_2d_tex_frame(shader, 246);
+        pg_shader_2d_transform(shader, (vec2){ ar * 0.75 + (-2 * ar * 0.08) - 0.025, 0.04 },
+                               (vec2){ 0.025, 0.025 }, 0);
+        pg_model_draw(&d->core->quad_2d_ctr, NULL);
+        pg_shader_2d_tex_frame(shader, 247);
+        pg_shader_2d_transform(shader, (vec2){ ar * 0.75 + (2 * ar * 0.08) + 0.025, 0.04 },
+                                       (vec2){ 0.025, 0.025 }, 0);
+        pg_model_draw(&d->core->quad_2d_ctr, NULL);
+    }
 }
 
 static void draw_hud_overlay(struct bork_play_data* d)
@@ -1140,12 +1459,18 @@ static void draw_hud_overlay(struct bork_play_data* d)
     vec2 screen_pos;
     enum bork_resource looked_resource;
     int looking_at_resource = 0;
+    int looking_at_upgrade = 0;
+    enum bork_upgrade looked_upgrade[2] = { -1, -1 };
     float name_center = 0;
     struct bork_entity* looked_ent;
     int ti = 0;
     int len;
     struct pg_shader_text text = { .use_blocks = 0 };
-    if(d->looked_item != -1 && (looked_ent = bork_entity_get(d->looked_item))) {
+    vec3 eye_pos, eye_dir;
+    bork_entity_get_eye(&d->plr, eye_dir, eye_pos);
+    eye_pos[2] -= 0.2;
+    if(d->looked_item != -1 && (looked_ent = bork_entity_get(d->looked_item))
+    && vec3_dist2(looked_ent->pos, eye_pos) < (2.5 * 2.5)) {
         if(looked_ent->flags & BORK_ENTFLAG_IS_FOOD) {
             looking_at_resource = 1;
             looked_resource = BORK_RESOURCE_FOODSTUFF;
@@ -1177,20 +1502,37 @@ static void draw_hud_overlay(struct bork_play_data* d)
             float sch_center = (float)len * 0.04 * 1.25 * 0.5;
             vec4_set(text.block_style[ti], screen_pos[0] - sch_center, screen_pos[1] - 0.05, 0.04, 1.25);
             vec4_set(text.block_color[ti], 1, 1, 1, 0.75);
+        } else if(looked_ent->type == BORK_ITEM_UPGRADE) {
+            looking_at_upgrade = 1;
+            looked_upgrade[0] = looked_ent->counter[0];
+            looked_upgrade[1] = looked_ent->counter[1];
         }
     }
     if(d->scan_ticks) {
         len = snprintf(text.block[++ti], 64, "%s", d->scanned_name);
         vec4_set(text.block_style[ti], 0.2 - (len * 0.02 * 1.25 * 0.5), 0.6, 0.02, 1.25);
         float scan_alpha;
-        if(d->scan_ticks > PLAY_SECONDS(4.75)) {
-            scan_alpha = PLAY_SECONDS(5) - d->scan_ticks;
+        if(d->scan_ticks > PLAY_SECONDS(2.75)) {
+            scan_alpha = PLAY_SECONDS(3) - d->scan_ticks;
             scan_alpha /= PLAY_SECONDS(0.25);
         } else if(d->scan_ticks < PLAY_SECONDS(0.25)) {
             scan_alpha = d->scan_ticks;
             scan_alpha /= PLAY_SECONDS(0.25);
         } else scan_alpha = 1;
         vec4_set(text.block_color[ti], 1, 1, 1, scan_alpha);
+    }
+    if(d->hud_announce_ticks) {
+        len = snprintf(text.block[++ti], 64, "%s", d->hud_announce);
+        vec4_set(text.block_style[ti], ar * 0.5 - (len * 0.02 * 1.25 * 0.5), 0.2, 0.02, 1.25);
+        float announce_alpha;
+        if(d->hud_announce_ticks > PLAY_SECONDS(3.25)) {
+            announce_alpha = PLAY_SECONDS(3.5) - d->hud_announce_ticks;
+            announce_alpha /= PLAY_SECONDS(0.25);
+        } else if(d->hud_announce_ticks < PLAY_SECONDS(0.25)) {
+            announce_alpha = d->hud_announce_ticks;
+            announce_alpha /= PLAY_SECONDS(0.25);
+        } else announce_alpha = 1;
+        vec4_set(text.block_color[ti], 1, 1, 1, announce_alpha);
     }
     text.use_blocks = ti + 1;
     pg_shader_text_write(&d->core->shader_text, &text);
@@ -1202,14 +1544,14 @@ static void draw_hud_overlay(struct bork_play_data* d)
             if(prof->hud_func) prof->hud_func(held_ent, d);
         }
     }
+    draw_quickfetch_items(d, (vec4){ 1, 1, 1, 0.75 }, (vec4){ 1, 1, 1, 0.9 });
     draw_quickfetch_text(d, 0, (vec4){ 1, 1, 1, 0.15 }, (vec4){ 1, 1, 1, 0.75 });
-
-    draw_quickfetch_items(d, (vec4){ 1, 1, 1, 0.15 }, (vec4){ 1, 1, 1, 0.75 });
     pg_shader_begin(&d->core->shader_2d, NULL);
     pg_model_begin(&d->core->quad_2d_ctr, &d->core->shader_2d);
     pg_shader_2d_resolution(&d->core->shader_2d, (vec2){ d->core->aspect_ratio, 1 });
     pg_shader_2d_set_light(&d->core->shader_2d, (vec2){}, (vec3){}, (vec3){ 1, 1, 1 });
     if(looking_at_resource) {
+        pg_shader_2d_texture(&d->core->shader_2d, &d->core->item_tex);
         pg_shader_2d_color_mod(&d->core->shader_2d, (vec4){ 1, 1, 1, 0.75 }, (vec4){});
         pg_shader_2d_tex_frame(&d->core->shader_2d, 200 + looked_resource * 2);
         pg_shader_2d_add_tex_tx(&d->core->shader_2d, (vec2){ 2, 2 }, (vec2){});
@@ -1217,18 +1559,39 @@ static void draw_hud_overlay(struct bork_play_data* d)
             (vec2){ screen_pos[0], screen_pos[1] - 0.075 },
             (vec2){ 0.05, 0.05 }, 0);
         pg_model_draw(&d->core->quad_2d_ctr, NULL);
+    } else if(looking_at_upgrade) {
+        pg_shader_2d_texture(&d->core->shader_2d, &d->core->upgrades_tex);
+        pg_shader_2d_color_mod(&d->core->shader_2d, (vec4){ 1, 1, 1, 0.75 }, (vec4){});
+        pg_shader_2d_tex_frame(&d->core->shader_2d, looked_upgrade[0]);
+        pg_shader_2d_transform(&d->core->shader_2d,
+            (vec2){ screen_pos[0] - 0.06, screen_pos[1] - 0.075 },
+            (vec2){ 0.05, 0.05 }, 0);
+        pg_model_draw(&d->core->quad_2d_ctr, NULL);
+        pg_shader_2d_tex_frame(&d->core->shader_2d, looked_upgrade[1]);
+        pg_shader_2d_transform(&d->core->shader_2d,
+            (vec2){ screen_pos[0] + 0.06, screen_pos[1] - 0.075 },
+            (vec2){ 0.05, 0.05 }, 0);
+        pg_model_draw(&d->core->quad_2d_ctr, NULL);
     }
+    pg_shader_2d_texture(&d->core->shader_2d, &d->core->item_tex);
     pg_model_begin(&d->core->quad_2d_ctr, &d->core->shader_2d);
-    pg_shader_2d_tex_frame(&d->core->shader_2d, 214);
-    pg_shader_2d_add_tex_tx(&d->core->shader_2d, (vec2){ 2, 2 }, (vec2){});
+    pg_shader_2d_tex_frame(&d->core->shader_2d, 58);
+    pg_shader_2d_add_tex_tx(&d->core->shader_2d, (vec2){ 6, 6 }, (vec2){});
     pg_shader_2d_transform(&d->core->shader_2d, (vec2){ 0.5 * ar, 0.5 }, (vec2){ 0.025, 0.025 }, 0);
     pg_shader_2d_color_mod(&d->core->shader_2d, (vec4){ 1, 1, 1, 0.5 }, (vec4){});
     pg_model_draw(&d->core->quad_2d_ctr, NULL);
+    /*  Health bar  */
+    /*  Transparent backing */
     pg_model_begin(&d->core->quad_2d, &d->core->shader_2d);
-    pg_shader_2d_color_mod(&d->core->shader_2d, (vec4){ 1, 1, 1, 1 }, (vec4){});
     pg_shader_2d_tex_frame(&d->core->shader_2d, 232);
+    pg_shader_2d_add_tex_tx(&d->core->shader_2d, (vec2){ 3, 2 }, (vec2){ 0, 0 });
+    pg_shader_2d_transform(&d->core->shader_2d, (vec2){ 0.05, 0.75 }, (vec2){ 0.3, 0.2 }, 0);
+    pg_shader_2d_color_mod(&d->core->shader_2d, (vec4){ 1, 1, 1, 0.1 }, (vec4){});
+    pg_model_draw(&d->core->quad_2d, NULL);
+    /*  Actual health bar   */
     float hp_frac = (float)d->plr.HP / 100.0f;
     float hp_offset = (1 - hp_frac) * (24.0f / 256.0f);
+    pg_shader_2d_tex_frame(&d->core->shader_2d, 232);
     pg_shader_2d_add_tex_tx(&d->core->shader_2d, (vec2){ hp_frac * 3, 2 }, (vec2){ hp_offset, 0 });
     pg_shader_2d_transform(&d->core->shader_2d,
                            (vec2){ 0.05 + 0.15 * (1 - hp_frac), 0.75 },
@@ -1236,8 +1599,9 @@ static void draw_hud_overlay(struct bork_play_data* d)
     if(hp_frac < 0.5) {
         float red_frac = (hp_frac / 0.5);
         pg_shader_2d_color_mod(&d->core->shader_2d, (vec4){ 1, red_frac, red_frac, 1 }, (vec4){});
-    }
+    } else pg_shader_2d_color_mod(&d->core->shader_2d, (vec4){ 1, 1, 1, 1 }, (vec4){});
     pg_model_draw(&d->core->quad_2d, NULL);
+    /*  Vignette effects    */
     if(d->teleport_ticks > 0) {
         pg_shader_2d_transform(&d->core->shader_2d, (vec2){}, (vec2){ ar, 1 }, 0);
         pg_shader_2d_texture(&d->core->shader_2d, &d->core->radial_vignette);
@@ -1245,6 +1609,7 @@ static void draw_hud_overlay(struct bork_play_data* d)
         pg_shader_2d_color_mod(&d->core->shader_2d, (vec4){ 0, 0.5, 0, hurt_alpha }, (vec4){});
         pg_model_draw(&d->core->quad_2d, NULL);
     } else if(d->plr.pain_ticks > 0) {
+        d->plr.pain_ticks = MIN(d->plr.pain_ticks, 240);
         pg_shader_2d_transform(&d->core->shader_2d, (vec2){}, (vec2){ ar, 1 }, 0);
         pg_shader_2d_texture(&d->core->shader_2d, &d->core->radial_vignette);
         float hurt_alpha = (float)d->plr.pain_ticks / 120 * 0.5;
@@ -1272,24 +1637,36 @@ static void draw_datapad(struct bork_play_data* d)
     pg_shader_2d_tex_frame(shader, 236);
     pg_shader_2d_add_tex_tx(shader, (vec2){ 4, 1.5 }, (vec2){});
     pg_shader_2d_transform(shader, (vec2){ ar * 0.5, 0.75 }, (vec2){ 0.25, 0.1 }, 0);
+    pg_shader_2d_color_mod(shader, (vec4){ 1, 1, 1, 0.4 }, (vec4){});
     pg_model_draw(&d->core->quad_2d_ctr, NULL);
     shader = &d->core->shader_text;
     pg_shader_begin(shader, NULL);
     pg_shader_text_resolution(shader, (vec2){ ar, 1 });
     pg_shader_text_transform(shader, (vec2){ 1, 1 }, (vec2){});
-    struct pg_shader_text text = { .use_blocks = 2 };
-    int len = snprintf(text.block[0], 64, "%s", dp->title);
+    int scan_level = get_upgrade_level(d, BORK_UPGRADE_SCANNING);
+    int translate = 0;
+    if(dp->lines_translated && scan_level == 1) translate = 1;
+    struct pg_shader_text text = { .use_blocks = 1 };
+    int len = snprintf(text.block[0], 64, "%s", translate ? dp->title_translated : dp->title);
     vec4_set(text.block_style[0], ar * 0.5 - (len * 0.025 * 1.125 * 0.5), 0.95, 0.025, 1.125);
     vec4_set(text.block_color[0], 1, 1, 1, 1);
-    len = snprintf(text.block[1], 64, "%s", dp->text[d->hud_datapad_line]);
-    vec4_set(text.block_style[1], ar * 0.5 - (len * 0.025 * 1.125 * 0.5), 0.6, 0.025, 1.125);
-    vec4_set(text.block_color[1], 1, 1, 1, 1);
-    if(d->hud_datapad_line < dp->lines - 1) {
-        text.use_blocks = 3;
-        len = snprintf(text.block[2], 64, "%s", dp->text[d->hud_datapad_line + 1]);
-        vec4_set(text.block_style[2], ar * 0.5 - (len * 0.025 * 1.125 * 0.5), 0.63, 0.025, 1.125);
-        vec4_set(text.block_color[2], 1, 1, 1, 1);
+    float text_size = 0.015 * ar;
+    float line_y = (float)d->hud_datapad_ticks / 190.0f;
+    int lines = translate ? dp->lines_translated : dp->lines;
+    int first_line = floor(line_y);
+    int i, line;
+    for(i = 0, line = first_line; i < 4 && line < lines; ++i, ++line) {
+        if(line >= lines) break;
+        if(line < 0) continue;
+        len = snprintf(text.block[i + 1], 64, "%s",
+                       translate ? dp->text_translated[line] : dp->text[line]);
+        float dist_from_ctr = (float)line * 190.0f - d->hud_datapad_ticks - 190.0f;
+        dist_from_ctr /= 380.0f;
+        vec4_set(text.block_style[i + 1], ar * 0.5 - (len * text_size * 1.125 * 0.5),
+                                      0.7 + dist_from_ctr * 0.08, text_size, 1.125);
+        vec4_set(text.block_color[i + 1], 1, 1, 1, 1 - fabs(dist_from_ctr));
     }
+    text.use_blocks = i + 2;
     pg_shader_text_write(shader, &text);
 }
 
@@ -1300,9 +1677,12 @@ static void draw_weapon(struct bork_play_data* d, float hud_anim_lerp,
     struct pg_model* model = &d->core->gun_model;
     struct bork_entity* held_item;
     const struct bork_entity_profile* prof;
-    if(d->held_item < 0
-    || !(held_item = bork_entity_get(d->inventory.data[d->held_item])))
-        return;
+    if(d->held_item < 0) return;
+    if(d->switch_ticks >= 30) {
+        if(d->switch_start_idx == -1) return;
+        held_item = bork_entity_get(d->inventory.data[d->switch_start_idx]);
+    } else held_item = bork_entity_get(d->inventory.data[d->held_item]);
+    if(!held_item) return;
     prof = &BORK_ENT_PROFILES[held_item->type];
     pg_shader_3d_texture(shader, &d->core->item_tex);
     pg_shader_3d_tex_frame(shader, prof->front_frame);
@@ -1323,6 +1703,15 @@ static void draw_weapon(struct bork_play_data* d, float hud_anim_lerp,
             t = (float)down_time / 30;
         } else if(d->reload_ticks < 31) {
             t = (float)d->reload_ticks / 30;
+        }
+        mat4_translate_in_place(offset, 0, 0, -t);
+    } else if(d->switch_ticks) {
+        int down_time = 60 - d->switch_ticks;
+        float t = 1;
+        if(down_time < 31) {
+            t = (float)down_time / 30;
+        } else if(d->switch_ticks < 31) {
+            t = (float)d->switch_ticks / 30;
         }
         mat4_translate_in_place(offset, 0, 0, -t);
     } else {
@@ -1399,7 +1788,8 @@ static void draw_enemies(struct bork_play_data* d, float lerp)
             float angle_f = angle / (M_PI * 2) - dir_adjust;
             angle_f = 1.0f - FMOD(angle_f, 1.0f);
             int frame = (int)(angle_f * (float)prof->dir_frames);
-            if(ent->type == BORK_ENEMY_GREAT_BANE) frame *= 2;
+            if(ent->type == BORK_ENEMY_GREAT_BANE
+            || ent->type == BORK_ENEMY_LAIKA) frame *= 2;
             frame += prof->front_frame;
             if(frame != current_frame) {
                 pg_shader_sprite_tex_frame(shader, frame);
@@ -1460,7 +1850,11 @@ static void draw_entities(struct bork_play_data* d, float lerp)
             mat4 transform;
             mat4_translate(transform, pos_lerp[0], pos_lerp[1], pos_lerp[2] + 0.05);
             pg_model_draw(model, transform);
-            if(ent->type == BORK_ENTITY_BARREL) {
+            if(ent->type == BORK_ENTITY_DESKLAMP) {
+                struct pg_light new_light = {};
+                pg_light_pointlight(&new_light, pos_lerp, 2, (vec3){ 0.9, 0.5, 0.5 });
+                ARR_PUSH(d->lights_buf, new_light);
+            } else if(ent->type == BORK_ENTITY_BARREL) {
                 struct pg_light new_light = {};
                 pg_light_pointlight(&new_light,
                     (vec3){ pos_lerp[0], pos_lerp[1], pos_lerp[2] + 0.75 }, 1.5,
@@ -1502,16 +1896,12 @@ static void draw_items(struct bork_play_data* d, float lerp)
             }
             vec3 pos_lerp;
             vec3_scale(pos_lerp, ent->vel, lerp);
-            vec3_add(pos_lerp, pos_lerp, ent->pos);
+            vec3_add(pos_lerp, (vec3){}, ent->pos);
             mat4 transform;
             mat4_translate(transform, pos_lerp[0], pos_lerp[1], pos_lerp[2] + 0.05);
-            if(ent->type == BORK_ITEM_DESKLAMP) {
-                struct pg_light new_light = {};
-                pg_light_pointlight(&new_light, pos_lerp, 2, (vec3){ 0.9, 0.5, 0.5 });
-                ARR_PUSH(d->lights_buf, new_light);
-            }
-            if(ent_id == d->looked_item) {
-                pg_shader_sprite_color_mod(shader, (vec4){ 1.5f, 1.8f, 1.5f, 1.0f });
+            if(ent_id == d->looked_item
+            && vec3_dist2(ent->pos, d->plr.pos) < (2.5 * 2.5)) {
+                pg_shader_sprite_color_mod(shader, (vec4){ 2.0f, 2.0f, 2.0f, 1.0f });
                 pg_model_draw(model, transform);
                 pg_shader_sprite_color_mod(shader, (vec4){ 1.0f, 1.0f, 1.0f, 1.0f });
             } else pg_model_draw(model, transform);
@@ -1557,12 +1947,18 @@ static void draw_map_lights(struct bork_play_data* d)
 {
     int i;
     struct pg_light* light;
+    vec3 plr_pos;
+    vec3_mul(plr_pos, d->plr.pos, (vec3){ 1, 1, 2 });
     ARR_FOREACH_PTR(d->map.lights, light, i) {
-        if(vec3_dist2(light->pos, d->plr.pos) > (32 * 32)) continue;
+        vec3 light_pos;
+        vec3_mul(light_pos, light->pos, (vec3){ 1, 1, 2 });
+        if(vec3_dist2(light_pos, plr_pos) > (48 * 48)) continue;
         ARR_PUSH(d->lights_buf, *light);
     }
     ARR_FOREACH_PTR(d->map.spotlights, light, i) {
-        if(vec3_dist2(light->pos, d->plr.pos) > (32 * 32)) continue;
+        vec3 light_pos;
+        vec3_mul(light_pos, light->pos, (vec3){ 1, 1, 2 });
+        if(vec3_dist2(light_pos, plr_pos) > (48 * 48)) continue;
         ARR_PUSH(d->spotlights, *light);
     }
 }
@@ -1570,7 +1966,7 @@ static void draw_map_lights(struct bork_play_data* d)
 static void draw_fires(struct bork_play_data* d)
 {
     struct pg_light light;
-    pg_light_pointlight(&light, (vec3){}, 2.5, (vec3){ 2.0, 1.5, 0 });
+    pg_light_pointlight(&light, (vec3){}, 2.5, (vec3){ 1.0, 0.75, 0 });
     struct bork_fire* fire;
     int i;
     ARR_FOREACH_PTR(d->map.fires, fire, i) {
@@ -1608,8 +2004,13 @@ static void draw_particles(struct bork_play_data* d)
         }
         if(part->flags & BORK_PARTICLE_LIGHT) {
             struct pg_light light;
-            pg_light_pointlight(&light, part->pos,
-                (float)part->ticks_left / (float)part->lifetime * part->light[3], part->light);
+            float light_size = part->light[3];
+            if(part->flags & BORK_PARTICLE_LIGHT_DECAY) {
+                light_size *= (float)part->ticks_left / (float)part->lifetime;
+            } else if(part->flags & BORK_PARTICLE_LIGHT_EXPAND) {
+                light_size *= 1 - (float)part->ticks_left / (float)part->lifetime;
+            }
+            pg_light_pointlight(&light, part->pos, light_size, part->light);
             ARR_PUSH(d->lights_buf, light);
         }
     }
@@ -1622,19 +2023,23 @@ static void draw_gameover(struct bork_play_data* d, float t)
     if(!pg_shader_is_active(shader)) pg_shader_begin(shader, NULL);
     pg_shader_text_resolution(shader, (vec2){d->core->aspect_ratio, 1});
     pg_shader_text_transform(shader, (vec2){ 1, 1 }, (vec2){});
-    struct pg_shader_text text = { .use_blocks = 3,
-        .block = { "YOU DIED", "PRESS ENTER TO RETURN", "TO THE MAIN MENU" },
+    struct pg_shader_text text = { .use_blocks = 4,
+        .block = { "YOU GOT", "PUT DOWN", "RETURN TO MAIN MENU", "LOAD LAST SAVE GAME" },
         .block_style = {
-            { ctr - (8 * 0.075 * 1.25 * 0.5), 0.35, 0.075, 1.25 },
-            { ctr - (strnlen(text.block[1], 64) * 0.04 * 1.25 * 0.5), 0.55, 0.04, 1.25 },
-            { ctr - (strnlen(text.block[2], 64) * 0.04 * 1.25 * 0.5), 0.6, 0.04, 1.25 } },
-        .block_color = { { 1, 1, 1, 1 }, { 1, 1, 1, 1 }, { 1, 1, 1, 1 } } };
+            { ctr - (7 * 0.05 * 1.25 * 0.5), 0.35, 0.05, 1.25 },
+            { ctr - (8 * 0.075 * 1.25 * 0.5), 0.41, 0.075, 1.25 },
+            { ctr - (strlen(text.block[2]) * 0.04 * 1.25 * 0.5), 0.575, 0.04, 1.25 },
+            { ctr - (strlen(text.block[3]) * 0.04 * 1.25 * 0.5), 0.675, 0.04, 1.25 } },
+        .block_color = { { 1, 1, 1, 1 }, { 1, 1, 1, 1 },
+                         { 1, 1, 1, d->menu.gameover.opt_idx == 0 ? 1 : 0.5f },
+                         { 1, 1, 1, d->menu.gameover.opt_idx == 1 ? 1 : 0.5f } } };
+    if(d->core->save_files.len) {
+        int len = snprintf(text.block[4], 32, "%s", d->core->save_files.data[0].name);
+        vec4_set(text.block_style[4], ctr - (len * 0.04 * 1.25 * 0.5), 0.725, 0.04, 1.25);
+        vec4_set(text.block_color[4], 1, 1, 1, d->menu.gameover.opt_idx == 1 ? 1 : 0.5);
+        text.use_blocks = 5;
+    }
     pg_shader_text_write(shader, &text);
-}
-
-static size_t write_entity(FILE* f, struct bork_entity* ent)
-{
-    return fwrite(ent, sizeof(struct bork_entity), 1, f);
 }
 
 static size_t write_ent_arr(FILE* f, bork_entity_arr_t* arr)
@@ -1651,7 +2056,6 @@ static size_t read_ent_arr(FILE* f, bork_entity_arr_t* arr)
     uint32_t len;
     size_t r = 0;
     r += sizeof(uint32_t) * fread(&len, sizeof(len), 1, f);
-    printf("Reading ent array, length: %u\n", len);
     ARR_RESERVE_CLEAR(*arr, len);
     r += sizeof(bork_entity_t) * fread(arr->data, sizeof(bork_entity_t), len, f);
     arr->len = len;
@@ -1716,10 +2120,11 @@ void save_game(struct bork_play_data* d, char* name)
     r += sizeof(struct bork_entity) * fwrite(&d->plr, sizeof(struct bork_entity), 1, f);
     r += sizeof(int) * fwrite(&d->flashlight_on, sizeof(int), 1, f);
     r += sizeof(int) * fwrite(d->held_datapads, sizeof(int), NUM_DATAPADS, f);
+    r += sizeof(int) * fwrite(&d->num_held_datapads, sizeof(int), 1, f);
     r += sizeof(uint32_t) * fwrite(&d->held_schematics, sizeof(uint32_t), 1, f);
-    r += sizeof(enum bork_upgrade) * fwrite(d->upgrades, sizeof(enum bork_upgrade), 3, f);
-    r += sizeof(int) * fwrite(d->upgrade_level, sizeof(int), 3, f);
-    r += sizeof(int) * fwrite(d->upgrade_counters, sizeof(int), 3, f);
+    r += sizeof(enum bork_upgrade) * fwrite(d->upgrades, sizeof(enum bork_upgrade), 4, f);
+    r += sizeof(int) * fwrite(d->upgrade_level, sizeof(int), 4, f);
+    r += sizeof(int) * fwrite(d->upgrade_counters, sizeof(int), 4, f);
     r += sizeof(int) * fwrite(&d->upgrade_use_level, sizeof(int), 1, f);
     r += sizeof(int) * fwrite(&d->upgrade_selected, sizeof(int), 1, f);
     r += sizeof(int) * fwrite(&d->decoy_active, sizeof(int), 1, f);
@@ -1732,6 +2137,7 @@ void save_game(struct bork_play_data* d, char* name)
     r += write_ent_arr(f, &d->inventory);
     r += write_ent_arr(f, &d->held_upgrades);
     /*  World data  */
+    r += fwrite(&d->killed_laika, sizeof(int), 1, f);
     r += fwrite(&d->play_ticks, sizeof(int), 1, f);
     r += fwrite(&d->ticks, sizeof(int), 1, f);
     r += bork_entpool_write_to_file(f);
@@ -1788,12 +2194,13 @@ void save_game(struct bork_play_data* d, char* name)
     len = d->map.grates.len;
     r += sizeof(uint32_t) * fwrite(&len, sizeof(uint32_t), 1, f);
     r += sizeof(struct bork_map_object) * fwrite(d->map.grates.data, sizeof(struct bork_map_object), len, f);
-    printf("Saved game: wrote %zu B\n", r);
     fclose(f);
+    bork_read_saves(d->core);
 }
 
 void load_game(struct bork_play_data* d, char* name)
 {
+    bork_play_reset(d);
     char filename[1024];
     snprintf(filename, 1024, "%ssaves/%s", d->core->base_path, name);
     FILE* f = fopen(filename, "rb");
@@ -1801,6 +2208,8 @@ void load_game(struct bork_play_data* d, char* name)
         printf("Could not open save file %s\n", filename);
         return;
     }
+    pg_mouse_mode(1);
+    d->menu.state = BORK_MENU_CLOSED;
     bork_map_reset(&d->map);
     ARR_TRUNCATE_CLEAR(d->bullets, 0);
     ARR_TRUNCATE_CLEAR(d->particles, 0);
@@ -1809,10 +2218,11 @@ void load_game(struct bork_play_data* d, char* name)
     r += sizeof(struct bork_entity) * fread(&d->plr, sizeof(struct bork_entity), 1, f);
     r += sizeof(int) * fread(&d->flashlight_on, sizeof(int), 1, f);
     r += sizeof(int) * fread(d->held_datapads, sizeof(int), NUM_DATAPADS, f);
+    r += sizeof(int) * fread(&d->num_held_datapads, sizeof(int), 1, f);
     r += sizeof(uint32_t) * fread(&d->held_schematics, sizeof(uint32_t), 1, f);
-    r += sizeof(enum bork_upgrade) * fread(d->upgrades, sizeof(enum bork_upgrade), 3, f);
-    r += sizeof(int) * fread(d->upgrade_level, sizeof(int), 3, f);
-    r += sizeof(int) * fread(d->upgrade_counters, sizeof(int), 3, f);
+    r += sizeof(enum bork_upgrade) * fread(d->upgrades, sizeof(enum bork_upgrade), 4, f);
+    r += sizeof(int) * fread(d->upgrade_level, sizeof(int), 4, f);
+    r += sizeof(int) * fread(d->upgrade_counters, sizeof(int), 4, f);
     r += sizeof(int) * fread(&d->upgrade_use_level, sizeof(int), 1, f);
     r += sizeof(int) * fread(&d->upgrade_selected, sizeof(int), 1, f);
     r += sizeof(int) * fread(&d->decoy_active, sizeof(int), 1, f);
@@ -1825,7 +2235,7 @@ void load_game(struct bork_play_data* d, char* name)
     r += read_ent_arr(f, &d->inventory);
     r += read_ent_arr(f, &d->held_upgrades);
     /*  World data  */
-    int tick;
+    r += fread(&d->killed_laika, sizeof(int), 1, f);
     r += fread(&d->play_ticks, sizeof(int), 1, f);
     r += fread(&d->ticks, sizeof(int), 1, f);
     r += bork_entpool_read_from_file(f);
@@ -1874,8 +2284,17 @@ void load_game(struct bork_play_data* d, char* name)
     ARR_RESERVE_CLEAR(d->map.grates, len);
     r += sizeof(struct bork_map_object) * fread(d->map.grates.data, sizeof(struct bork_map_object), len, f);
     d->map.grates.len = len;
-    printf("Loaded game: read %zu B\n", r);
     d->map.plr = &d->plr;
     fclose(f);
     bork_play_reset_hud_anim(d);
+    int plr_x = floor(d->plr.pos[0] / 2);
+    int plr_y = floor(d->plr.pos[1] / 2);
+    int plr_z = floor(d->plr.pos[2] / 2);
+    d->plr_map_pos[0] = plr_x;
+    d->plr_map_pos[1] = plr_y;
+    d->plr_map_pos[2] = plr_z;
+    if(!d->decoy_active) bork_map_build_plr_dist(&d->map, d->plr.pos);
+    pg_audio_channel_pause(1, 0);
+    pg_audio_channel_pause(2, 0);
+    pg_reset_input();
 }

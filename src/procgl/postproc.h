@@ -28,8 +28,15 @@ void pg_ppbuffer_swapdst(struct pg_ppbuffer* buf);
 void pg_postproc_load(struct pg_postproc* pp,
                       const char* vert_filename, const char* frag_filename,
                       const char* color_name, const char* size_name);
+void pg_postproc_load_static(struct pg_postproc* pp,
+                      const char* vert, int vert_len,
+                      const char* frag, int frag_len,
+                      const char* color_name, const char* size_name);
 void pg_postproc_deinit(struct pg_postproc* pp);
 void pg_postproc_apply(struct pg_postproc* pp, struct pg_ppbuffer* src);
 
 /*  The basic no-post-process post-process  */
 void pg_postproc_screen(struct pg_postproc* pp);
+
+void pg_postproc_gamma(struct pg_postproc* pp);
+void pg_postproc_gamma_set(struct pg_postproc* pp, float gamma);

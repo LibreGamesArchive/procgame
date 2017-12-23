@@ -21,12 +21,13 @@ enum bork_menu_option {
     BORK_MENU_OPTIONS,
     BORK_MENU_CREDITS,
     BORK_MENU_EXIT,
+    BORK_MENU_COUNT,
     BORK_MENU_EDITOR,
-    BORK_MENU_COUNT
 };
 
 struct bork_menu_data {
     struct bork_game_core* core;
+    int music_audio_handle;
     const uint8_t* kb_state;
     vec2 mouse_motion;
     int current_selection;
@@ -60,6 +61,8 @@ void bork_menu_start(struct pg_game_state* state, struct bork_game_core* core)
     d->opt_fullscreen = core->fullscreen;
     d->opt_res[0] = core->screen_size[0];
     d->opt_res[1] = core->screen_size[1];
+    d->music_audio_handle = pg_audio_emitter(&d->core->sounds[BORK_MUS_MAINMENU], 0.5, 1, (vec3){}, 3);
+    pg_audio_channel_pause(3, 0);
     state->data = d;
     state->update = NULL;
     state->tick = bork_menu_tick;
@@ -67,24 +70,11 @@ void bork_menu_start(struct pg_game_state* state, struct bork_game_core* core)
     state->deinit = free;
 }
 
-/*
-static const resolutions_4_3[11][2] = {
-    { 640, 480 }, { 800, 600 }, { 960, 720 }, { 1024, 768 }, { 1280, 960 },
-    { 1400, 1050 }, { 1440, 1080 }, { 1600, 1200 }, { 1856, 1392 },
-    { 1920, 1440 }, { 2048, 1536 } };
-
-static const resolutions_16_9[8][2] = {
-    { 960, 540 }, { 1024, 576 }, { 1280, 720 }, { 1600, 900 },
-    { 1920, 1080 }, { 2560, 1440 }, { 3200, 1800 }, { 3840, 2160 } };
-
-static const resolutions_16_10[7][2] = {
-    { 960, 600 }, { 1024, 640 }, { 1280, 800 }, { 1440, 900 }, { 1680, 1050 },
-    { 1920, 1200 }, { 2560, 1600 } };*/
-
 static void bork_menu_tick(struct pg_game_state* state)
 {
     struct bork_menu_data* d = state->data;
     uint8_t* kmap = d->core->ctrl_map;
+    int8_t* gmap = d->core->gpad_map;
     pg_poll_input();
     if(pg_user_exit()) state->running = 0;
     float ar = d->core->aspect_ratio;
@@ -106,11 +96,11 @@ static void bork_menu_tick(struct pg_game_state* state)
     }
     if(d->mode == BORK_MENU_BASE) {
         int i;
-        for(i = 0; i < 6; ++i) {
+        for(i = 0; i < BORK_MENU_COUNT; ++i) {
             if(mouse_pos[0] > ar * 0.55 && mouse_pos[0] < ar * 0.55 + 0.5
-            && mouse_pos[1] > i * 0.1 + 0.205 && mouse_pos[1] < i * 0.1 + 0.285) {
+            && mouse_pos[1] > i * 0.1 + 0.275 && mouse_pos[1] < i * 0.1 + 0.375) {
                 if(mouse_motion[0] != 0 || mouse_motion[1] != 0) {
-                    if(i != d->current_selection) pg_audio_play(&d->core->menu_sound, 0.2);
+                    if(i != d->current_selection) pg_audio_play(&d->core->menu_sound, 0.5);
                     d->current_selection = i;
                 }
                 if(click) {
@@ -123,18 +113,19 @@ static void bork_menu_tick(struct pg_game_state* state)
         || pg_check_input(SDL_SCANCODE_DOWN, PG_CONTROL_HIT)
         || stick_ctrl_y == 1) {
             d->current_selection = MOD(d->current_selection + 1, BORK_MENU_COUNT);
-            pg_audio_play(&d->core->menu_sound, 0.2);
+            pg_audio_play(&d->core->menu_sound, 0.5);
         }
         if(pg_check_input(kmap[BORK_CTRL_UP], PG_CONTROL_HIT)
         || pg_check_input(SDL_SCANCODE_UP, PG_CONTROL_HIT)
         || stick_ctrl_y == -1) {
             d->current_selection = MOD(d->current_selection - 1, BORK_MENU_COUNT);
-            pg_audio_play(&d->core->menu_sound, 0.2);
+            pg_audio_play(&d->core->menu_sound, 0.5);
         }
         if(clicked_item || pg_check_input(kmap[BORK_CTRL_SELECT], PG_CONTROL_HIT)
         || pg_check_input(SDL_SCANCODE_RETURN, PG_CONTROL_HIT)
-        || pg_check_gamepad(SDL_CONTROLLER_BUTTON_A, PG_CONTROL_HIT)) {
+        || pg_check_gamepad(gmap[BORK_CTRL_SELECT], PG_CONTROL_HIT)) {
             if(d->current_selection == BORK_MENU_NEW_GAME) {
+                pg_audio_emitter_remove(d->music_audio_handle);
                 bork_play_start(state, d->core);
             } else if(d->current_selection == BORK_MENU_CONTINUE) {
                 d->mode = BORK_MENU_SELECT_SAVE;
@@ -149,13 +140,14 @@ static void bork_menu_tick(struct pg_game_state* state)
             } else if(d->current_selection == BORK_MENU_EXIT) {
                 state->running = 0;
             } else if(d->current_selection == BORK_MENU_EDITOR) {
+                pg_audio_emitter_remove(d->music_audio_handle);
                 bork_editor_start(state, d->core);
             }
         }
     } else if(d->mode == BORK_MENU_SHOW_CREDITS) {
         if(pg_check_input(kmap[BORK_CTRL_MENU_BACK], PG_CONTROL_HIT)
         || pg_check_input(SDL_SCANCODE_ESCAPE, PG_CONTROL_HIT)
-        || pg_check_gamepad(SDL_CONTROLLER_BUTTON_B, PG_CONTROL_HIT)) {
+        || pg_check_gamepad(gmap[BORK_CTRL_MENU_BACK], PG_CONTROL_HIT)) {
             d->mode = BORK_MENU_BASE;
         } else if(click && fabs(mouse_pos[0] - ar * 0.655) < 0.2
                && fabs(mouse_pos[1] - 0.87) < 0.3) {
@@ -163,16 +155,16 @@ static void bork_menu_tick(struct pg_game_state* state)
         }
     } else if(d->mode == BORK_MENU_SELECT_SAVE) {
         int i;
-        int num_saves = MIN(d->core->save_files.len + 1, 6);
+        int num_saves = MIN(d->core->save_files.len, 6);
         for(i = 0; i < num_saves; ++i) {
             if(click && mouse_pos[0] > ar * 0.55 && mouse_pos[0] < ar
             && mouse_pos[1] > (0.23 + 0.1 * i) && mouse_pos[1] < (0.3 + 0.1 * i)) {
-                if(d->save_idx != d->save_scroll + i) pg_audio_play(&d->core->menu_sound, 0.2);
+                if(d->save_idx != d->save_scroll + i) pg_audio_play(&d->core->menu_sound, 0.5);
                 d->save_idx = d->save_scroll + i;
                 d->save_side = 1;
             }
         }
-        if(fabs(mouse_pos[0] - ar * 0.35) < 0.2
+        if(fabs(mouse_pos[0] - ar * 0.275) < 0.2
         && fabs(mouse_pos[1] - 0.72) < 0.04) {
             d->save_action_idx = 0;
             d->save_side = 0;
@@ -182,13 +174,15 @@ static void bork_menu_tick(struct pg_game_state* state)
                 d->save_idx = 0;
             }
         }
-        if(fabs(mouse_pos[0] - ar * 0.35) < 0.2
+        if(fabs(mouse_pos[0] - ar * 0.275) < 0.2
         && fabs(mouse_pos[1] - 0.8) < 0.04) {
             d->save_action_idx = 1;
             d->save_side = 0;
         }
-        if(click && fabs(mouse_pos[0] - ar * 0.655) < 0.2
-        && fabs(mouse_pos[1] - 0.9) < 0.04) {
+        if(click && num_saves
+        && fabs(mouse_pos[0] - ar * 0.655) < 0.2
+        && fabs(mouse_pos[1] - 0.925) < 0.04) {
+            pg_audio_emitter_remove(d->music_audio_handle);
             bork_play_start(state, d->core);
             struct bork_play_data* play_d = state->data;
             struct bork_save* save = &d->core->save_files.data[d->save_idx];
@@ -216,7 +210,7 @@ static void bork_menu_tick(struct pg_game_state* state)
             } else {
                 d->save_idx = MIN(d->core->save_files.len - 1, d->save_idx + 1);
                 if(d->save_scroll + 5 < d->save_idx) d->save_scroll = d->save_idx - 5;
-                pg_audio_play(&d->core->menu_sound, 0.2);
+                pg_audio_play(&d->core->menu_sound, 0.5);
             }
         } else if(pg_check_input(SDL_SCANCODE_UP, PG_CONTROL_HIT)
         || pg_check_input(kmap[BORK_CTRL_UP], PG_CONTROL_HIT)
@@ -226,21 +220,22 @@ static void bork_menu_tick(struct pg_game_state* state)
             } else {
                 d->save_idx = MAX(0, d->save_idx - 1);
                 if(d->save_scroll > d->save_idx) d->save_scroll = d->save_idx;
-                pg_audio_play(&d->core->menu_sound, 0.2);
+                pg_audio_play(&d->core->menu_sound, 0.5);
             }
         } else if(pg_check_input(kmap[BORK_CTRL_LEFT], PG_CONTROL_HIT)
                || pg_check_input(SDL_SCANCODE_LEFT, PG_CONTROL_HIT)
                || stick_ctrl_x == -1) {
             d->save_side = 0;
-            pg_audio_play(&d->core->menu_sound, 0.2);
+            pg_audio_play(&d->core->menu_sound, 0.5);
         } else if(pg_check_input(kmap[BORK_CTRL_RIGHT], PG_CONTROL_HIT)
                || pg_check_input(SDL_SCANCODE_RIGHT, PG_CONTROL_HIT)
                || stick_ctrl_x == 1) {
             d->save_side = 1;
-            pg_audio_play(&d->core->menu_sound, 0.2);
+            pg_audio_play(&d->core->menu_sound, 0.5);
         } else if(pg_check_input(kmap[BORK_CTRL_SELECT], PG_CONTROL_HIT)
-               || pg_check_gamepad(SDL_CONTROLLER_BUTTON_A, PG_CONTROL_HIT)) {
+               || pg_check_gamepad(gmap[BORK_CTRL_SELECT], PG_CONTROL_HIT)) {
             if(d->save_side == 1) {
+                pg_audio_emitter_remove(d->music_audio_handle);
                 bork_play_start(state, d->core);
                 struct bork_play_data* play_d = state->data;
                 struct bork_save* save = &d->core->save_files.data[d->save_idx];
@@ -261,23 +256,35 @@ static void bork_menu_tick(struct pg_game_state* state)
             d->save_scroll = d->save_scroll + 1;
         } else if(pg_check_input(SDL_SCANCODE_ESCAPE, PG_CONTROL_HIT)
                || pg_check_input(kmap[BORK_CTRL_MENU_BACK], PG_CONTROL_HIT)
-               || pg_check_gamepad(SDL_CONTROLLER_BUTTON_B, PG_CONTROL_HIT)) {
+               || pg_check_gamepad(gmap[BORK_CTRL_MENU_BACK], PG_CONTROL_HIT)) {
             d->mode = BORK_MENU_BASE;
             d->save_scroll = 0;
             d->save_idx = 0;
         }
+    /*  THE OPTIONS MENU    */
     } else if(d->mode == BORK_MENU_SHOW_OPTIONS) {
         if(d->remap_ctrl) {
-            uint8_t ctrl = pg_first_input();
-            if(ctrl) {
-                d->core->ctrl_map[d->opt_idx - 5] = ctrl;
-                d->remap_ctrl = 0;
+            if(d->core->gpad_idx >= 0) {
+                if(pg_check_input(kmap[BORK_CTRL_MENU_BACK], PG_CONTROL_HIT))
+                    d->remap_ctrl = 0;
+                uint8_t ctrl = pg_first_gamepad();
+                if(ctrl) {
+                    d->core->gpad_map[d->opt_idx - BORK_OPTS] = ctrl;
+                    d->remap_ctrl = 0;
+                }
+            } else {
+                uint8_t ctrl = pg_first_input();
+                if(ctrl) {
+                    d->core->ctrl_map[d->opt_idx - BORK_OPTS] = ctrl;
+                    d->remap_ctrl = 0;
+                }
             }
         } else if(d->opt_res_typing) {
             if(pg_check_input(SDL_SCANCODE_ESCAPE, PG_CONTROL_HIT)) {
                 d->opt_res_typing = 0;
                 pg_text_mode(0);
-            } else if(pg_check_input(SDL_SCANCODE_RETURN, PG_CONTROL_HIT)) {
+            } else if(pg_check_input(SDL_SCANCODE_RETURN, PG_CONTROL_HIT)
+                   || pg_check_input(SDL_SCANCODE_KP_ENTER, PG_CONTROL_HIT)) {
                 int res_opt = d->opt_idx - 1;
                 int input = (res_opt == 0) ? MAX(atoi(d->opt_res_input), 160)
                                          : MAX(atoi(d->opt_res_input), 90);
@@ -290,12 +297,12 @@ static void bork_menu_tick(struct pg_game_state* state)
                 d->opt_res_input[--d->opt_res_input_idx] = '\0';
             } else {
                 int len = pg_copy_text_input(d->opt_res_input + d->opt_res_input_idx,
-                                             6 - d->opt_res_input_idx);
+                                             5 - d->opt_res_input_idx);
                 d->opt_res_input_idx += len;
             }
         } else if(pg_check_input(SDL_SCANCODE_ESCAPE, PG_CONTROL_HIT)
                || pg_check_input(kmap[BORK_CTRL_MENU_BACK], PG_CONTROL_HIT)
-               || pg_check_gamepad(SDL_CONTROLLER_BUTTON_B, PG_CONTROL_HIT)) {
+               || pg_check_gamepad(gmap[BORK_CTRL_MENU_BACK], PG_CONTROL_HIT)) {
             d->mode = BORK_MENU_BASE;
             d->opt_idx = 0;
             d->opt_scroll = 0;
@@ -318,6 +325,7 @@ static void bork_menu_tick(struct pg_game_state* state)
                 }
                 bork_save_options(d->core);
             } else {
+                /*  Clicking on options */
                 int i;
                 for(i = 0; i < 10; ++i) {
                     if(fabs(mouse_pos[0] - (ar * 0.1 + 0.0125 + 0.25)) < 0.25
@@ -327,79 +335,181 @@ static void bork_menu_tick(struct pg_game_state* state)
                            && fabs(mouse_pos[1] - (0.25 + i * 0.06 + 0.0125)) < 0.025) {
                         int opt = d->opt_scroll + i;
                         d->opt_idx = opt;
-                        if(opt == 0) d->opt_fullscreen = 1 - d->opt_fullscreen;
-                        else if(opt == 1 || opt == 2) {
-                            d->opt_res_typing = 1;
-                            d->opt_res_input_idx = 0;
-                            pg_text_mode(1);
-                        } else if(opt == 3) {
-                            d->core->show_fps = 1 - d->core->show_fps;
-                        } else if(opt == 4) {
-                            if(fabs(mouse_pos[0] - (ar * 0.65 + 0.0125)) < 0.03) {
-                                d->core->mouse_sensitivity =
-                                    MAX(0.0001, d->core->mouse_sensitivity - 0.0001);
-                            } else if(fabs(mouse_pos[0] - (ar * 0.65 + 0.2)) < 0.03) {
-                                d->core->mouse_sensitivity =
-                                    MIN(5.0f / 1000, d->core->mouse_sensitivity + 0.0001);
+                        if(opt == BORK_CTRL_COUNT + BORK_OPTS) {
+                            if(d->core->gpad_idx >= 0) {
+                                bork_reset_gamepad_map(d->core);
+                                d->core->joy_sensitivity = 1.0f;
+                            } else {
+                                bork_reset_keymap(d->core);
+                                d->core->mouse_sensitivity = 1.0f / 1000;
                             }
-                        } else if(opt == BORK_CTRL_COUNT + 4) {
-                            bork_reset_keymap(d->core);
-                            d->core->mouse_sensitivity = 1.0f / 1000;
-                        } else if(opt > 3) {
+                        } else if(opt >= BORK_OPTS) {
                             d->remap_ctrl = 1;
+                        } else {
+                            int hit = 0;
+                            switch(opt) {
+                            case BORK_OPT_FULLSCREEN:
+                                d->opt_fullscreen = 1 - d->opt_fullscreen;
+                                break;
+                            case BORK_OPT_RES_X: case BORK_OPT_RES_Y:
+                                d->opt_res_typing = 1;
+                                d->opt_res_input_idx = 0;
+                                pg_text_mode(1);
+                                hit = 1;
+                                break;
+                            case BORK_OPT_SHOW_FPS:
+                                d->core->show_fps = 1 - d->core->show_fps;
+                                hit = 1;
+                                break;
+                            case BORK_OPT_GAMMA:
+                                if(fabs(mouse_pos[0] - (ar * 0.65 + 0.0125)) < 0.035) {
+                                    d->core->gamma = MAX(0.05, d->core->gamma - 0.05);
+                                    hit = 1;
+                                } else if(fabs(mouse_pos[0] - (ar * 0.65 + 0.25)) < 0.035) {
+                                    d->core->gamma = MIN(5.0, d->core->gamma + 0.05);
+                                    hit = 1;
+                                }
+                                bork_set_gamma(d->core, d->core->gamma);
+                                break;
+                            case BORK_OPT_MUSIC_VOL:
+                                if(fabs(mouse_pos[0] - (ar * 0.65 + 0.0125)) < 0.03) {
+                                    d->core->music_volume = MAX(0.0f, d->core->music_volume - 0.05);
+                                    hit = 1;
+                                } else if(fabs(mouse_pos[0] - (ar * 0.65 + 0.25)) < 0.035) {
+                                    d->core->music_volume = MIN(2.0, d->core->music_volume + 0.05);
+                                    hit = 1;
+                                }
+                                bork_set_music_volume(d->core, d->core->music_volume);
+                                break;
+                            case BORK_OPT_SFX_VOL:
+                                if(fabs(mouse_pos[0] - (ar * 0.65 + 0.0125)) < 0.03) {
+                                    d->core->sfx_volume = MAX(0.0f, d->core->sfx_volume - 0.05);
+                                    hit = 1;
+                                } else if(fabs(mouse_pos[0] - (ar * 0.65 + 0.25)) < 0.035) {
+                                    d->core->sfx_volume = MIN(2.0, d->core->sfx_volume + 0.05);
+                                    hit = 1;
+                                }
+                                bork_set_sfx_volume(d->core, d->core->sfx_volume);
+                                break;
+                            case BORK_OPT_INVERT_Y:
+                                d->core->invert_y = 1 - d->core->invert_y;
+                                hit = 1;
+                                break;
+                            case BORK_OPT_MOUSE_SENS:
+                                if(fabs(mouse_pos[0] - (ar * 0.65 + 0.0125)) < 0.03) {
+                                    d->core->mouse_sensitivity =
+                                        MAX(0.0001, d->core->mouse_sensitivity - 0.0001);
+                                    hit = 1;
+                                } else if(fabs(mouse_pos[0] - (ar * 0.65 + 0.2)) < 0.03) {
+                                    d->core->mouse_sensitivity =
+                                        MIN(5.0f / 1000, d->core->mouse_sensitivity + 0.0001);
+                                    hit = 1;
+                                }
+                                break;
+                            case BORK_OPT_GAMEPAD:
+                                if(SDL_NumJoysticks() == 0) d->core->gpad_idx = -1;
+                                else if(d->core->gpad_idx == SDL_NumJoysticks() - 1) d->core->gpad_idx = -1;
+                                else ++d->core->gpad_idx;
+                                pg_use_gamepad(d->core->gpad_idx);
+                                hit = 1;
+                                break;
+                            }
+                            if(hit) pg_audio_play(&d->core->menu_sound, 0.5);
                         }
                     }
                 }
             }
         } else if(pg_check_input(kmap[BORK_CTRL_RIGHT], PG_CONTROL_HIT)
-               || pg_check_input(SDL_SCANCODE_RIGHT, PG_CONTROL_HIT)) {
-            if(d->opt_idx == 0) {
+               || pg_check_input(SDL_SCANCODE_RIGHT, PG_CONTROL_HIT)
+               || stick_ctrl_x == -1) {
+            if(d->opt_idx == BORK_OPT_FULLSCREEN) {
                 d->opt_fullscreen = 1 - d->opt_fullscreen;
-            } else if(d->opt_idx == 3) {
+            } else if(d->opt_idx == BORK_OPT_SHOW_FPS) {
                 d->core->show_fps = 1 - d->core->show_fps;
-            } else if(d->opt_idx == 4) {
+            } else if(d->opt_idx == BORK_OPT_INVERT_Y) {
+                d->core->invert_y = 1 - d->core->invert_y;
+            } else if(d->opt_idx == BORK_OPT_GAMMA) {
+                d->core->gamma = MIN(5.0f, d->core->gamma + 0.05);
+                bork_set_gamma(d->core, d->core->gamma);
+            } else if(d->opt_idx == BORK_OPT_MUSIC_VOL) {
+                d->core->music_volume = MIN(2.0, d->core->music_volume + 0.05);
+                bork_set_music_volume(d->core, d->core->music_volume);
+            } else if(d->opt_idx == BORK_OPT_SFX_VOL) {
+                d->core->sfx_volume = MIN(2.0, d->core->sfx_volume + 0.05);
+                bork_set_sfx_volume(d->core, d->core->sfx_volume);
+            } else if(d->opt_idx == BORK_OPT_MOUSE_SENS) {
                 d->core->mouse_sensitivity = MIN(5.0f / 1000, d->core->mouse_sensitivity + 0.0001);
+            } else if(d->opt_idx == BORK_OPT_GAMEPAD) {
+                int num_gpads = SDL_NumJoysticks();
+                if(num_gpads == 0) d->core->gpad_idx = -1;
+                else if(d->core->gpad_idx < num_gpads) ++d->core->gpad_idx;
+                pg_use_gamepad(d->core->gpad_idx);
             }
         } else if(pg_check_input(kmap[BORK_CTRL_LEFT], PG_CONTROL_HIT)
-               || pg_check_input(SDL_SCANCODE_LEFT, PG_CONTROL_HIT)) {
-            if(d->opt_idx == 0) {
+               || pg_check_input(SDL_SCANCODE_LEFT, PG_CONTROL_HIT)
+               || stick_ctrl_x == 1) {
+            if(d->opt_idx == BORK_OPT_FULLSCREEN) {
                 d->opt_fullscreen = 1 - d->opt_fullscreen;
-            } else if(d->opt_idx == 3) {
+            } else if(d->opt_idx == BORK_OPT_SHOW_FPS) {
                 d->core->show_fps = 1 - d->core->show_fps;
-            } else if(d->opt_idx == 4) {
+            } else if(d->opt_idx == BORK_OPT_INVERT_Y) {
+                d->core->invert_y = 1 - d->core->invert_y;
+            } else if(d->opt_idx == BORK_OPT_GAMMA) {
+                d->core->gamma = MAX(0.05f, d->core->gamma - 0.05);
+                bork_set_gamma(d->core, d->core->gamma);
+            } else if(d->opt_idx == BORK_OPT_MUSIC_VOL) {
+                d->core->music_volume = MAX(0.0f, d->core->music_volume - 0.05);
+                bork_set_music_volume(d->core, d->core->music_volume);
+            } else if(d->opt_idx == BORK_OPT_SFX_VOL) {
+                d->core->sfx_volume = MAX(0.0f, d->core->sfx_volume - 0.05);
+                bork_set_sfx_volume(d->core, d->core->sfx_volume);
+            } else if(d->opt_idx == BORK_OPT_MOUSE_SENS) {
                 d->core->mouse_sensitivity = MAX(0.0001, d->core->mouse_sensitivity - 0.0001);
+            } else if(d->opt_idx == BORK_OPT_GAMEPAD) {
+                if(d->core->gpad_idx > -1) {
+                    --d->core->gpad_idx;
+                    pg_use_gamepad(d->core->gpad_idx);
+                }
             }
-        } else if(pg_check_input(kmap[BORK_CTRL_SELECT], PG_CONTROL_HIT)) {
-            if(d->opt_idx == 1 || d->opt_idx == 2) {
+        } else if(pg_check_input(kmap[BORK_CTRL_SELECT], PG_CONTROL_HIT)
+               || pg_check_gamepad(gmap[BORK_CTRL_SELECT], PG_CONTROL_HIT)) {
+            if(d->opt_idx == BORK_OPT_FULLSCREEN) {
+                d->opt_fullscreen = 1 - d->opt_fullscreen;
+            } else if(d->opt_idx == BORK_OPT_RES_X || d->opt_idx == BORK_OPT_RES_Y) {
                 d->opt_res_typing = 1;
                 pg_text_mode(1);
-            } else if(d->opt_idx == 0) {
-                d->opt_fullscreen = 1 - d->opt_fullscreen;
-            } else if(d->opt_idx == 3) {
+            } else if(d->opt_idx == BORK_OPT_SHOW_FPS) {
                 d->core->show_fps = 1 - d->core->show_fps;
-            } else if(d->opt_idx == BORK_CTRL_COUNT + 5) {
-                bork_reset_keymap(d->core);
-                d->core->mouse_sensitivity = 1.0f / 1000;
-            } else if(d->opt_idx > 4) d->remap_ctrl = 1;
+            } else if(d->opt_idx == BORK_OPT_INVERT_Y) {
+                d->core->invert_y = 1 - d->core->invert_y;
+            } else if(d->opt_idx == BORK_CTRL_COUNT + BORK_OPTS) {
+                if(d->core->gpad_idx >= 0) {
+                    bork_reset_gamepad_map(d->core);
+                    d->core->joy_sensitivity = 1.0f;
+                } else {
+                    bork_reset_keymap(d->core);
+                    d->core->mouse_sensitivity = 1.0f / 1000;
+                }
+            } else if(d->opt_idx >= BORK_OPTS) d->remap_ctrl = 1;
         } else if(pg_check_input(SDL_SCANCODE_DOWN, PG_CONTROL_HIT)
                || pg_check_input(kmap[BORK_CTRL_DOWN], PG_CONTROL_HIT)
                || stick_ctrl_y == 1) {
-            d->opt_idx = MIN(BORK_CTRL_COUNT + 5, d->opt_idx + 1);
+            d->opt_idx = MIN(BORK_CTRL_COUNT + BORK_OPTS, d->opt_idx + 1);
             if(d->opt_scroll + 9 < d->opt_idx) d->opt_scroll = d->opt_idx - 9;
             else if(d->opt_scroll > d->opt_idx) d->opt_scroll = d->opt_idx;
-            pg_audio_play(&d->core->menu_sound, 0.2);
+            pg_audio_play(&d->core->menu_sound, 0.5);
         } else if(pg_check_input(SDL_SCANCODE_UP, PG_CONTROL_HIT)
                || pg_check_input(kmap[BORK_CTRL_UP], PG_CONTROL_HIT)
                || stick_ctrl_y == -1) {
             d->opt_idx = MAX(0, d->opt_idx - 1);
             if(d->opt_scroll + 9 < d->opt_idx) d->opt_scroll = d->opt_idx - 9;
             else if(d->opt_scroll > d->opt_idx) d->opt_scroll = d->opt_idx;
-            pg_audio_play(&d->core->menu_sound, 0.2);
+            pg_audio_play(&d->core->menu_sound, 0.5);
         } else if(pg_check_input(PG_MOUSEWHEEL_UP, PG_CONTROL_HIT)
         && d->opt_scroll > 0) {
             d->opt_scroll -= 1;
         } else if(pg_check_input(PG_MOUSEWHEEL_DOWN, PG_CONTROL_HIT)
-        && d->opt_scroll + 10 < BORK_CTRL_COUNT + 6) {
+        && d->opt_scroll + 10 < BORK_FULL_OPTS) {
             d->opt_scroll += 1;
         }
     }
@@ -411,93 +521,101 @@ static void bork_menu_draw(struct pg_game_state* state)
     struct bork_menu_data* d = state->data;
     float ar = d->core->aspect_ratio;
     /*  Overlay */
-    pg_screen_dst();
+    pg_ppbuffer_dst(&d->core->ppbuf);
+    glClear(GL_COLOR_BUFFER_BIT);
+    struct pg_shader* shader = &d->core->shader_2d;
+    pg_shader_begin(shader, NULL);
     bork_draw_backdrop(d->core, (vec4){ 2, 2, 2, 1 },
                        (float)state->ticks / (float)state->tick_rate);
     bork_draw_linear_vignette(d->core, (vec4){ 0, 0, 0, 1 });
-    struct pg_shader* shader = &d->core->shader_2d;
-    pg_shader_2d_resolution(shader, (vec2){ ar, 1 });
-    pg_shader_2d_set_light(&d->core->shader_2d, (vec2){}, (vec3){}, (vec3){ 1, 1, 1 });
-    pg_shader_2d_color_mod(shader, (vec4){ 0.2, 0.2, 0.2, 1 }, (vec4){});
-    pg_shader_2d_texture(shader, &d->core->env_atlas);
-    pg_shader_2d_tex_frame(shader, 45);
-    pg_shader_2d_add_tex_tx(shader, (vec2){ 2, 2 }, (vec2){});
-    pg_shader_2d_transform(shader, (vec2){ ar * 0.275, 0.5 }, (vec2){ 0.3, 0.3 }, 0);
-    pg_shader_begin(shader, NULL);
-    pg_model_begin(&d->core->quad_2d_ctr, shader);
-    pg_model_draw(&d->core->quad_2d_ctr, NULL);
-    pg_shader_2d_color_mod(shader, (vec4){ 1, 1, 1, 0.2 }, (vec4){});
-    pg_shader_2d_tex_frame(shader, 77);
-    pg_shader_2d_add_tex_tx(shader, (vec2){ 2, 2 }, (vec2){});
-    pg_shader_2d_transform(shader, (vec2){ ar * 0.275, 0.5 }, (vec2){ 0.2, 0.2 }, 0);
-    pg_model_draw(&d->core->quad_2d_ctr, NULL);
+    if(d->mode == BORK_MENU_BASE || d->mode == BORK_MENU_SELECT_SAVE) {
+        pg_shader_2d_resolution(shader, (vec2){ ar, 1 });
+        pg_shader_2d_set_light(&d->core->shader_2d, (vec2){}, (vec3){}, (vec3){ 1, 1, 1 });
+        pg_shader_2d_color_mod(shader, (vec4){ 0.2, 0.2, 0.2, 1 }, (vec4){});
+        pg_shader_2d_texture(shader, &d->core->env_atlas);
+        pg_shader_2d_tex_frame(shader, 45);
+        pg_shader_2d_add_tex_tx(shader, (vec2){ 2, 2 }, (vec2){});
+        pg_shader_2d_transform(shader, (vec2){ ar * 0.275, 0.5 }, (vec2){ 0.3, 0.3 }, 0);
+        pg_shader_begin(shader, NULL);
+        pg_model_begin(&d->core->quad_2d_ctr, shader);
+        pg_model_draw(&d->core->quad_2d_ctr, NULL);
+        pg_shader_2d_color_mod(shader, (vec4){ 1, 1, 1, 0.2 }, (vec4){});
+        pg_shader_2d_tex_frame(shader, 77);
+        pg_shader_2d_add_tex_tx(shader, (vec2){ 2, 2 }, (vec2){});
+        pg_shader_2d_transform(shader, (vec2){ ar * 0.275, 0.5 }, (vec2){ 0.2, 0.2 }, 0);
+        pg_model_draw(&d->core->quad_2d_ctr, NULL);
+    }
     shader = &d->core->shader_text;
     pg_shader_begin(shader, NULL);
     pg_shader_text_resolution(shader, (vec2){d->core->aspect_ratio, 1});
     pg_shader_text_transform(shader, (vec2){ 1, 1 }, (vec2){});
     static const char* menu_opts[] = {
         "NEW GAME", "CONTINUE", "OPTIONS", "CREDITS", "EXIT", "EDITOR" };
-    struct pg_shader_text text = {
-        .use_blocks = 10,
-        .block = { "THE", "COMMUNIST", "DOG      ", "   IFESTO" },
-        .block_style = {
-            /*  BORK OF DOOOOOM */
-            { ar * 0.275 - (3 * 0.025 * 1.1 * 0.5), 0.44, 0.025, 1.1 },
-            { ar * 0.275 - (9 * 0.06 * 1.1 * 0.5), 0.48, 0.06, 1.1 },
-            { ar * 0.275 - (9 * 0.06 * 1.1 * 0.5), 0.56, 0.06, 1.1 },
-            { ar * 0.275 - (9 * 0.06 * 1.1 * 0.5), 0.56, 0.06, 1.1 },
-        },
-        .block_color = { { 1, 1, 1, 0.75 }, { 1, 0, 0, 0.75 }, { 1, 1, 1, 1 }, { 1, 1, 1, 0.75 } }
-    };
+    struct pg_shader_text text = {};
+    if(d->mode == BORK_MENU_BASE || d->mode == BORK_MENU_SELECT_SAVE) {
+        text = (struct pg_shader_text) {
+            .use_blocks = 10,
+            .block = { "THE", "COMMUNIST", "DOG      ", "   IFESTO" },
+            .block_style = {
+                /*  BORK OF DOOOOOM */
+                { ar * 0.275 - (3 * 0.025 * 1.1 * 0.5), 0.44, 0.025, 1.1 },
+                { ar * 0.275 - (9 * 0.06 * 1.1 * 0.5), 0.48, 0.06, 1.1 },
+                { ar * 0.275 - (9 * 0.06 * 1.1 * 0.5), 0.56, 0.06, 1.1 },
+                { ar * 0.275 - (9 * 0.06 * 1.1 * 0.5), 0.56, 0.06, 1.1 },
+            },
+            .block_color = { { 1, 1, 1, 0.75 }, { 1, 0, 0, 0.75 }, { 1, 1, 1, 1 },
+                             { 1, 1, 1, 0.75 } }
+        };
+    }
     if(d->mode == BORK_MENU_BASE) {
         int i;
         for(i = 0; i < BORK_MENU_COUNT; ++i) {
             strncpy(text.block[i + 4], menu_opts[i], 10);
             vec4_set(text.block_style[i + 4],
                 (d->current_selection == i) * 0.075 + ar * 0.55,
-                i * 0.1 + 0.225, 0.04, 1.2);
+                i * 0.1 + 0.3, 0.04, 1.2);
             vec4_set(text.block_color[i + 4], 1, 1, 1, 1);
         }
     } else if(d->mode == BORK_MENU_SELECT_SAVE) {
-        int ti = 2;
+        int ti = 3;
         int i;
         int num_saves = MIN(d->core->save_files.len, 6);
         snprintf(text.block[++ti], 32, "BACK");
-        vec4_set(text.block_style[ti], ar * 0.35 - (4 * 0.04 * 1.25 * 0.5),
+        vec4_set(text.block_style[ti], ar * 0.275 - (4 * 0.04 * 1.25 * 0.5),
                  0.7, 0.04, 1.2);
-        if(d->save_action_idx == 0) {
+        if(d->save_action_idx == 0 && d->save_side == 0) {
             vec4_set(text.block_color[ti], 1, 1, 1, 1);
         } else {
-            vec4_set(text.block_color[ti], 1, 1, 1, d->save_side == 0 ? 0.5 : 1);
+            vec4_set(text.block_color[ti], 1, 1, 1, 0.5);
         }
         snprintf(text.block[++ti], 32, "DELETE");
-        vec4_set(text.block_style[ti], ar * 0.35 - (6 * 0.04 * 1.25 * 0.5),
+        vec4_set(text.block_style[ti], ar * 0.275 - (6 * 0.04 * 1.25 * 0.5),
                  0.8, 0.04, 1.2);
         if(d->delete_ticks) {
             text.block_style[ti][0] += (RANDF * 0.1 - 0.05) * (d->delete_ticks / 60.0f);
             text.block_style[ti][1] += (RANDF * 0.1 - 0.05) * (d->delete_ticks / 60.0f);
         }
-        if(d->save_action_idx == 1) {
+        if(d->save_action_idx == 1 && d->save_side == 0) {
             vec4_set(text.block_color[ti], 1, 1, 1, 1);
         } else {
-            vec4_set(text.block_color[ti], 1, 1, 1, d->save_side == 0 ? 0.75 : 0.5);
+            vec4_set(text.block_color[ti], 1, 1, 1, 0.5);
         }
         snprintf(text.block[++ti], 32, "LOAD");
         vec4_set(text.block_style[ti], ar * 0.655 - (4 * 0.05 * 1.25 * 0.5),
                  0.9, 0.05, 1.2);
-        vec4_set(text.block_color[ti], 1, 1, 1, 1);
+        vec4_set(text.block_color[ti], 1, 1, 1, num_saves ? 1 : 0.1);
         for(i = 0; i < num_saves; ++i) {
             int is_selected = (i + d->save_scroll == d->save_idx);
             struct bork_save* save = &d->core->save_files.data[i + d->save_scroll];
             snprintf(text.block[++ti], 32, "%s", save->name);
             vec4_set(text.block_style[ti], ar * 0.55 + 0.04 * is_selected,
                      0.25 + 0.1 * i, 0.03, 1.2);
-            vec4_set(text.block_color[ti], 1, 1, 1, 1);
+            vec4_set(text.block_color[ti], 1, 1, 1, d->save_side == 1 ? 1 : 0.5);
         }
-        text.use_blocks = ti + num_saves;
+        text.use_blocks = ti + num_saves + 1;
     } else if(d->mode == BORK_MENU_SHOW_CREDITS) {
         int ti = 0;
-        float y = 0.25;
+        float y = 0.2;
         int len;
         len = snprintf(text.block[ti], 64, "DEVELOPED BY");
         vec4_set(text.block_style[ti], ar * 0.5 - (len * 0.02 * 1.25 * 0.5), y, 0.02, 1.25);
@@ -507,19 +625,23 @@ static void bork_menu_draw(struct pg_game_state* state)
         vec4_set(text.block_style[ti], ar * 0.5 - (len * 0.04 * 1.25 * 0.5), y, 0.04, 1.25);
         vec4_set(text.block_color[ti], 1, 1, 1, 1);
         y += 0.1;
-        len = snprintf(text.block[++ti], 64, "TESTING AND DESIGN ADVICE FROM");
+        len = snprintf(text.block[++ti], 64, "MUSIC BY");
         vec4_set(text.block_style[ti], ar * 0.5 - (len * 0.02 * 1.25 * 0.5), y, 0.02, 1.25);
         vec4_set(text.block_color[ti], 1, 1, 1, 0.75);
         y += 0.04;
-        len = snprintf(text.block[++ti], 64, "KDRNIC");
+        len = snprintf(text.block[++ti], 64, "ERIC MATYAS");
         vec4_set(text.block_style[ti], ar * 0.5 - (len * 0.04 * 1.25 * 0.5), y, 0.04, 1.25);
+        vec4_set(text.block_color[ti], 1, 1, 1, 1);
+        y += 0.06;
+        len = snprintf(text.block[++ti], 64, "WWW.SOUNDIMAGE.ORG");
+        vec4_set(text.block_style[ti], ar * 0.5 - (len * 0.03 * 1.25 * 0.5), y, 0.03, 1.25);
         vec4_set(text.block_color[ti], 1, 1, 1, 1);
         y += 0.1;
         len = snprintf(text.block[++ti], 64, "SUPER SPECIAL THANKS TO");
         vec4_set(text.block_style[ti], ar * 0.5 - (len * 0.02 * 1.25 * 0.5), y, 0.02, 1.25);
         vec4_set(text.block_color[ti], 1, 1, 1, 0.75);
         y += 0.04;
-        len = snprintf(text.block[++ti], 64, "CAIN, STACY, AND");
+        len = snprintf(text.block[++ti], 64, "CAIN, STACEY, AND");
         vec4_set(text.block_style[ti], ar * 0.5 - (len * 0.04 * 1.25 * 0.5), y, 0.04, 1.25);
         vec4_set(text.block_color[ti], 1, 1, 1, 1);
         y += 0.06;
@@ -557,11 +679,11 @@ static void bork_menu_draw(struct pg_game_state* state)
         for(i = 0; i < 10; ++i) {
             int opt = d->opt_scroll + i;
             int is_selected = (d->opt_scroll + i == d->opt_idx);
-            if(opt == 0) {
+            if(opt == BORK_OPT_FULLSCREEN) {
                 strncpy(text.block[++ti], "FULLSCREEN", 32);
                 memset(text.block[ti + 1], 0, 32);
                 snprintf(text.block[ti + 1], 32, d->opt_fullscreen ? "YES" : "NO");
-            } else if(opt == 1) {
+            } else if(opt == BORK_OPT_RES_X) {
                 strncpy(text.block[++ti], "RES. WIDTH", 32);
                 memset(text.block[ti + 1], 0, 32);
                 if(d->opt_res_typing && d->opt_idx == opt) {
@@ -569,7 +691,7 @@ static void bork_menu_draw(struct pg_game_state* state)
                 } else {
                     snprintf(text.block[ti + 1], 32, "%d", d->opt_res[0]);
                 }
-            } else if(opt == 2) {
+            } else if(opt == BORK_OPT_RES_Y) {
                 strncpy(text.block[++ti], "RES. HEIGHT", 32);
                 memset(text.block[ti + 1], 0, 32);
                 if(d->opt_res_typing && d->opt_idx == opt) {
@@ -577,21 +699,59 @@ static void bork_menu_draw(struct pg_game_state* state)
                 } else {
                     snprintf(text.block[ti + 1], 32, "%d", d->opt_res[1]);
                 }
-            } else if(opt == 3) {
+            } else if(opt == BORK_OPT_SHOW_FPS) {
                 strncpy(text.block[++ti], "SHOW FPS", 32);
                 memset(text.block[ti + 1], 0, 32);
                 snprintf(text.block[ti + 1], 32, "%s", d->core->show_fps ? "YES" : "NO");
-            } else if(opt == 4) {
-                strncpy(text.block[++ti], "MOUSE SENSITIVITY", 32);
+            } else if(opt == BORK_OPT_GAMMA) {
+                strncpy(text.block[++ti], "GAMMA CORRECTION", 32);
                 memset(text.block[ti + 1], 0, 32);
-                snprintf(text.block[ti + 1], 32, "< %.1f >", d->core->mouse_sensitivity * 1000);
-            } else if(opt == BORK_CTRL_COUNT + 5) {
+                snprintf(text.block[ti + 1], 32, "< %.2f >", d->core->gamma);
+            } else if(opt == BORK_OPT_MUSIC_VOL) {
+                strncpy(text.block[++ti], "MUSIC VOLUME", 32);
+                memset(text.block[ti + 1], 0, 32);
+                snprintf(text.block[ti + 1], 32, "< %.2f >", d->core->music_volume);
+            } else if(opt == BORK_OPT_SFX_VOL) {
+                strncpy(text.block[++ti], "SFX VOLUME", 32);
+                memset(text.block[ti + 1], 0, 32);
+                snprintf(text.block[ti + 1], 32, "< %.2f >", d->core->sfx_volume);
+            } else if(opt == BORK_OPT_INVERT_Y) {
+                strncpy(text.block[++ti], "INVERT Y AXIS", 32);
+                memset(text.block[ti + 1], 0, 32);
+                snprintf(text.block[ti + 1], 32, "%s", d->core->invert_y ? "YES" : "NO");
+            } else if(opt == BORK_OPT_MOUSE_SENS) {
+                if(d->core->gpad_idx >= 0) {
+                    strncpy(text.block[++ti], "JOYSTICK SENSITIVITY", 32);
+                    memset(text.block[ti + 1], 0, 32);
+                    snprintf(text.block[ti + 1], 32, "< %.2f >", d->core->joy_sensitivity);
+                } else {
+                    strncpy(text.block[++ti], "MOUSE SENSITIVITY", 32);
+                    memset(text.block[ti + 1], 0, 32);
+                    snprintf(text.block[ti + 1], 32, "< %.1f >", d->core->mouse_sensitivity * 1000);
+                }
+            } else if(opt == BORK_OPT_GAMEPAD) {
+                strncpy(text.block[++ti], "SELECT GAMEPAD", 32);
+                memset(text.block[ti + 1], 0, 32);
+                snprintf(text.block[ti + 1], 32, "%s",
+                    d->core->gpad_idx == -1 ? "DISABLED" :
+                        SDL_GameControllerNameForIndex(d->core->gpad_idx));
+            } else if(opt == BORK_CTRL_COUNT + BORK_OPTS) {
                 strncpy(text.block[++ti], "RESET TO DEFAULTS", 32);
                 memset(text.block[ti + 1], 0, 32);
                 snprintf(text.block[ti + 1], 32, "[RESET]");
             } else {
-                strncpy(text.block[++ti], bork_get_ctrl_name(opt - 5), 32);
-                strncpy(text.block[ti + 1], pg_input_name(d->core->ctrl_map[opt - 5]), 32);
+                strncpy(text.block[++ti], bork_get_ctrl_name(opt - BORK_OPTS), 32);
+                if(d->core->gpad_idx >= 0) {
+                    if(opt - BORK_OPTS < BORK_CTRL_JUMP) {
+                        strncpy(text.block[ti + 1], "---", 32);
+                    } else {
+                        strncpy(text.block[ti + 1],
+                            pg_gamepad_name(d->core->gpad_map[opt - BORK_OPTS]), 32);
+                    }
+                } else {
+                    strncpy(text.block[ti + 1],
+                        pg_input_name(d->core->ctrl_map[opt - BORK_OPTS]), 32);
+                }
             }
             vec4_set(text.block_style[ti], ar * 0.1 + is_selected * 0.05,
                                            0.25 + i * 0.06, 0.025, 1.2);
@@ -604,23 +764,54 @@ static void bork_menu_draw(struct pg_game_state* state)
             len = snprintf(text.block[++ti], 64, "PRESS DESIRED CONTROL FOR");
             vec4_set(text.block_style[ti], ar * 0.5 - (len * 0.025 * 1.2 * 0.5), 0.875, 0.025, 1.2);
             vec4_set(text.block_color[ti], 1, 1, 1, 1);
-            len = snprintf(text.block[++ti], 64, "%s", bork_get_ctrl_name(d->opt_idx - 4));
+            len = snprintf(text.block[++ti], 64, "%s", bork_get_ctrl_name(d->opt_idx - BORK_OPTS));
             vec4_set(text.block_style[ti], ar * 0.5 - (len * 0.025 * 1.2 * 0.5), 0.925, 0.025, 1.2);
             vec4_set(text.block_color[ti], 1, 1, 1, 1);
-        } else if(d->opt_idx > 4) {
-            len = snprintf(text.block[++ti], 64, "PRESS %s TO RE-MAP CONTROL",
-                           pg_input_name(d->core->ctrl_map[BORK_CTRL_SELECT]));
-            vec4_set(text.block_style[ti], ar * 0.5 - (len * 0.025 * 1.2 * 0.5), 0.875, 0.025, 1.2);
-            vec4_set(text.block_color[ti], 1, 1, 1, 1);
-        } else if(d->opt_idx == 0 || d->opt_idx == 3 || d->opt_idx == 4) {
-            len = snprintf(text.block[++ti], 64, "LEFT/RIGHT TO SET OPTION");
-            vec4_set(text.block_style[ti], ar * 0.5 - (len * 0.025 * 1.2 * 0.5), 0.875, 0.025, 1.2);
-            vec4_set(text.block_color[ti], 1, 1, 1, 1);
-        } else if(d->opt_idx == 1 || d->opt_idx == 2) {
-            len = snprintf(text.block[++ti], 64, "PRESS %s TO SET RESOLUTION",
-                           pg_input_name(d->core->ctrl_map[BORK_CTRL_SELECT]));
-            vec4_set(text.block_style[ti], ar * 0.5 - (len * 0.025 * 1.2 * 0.5), 0.875, 0.025, 1.2);
-            vec4_set(text.block_color[ti], 1, 1, 1, 1);
+        } else {
+            switch(d->opt_idx) {
+                case BORK_OPTS + BORK_CTRL_COUNT:
+                    len = snprintf(text.block[++ti], 64, "!!! PRESS %s TO RESET CONTROLS !!!",
+                                   pg_input_name(d->core->ctrl_map[BORK_CTRL_SELECT]));
+                    vec4_set(text.block_style[ti], ar * 0.5 - (len * 0.025 * 1.2 * 0.5), 0.875, 0.025, 1.2);
+                    vec4_set(text.block_color[ti], 1, 1, 1, 1);
+                    break;
+                case BORK_OPT_FULLSCREEN:
+                    len = snprintf(text.block[++ti], 64, "PRESS %s TO TOGGLE FULLSCREEN",
+                                   pg_input_name(d->core->ctrl_map[BORK_CTRL_SELECT]));
+                    vec4_set(text.block_style[ti], ar * 0.5 - (len * 0.025 * 1.2 * 0.5), 0.875, 0.025, 1.2);
+                    vec4_set(text.block_color[ti], 1, 1, 1, 1);
+                    break;
+                case BORK_OPT_RES_X: case BORK_OPT_RES_Y:
+                    len = snprintf(text.block[++ti], 64, "PRESS %s TO SET RESOLUTION",
+                                   pg_input_name(d->core->ctrl_map[BORK_CTRL_SELECT]));
+                    vec4_set(text.block_style[ti], ar * 0.5 - (len * 0.025 * 1.2 * 0.5), 0.875, 0.025, 1.2);
+                    vec4_set(text.block_color[ti], 1, 1, 1, 1);
+                    break;
+                case BORK_OPT_SHOW_FPS:
+                    len = snprintf(text.block[++ti], 64, "PRESS %s TO TOGGLE FPS DISPLAY",
+                                   pg_input_name(d->core->ctrl_map[BORK_CTRL_SELECT]));
+                    vec4_set(text.block_style[ti], ar * 0.5 - (len * 0.025 * 1.2 * 0.5), 0.875, 0.025, 1.2);
+                    vec4_set(text.block_color[ti], 1, 1, 1, 1);
+                    break;
+                case BORK_OPT_INVERT_Y:
+                    len = snprintf(text.block[++ti], 64, "PRESS %s TO INVERT Y AXIS",
+                                   pg_input_name(d->core->ctrl_map[BORK_CTRL_SELECT]));
+                    vec4_set(text.block_style[ti], ar * 0.5 - (len * 0.025 * 1.2 * 0.5), 0.875, 0.025, 1.2);
+                    vec4_set(text.block_color[ti], 1, 1, 1, 1);
+                    break;
+                case BORK_OPT_GAMMA: case BORK_OPT_MOUSE_SENS: case BORK_OPT_GAMEPAD:
+                case BORK_OPT_MUSIC_VOL: case BORK_OPT_SFX_VOL:
+                    len = snprintf(text.block[++ti], 64, "LEFT/RIGHT TO SET OPTION");
+                    vec4_set(text.block_style[ti], ar * 0.5 - (len * 0.025 * 1.2 * 0.5), 0.875, 0.025, 1.2);
+                    vec4_set(text.block_color[ti], 1, 1, 1, 1);
+                    break;
+                default:
+                    len = snprintf(text.block[++ti], 64, "PRESS %s TO RE-MAP CONTROL",
+                                   pg_input_name(d->core->ctrl_map[BORK_CTRL_SELECT]));
+                    vec4_set(text.block_style[ti], ar * 0.5 - (len * 0.025 * 1.2 * 0.5), 0.875, 0.025, 1.2);
+                    vec4_set(text.block_color[ti], 1, 1, 1, 1);
+                    break;
+            }
         }
         text.use_blocks = ti + 1;
     }
@@ -646,4 +837,7 @@ static void bork_menu_draw(struct pg_game_state* state)
             pg_model_draw(&d->core->quad_2d_ctr, NULL);
         }
     }
+    pg_screen_dst();
+    pg_ppbuffer_swap(&d->core->ppbuf);
+    pg_postproc_apply(&d->core->post_gamma, &d->core->ppbuf);
 }

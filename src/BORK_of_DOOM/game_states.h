@@ -3,6 +3,7 @@ struct bork_editor_tile {
     uint8_t alt_type;
     uint8_t dir;
     uint8_t alt_dir;
+    uint8_t wall[6];
     uint16_t obj_idx;
 };
 
@@ -16,7 +17,7 @@ struct bork_editor_data {
             union {
                 struct { uint8_t flags; uint8_t code[4]; } door;
                 struct { int id; } teleport;
-                struct { uint8_t pos; uint8_t scale; char text[16];
+                struct { uint8_t pos; uint8_t scale; char text[32];
                          char text_len; uint8_t color[4]; } text;
             };
         }) objs;

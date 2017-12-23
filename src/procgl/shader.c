@@ -198,10 +198,12 @@ void pg_shader_rebuild_matrices(struct pg_shader* shader)
     }
 }
 
-void pg_shader_buffer_model(struct pg_shader* shader, struct pg_model* model)
+void pg_shader_buffer_model_(struct pg_shader* shader, struct pg_model* model,
+                             const char* file, int line)
 {
     if((shader->components & model->components) != shader->components) {
-        printf("procgl shader error: Incompatible model!\n");
+        printf("procgl shader error: Incompatible model!\n"
+               "    %s:%d\n", file, line);
         return;
     }
     int i;

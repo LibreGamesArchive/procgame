@@ -6,6 +6,7 @@
 #define BORK_PARTICLE_LIGHT_DECAY   (1 << 5)
 #define BORK_PARTICLE_DECELERATE    (1 << 6)
 #define BORK_PARTICLE_COLLIDE_DIE   (1 << 7)
+#define BORK_PARTICLE_LIGHT_EXPAND  (1 << 8)
 
 struct bork_particle {
     vec3 pos;
@@ -13,7 +14,7 @@ struct bork_particle {
     vec4 light;
     uint8_t color_mod[3];
     uint8_t start_frame, end_frame, current_frame;
-    uint8_t flags;
+    uint32_t flags;
     uint8_t frame_ticks;
     uint16_t lifetime;
     uint16_t ticks_left;

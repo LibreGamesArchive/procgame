@@ -55,8 +55,8 @@ typedef ARR_T(char*)            arr_str_t;
 
 #define ARR_INSERT(arr, idx, ...) \
     ( !ARR_RESERVE((arr), (arr).len + 1) ? ARR_FAIL \
-        : (memmove((arr).data + (idx) + 1, \
-                   (arr).data + (idx), ((arr).len++) - (idx)), \
+        : (memmove((arr).data + (idx) + 1, (arr).data + (idx), \
+                   (((arr).len++) - (idx)) * sizeof(*(arr).data)), \
             ((arr).data[idx] = (__VA_ARGS__)), ARR_SUCCEED) )
 
 #define ARR_SWAPINSERT(arr, idx, ...) \

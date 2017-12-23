@@ -40,11 +40,13 @@ static void begin(struct pg_shader* shader, struct pg_viewer* view)
     struct data_2d* d = shader->data;
     /*  Set the uniforms    */
     if(d->unis_dirty) {
-        glUniform1i(d->unis.tex_unit, d->state.tex->diffuse_slot);
-        glUniform1i(d->unis.norm_unit, d->state.tex->light_slot);
-        if(d->state.tex->light_slot >= 0)
+        if(d->state.tex) {
+            glUniform1i(d->unis.tex_unit, d->state.tex->diffuse_slot);
             glUniform1i(d->unis.norm_unit, d->state.tex->light_slot);
-        else glUniform1i(d->unis.norm_unit, d->state.tex->diffuse_slot);
+            if(d->state.tex->light_slot >= 0)
+                glUniform1i(d->unis.norm_unit, d->state.tex->light_slot);
+            else glUniform1i(d->unis.norm_unit, d->state.tex->diffuse_slot);
+        }
         glUniform1f(d->unis.tex_weight, d->state.tex_weight);
         glUniform4fv(d->unis.tex_tx, 1, d->state.tex_tx);
         glUniform4fv(d->unis.color_mod, 1, d->state.color_mod);
@@ -85,9 +87,10 @@ int pg_shader_2d(struct pg_shader* shader)
     d->state.tex = NULL;
     d->state.tex_weight = 1;
     vec4_set(d->state.color_mod, 1, 1, 1, 1);
+    vec4_set(d->state.color_add, 0, 0, 0, 0);
     vec4_set(d->state.tex_tx, 1, 1, 0, 0);
     vec2_set(d->state.light_pos, 0, 1);
-    vec3_set(d->state.light_color, 0.25, 0, 0);
+    vec3_set(d->state.light_color, 0, 0, 0);
     vec3_set(d->state.ambient_color, 1, 1, 1);
     d->unis.tex_unit = glGetUniformLocation(shader->prog, "tex");
     d->unis.norm_unit = glGetUniformLocation(shader->prog, "norm");

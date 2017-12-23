@@ -42,6 +42,9 @@ void main()
     vec3 specular = f_color * shininess * pow(max(dot(norm, half_angle), 0), 16);
     vec3 diffuse = f_color * max(dot(norm, -light_dir), 0);
     float attenuation = pow(1 - dist / f_light.w, 1.7);
+    //attenuation = attenuation * (dist * dist);
+    //dist = dist;
+    //float attenuation = (1 - (dist / f_light.w)) * (f_light.w / (dist * dist));
     frag_color = vec4(attenuation * (diffuse + specular)
             * clamp((f_dir_angle.w - light_angle) * 20, 0, 1), 0);
 }

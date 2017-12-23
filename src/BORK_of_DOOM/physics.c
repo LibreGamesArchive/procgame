@@ -37,16 +37,16 @@ int bork_map_collide(struct bork_map* map, struct bork_collision* coll_out,
                 struct bork_tile* tile = bork_map_tile_ptri(map, x, y, z);
                 /*  If the tile is outside the map, or the tile is not
                     collidable, move on to the next one */
-                if(!tile || tile->type < 2) continue;
+                if(!tile) continue;
                 /*  Otherwise test collisions against this tile's associated
                     triangles in the area model */
                 vec3 tile_push, tile_norm;
                 int c = pg_model_collide_ellipsoid_sub(model, tile_push,
-                            pos, size, 3, tile->model_tri_idx, tile->num_tris);
+                            pos, size, 5, tile->model_tri_idx, tile->num_tris);
                 if(c < 0) continue;
                 pg_model_get_face_normal(model, c, tile_norm);
                 float depth = vec3_len(tile_push);
-                if(depth <= deepest) continue;
+                if(depth < deepest) continue;
                 deepest = depth;
                 *coll_out = (struct bork_collision) {
                     .x = x, .y = y, .z = z, .tile = tile };

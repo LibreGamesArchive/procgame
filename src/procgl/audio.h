@@ -23,10 +23,15 @@ void pg_audio_free(struct pg_audio_chunk* chunk);
 void pg_audio_generate(struct pg_audio_chunk* chunk, float len,
                        struct pg_wave* w, struct pg_audio_envelope* env);
 void pg_audio_play(struct pg_audio_chunk* chunk, float volume);
+void pg_audio_play_ch(struct pg_audio_chunk* chunk, float volume, int channel);
+void pg_audio_emit_once(struct pg_audio_chunk* chunk, float volume, float area,
+                        vec3 pos, int channel);
 int pg_audio_emitter(struct pg_audio_chunk* chunk, float volume,
                      float area, vec3 pos, int channel);
 void pg_audio_set_listener(int channel, vec3 pos);
+void pg_audio_channel_volume(int channel, float vol);
 void pg_audio_channel_pause(int channel, int paused);
 void pg_audio_emitter_remove(int handle);
 void pg_audio_save_wav(struct pg_audio_chunk* chunk, const char* filename);
 void pg_audio_load_wav(struct pg_audio_chunk* chunk, const char* filename);
+void pg_audio_load_ogg(struct pg_audio_chunk* chunk, const char* filename);

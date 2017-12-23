@@ -1,3 +1,5 @@
+#include "tinyfiles.h"
+
 enum bork_control {
     BORK_CTRL_UP,
     BORK_CTRL_DOWN,
@@ -49,16 +51,45 @@ enum bork_sound {
     BORK_SND_KEYPAD_PRESS,
     BORK_SND_SWING_PIPE,
     BORK_SND_SWING_BEAMSWORD,
+    BORK_SND_CHARGE,
+    BORK_SND_FASTBEEPS,
+    BORK_SND_SINGLEBEEP,
     BORK_SND_HURT,
+    BORK_SND_HACK,
+    BORK_SND_HEAL_TECH,
+    BORK_SND_RELOAD_START,
+    BORK_SND_RELOAD_END,
     BORK_SND_HUM,
     BORK_SND_HISS,
-    BORK_SND_BEEPS,
+    BORK_SND_COMPUTERS,
     BORK_SND_BUZZ,
+    BORK_SND_HUM2,
+    BORK_SND_HUM3,
+    BORK_MUS_MAINMENU,
+    BORK_MUS_BOSSFIGHT,
+    BORK_MUS_ENDGAME,
     BORK_NUM_SOUNDS
 };
 
+enum bork_option {
+    BORK_OPT_FULLSCREEN,
+    BORK_OPT_RES_X,
+    BORK_OPT_RES_Y,
+    BORK_OPT_SHOW_FPS,
+    BORK_OPT_GAMMA,
+    BORK_OPT_MUSIC_VOL,
+    BORK_OPT_SFX_VOL,
+    BORK_OPT_INVERT_Y,
+    BORK_OPT_MOUSE_SENS,
+    BORK_OPT_GAMEPAD,
+    BORK_OPTS
+};
+
+#define BORK_FULL_OPTS      (BORK_OPTS + BORK_CTRL_COUNT + 1)
+
 struct bork_save {
     char name[32];
+    tfFILETIME time;
 };
 
 struct bork_game_core {
@@ -67,6 +98,7 @@ struct bork_game_core {
     int free_base_path;
     int user_exit;
     /*  Rendering data  */
+    float gamma;
     int fullscreen;
     vec2 screen_size;
     float aspect_ratio;
@@ -78,6 +110,7 @@ struct bork_game_core {
     struct pg_shader shader_text;
     struct pg_ppbuffer ppbuf;
     struct pg_postproc post_blur;
+    struct pg_postproc post_gamma;
     struct pg_postproc post_screen;
     /*  Assets  */
     struct pg_texture env_atlas;
@@ -102,11 +135,15 @@ struct bork_game_core {
     struct pg_model gun_model;
     struct pg_audio_chunk menu_sound;
     /*  Input state */
+    float music_volume, sfx_volume;
+    int invert_y;
     int show_fps;
     uint8_t ctrl_map[BORK_CTRL_COUNT];
+    int8_t gpad_map[BORK_CTRL_COUNT];
     float mouse_sensitivity;
+    float joy_sensitivity;
     int mouse_relative;
-    SDL_GameController* gpad;
+    int gpad_idx;
     /*  Save files  */
     ARR_T(struct bork_save) save_files;
 };
@@ -115,11 +152,16 @@ struct bork_map;
 struct bork_play_data;
 
 void bork_init(struct bork_game_core* core, char* base_path);
+void bork_set_gamma(struct bork_game_core* core, float gamma);
+void bork_set_music_volume(struct bork_game_core* core, float vol);
+void bork_set_sfx_volume(struct bork_game_core* core, float vol);
+void bork_read_saves(struct bork_game_core* core);
 void bork_delete_save(struct bork_game_core* core, int save_idx);
 void bork_load_options(struct bork_game_core* core);
 void bork_save_options(struct bork_game_core* core);
 void bork_reinit_gfx(struct bork_game_core* core, int sw, int sh, int fullscreen);
 void bork_reset_keymap(struct bork_game_core* core);
+void bork_reset_gamepad_map(struct bork_game_core* core);
 const char* bork_get_ctrl_name(enum bork_control ctrl);
 void bork_deinit(struct bork_game_core* core);
 void bork_load_assets(struct bork_game_core* core);

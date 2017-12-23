@@ -41,7 +41,7 @@ static void bullet_die(struct bork_bullet* blt, struct bork_play_data* d)
             break;
         } case 30: {
             struct bork_particle new_part = {
-                .flags = BORK_PARTICLE_LIGHT,
+                .flags = BORK_PARTICLE_LIGHT | BORK_PARTICLE_LIGHT_DECAY,
                 .light = { 1.5, 0.5, 0.5, 2.5 },
                 .pos = { blt->pos[0], blt->pos[1], blt->pos[2] },
                 .vel = { 0, 0, 0 },
@@ -65,7 +65,7 @@ static void bullet_die(struct bork_bullet* blt, struct bork_play_data* d)
             break;
         } case 6: {
             struct bork_particle new_part = {
-                .flags = BORK_PARTICLE_LIGHT,
+                .flags = BORK_PARTICLE_LIGHT | BORK_PARTICLE_LIGHT_DECAY,
                 .light = { 1.5, 0.5, 0.5, 2 },
                 .pos = { blt->pos[0], blt->pos[1], blt->pos[2] },
                 .vel = { 0, 0, 0 },
@@ -93,17 +93,18 @@ static void bullet_die(struct bork_bullet* blt, struct bork_play_data* d)
             ARR_FOREACH(surr, ent_id, i) {
                 surr_ent = bork_entity_get(ent_id);
                 if(!surr_ent) continue;
+                if(surr_ent->flags & BORK_ENTFLAG_STATIONARY) continue;
                 vec3 push;
                 vec3_sub(push, surr_ent->pos, blt->pos);
                 float dist = vec3_len(push);
                 float dist_f = MAX(1 - (dist / 3.0f), 0);
-                surr_ent->HP -= dist_f * 30;
+                surr_ent->HP -= dist_f * 50;
                 vec3_set_len(push, push, 0.2 * dist_f);
                 push[2] += 0.025;
                 vec3_add(surr_ent->vel, surr_ent->vel, push);
             }
             struct bork_particle new_part = {
-                .flags = BORK_PARTICLE_LIGHT,
+                .flags = BORK_PARTICLE_LIGHT | BORK_PARTICLE_LIGHT_DECAY,
                 .light = { 1.5, 0.5, 0.5, 4 },
                 .pos = { blt->pos[0], blt->pos[1], blt->pos[2] },
                 .vel = { 0, 0, 0 },
@@ -120,7 +121,7 @@ static void bullet_die(struct bork_bullet* blt, struct bork_play_data* d)
             break;
         } case 8: {
             struct bork_particle new_part = {
-                .flags = BORK_PARTICLE_LIGHT,
+                .flags = BORK_PARTICLE_LIGHT | BORK_PARTICLE_LIGHT_DECAY,
                 .light = { 0.5, 0.5, 1.5, 2 },
                 .pos = { blt->pos[0], blt->pos[1], blt->pos[2] },
                 .vel = { 0, 0, 0 },
@@ -133,7 +134,7 @@ static void bullet_die(struct bork_bullet* blt, struct bork_play_data* d)
         } case 9: {
             ARR_TRUNCATE(surr, 0);
             struct bork_particle new_part = {
-                .flags = BORK_PARTICLE_LIGHT,
+                .flags = BORK_PARTICLE_LIGHT | BORK_PARTICLE_LIGHT_DECAY,
                 .light = { 1.5, 0.5, 0.5, 4 },
                 .pos = { blt->pos[0], blt->pos[1], blt->pos[2] },
                 .vel = { 0, 0, 0 },
@@ -205,6 +206,7 @@ void bork_bullet_move(struct bork_bullet* blt, struct bork_play_data* d)
                 }
             }
             if(closest_ent) {
+                if(closest_ent->flags & BORK_ENTFLAG_ENEMY) closest_ent->aware_ticks = PLAY_SECONDS(4);
                 closest_ent->HP -= blt->damage;
                 blt->flags |= BORK_BULLET_DEAD;
                 if(!(closest_ent->flags & BORK_ENTFLAG_STATIONARY)
@@ -229,12 +231,12 @@ void bork_bullet_move(struct bork_bullet* blt, struct bork_play_data* d)
         if(blt->flags & BORK_BULLET_HURTS_PLAYER) {
             vec3 blt_to_plr;
             vec3_sub(blt_to_plr, blt->pos, map->plr->pos);
+            vec3_abs(blt_to_plr, blt_to_plr);
             float dist = vec3_len(blt_to_plr);
-            if(dist < 0.8) {
+            if(blt_to_plr[0] < 0.75 && blt_to_plr[1] < 0.75 && blt_to_plr[2] < 1) {
                 pg_audio_play(&d->core->sounds[BORK_SND_HURT], 1);
                 blt->flags |= BORK_BULLET_DEAD;
-                map->plr->pain_ticks += 120;
-                map->plr->HP -= blt->damage;
+                hurt_player(d, blt->damage, 1);
                 vec3_sub(blt->pos, new_pos, blt->dir);
                 vec3_set(blt->dir, 0, 0, 0);
                 vec3_set(blt->light_color, 2, 0.8, 0.8);

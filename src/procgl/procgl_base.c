@@ -1,3 +1,4 @@
+#include <string.h>
 #include <stdio.h>
 #include <GL/glew.h>
 #include <SDL2/SDL.h>
@@ -67,6 +68,7 @@ int pg_init(int w, int h, int fullscreen, const char* window_title)
 
 void pg_deinit(void)
 {
+    pg_deinit_audio();
     SDL_GL_DeleteContext(pg_context);
     SDL_DestroyWindow(pg_window);
     SDL_Quit();
@@ -103,7 +105,17 @@ void pg_screen_dst(void)
 
 float pg_time(void)
 {
-    return (float)SDL_GetTicks() * 0.001;
+    return SDL_GetTicks() * 0.001;
+}
+
+uint64_t pg_perf_time(void)
+{
+    return SDL_GetPerformanceCounter();
+}
+
+double pg_perf_time_diff(uint64_t start, uint64_t end)
+{
+    return (double)(end - start) / (double)SDL_GetPerformanceFrequency();
 }
 
 static float last_time = 0;
@@ -128,6 +140,12 @@ float pg_framerate(void)
 int pg_user_exit(void)
 {
     return user_exit;
+}
+
+void pg_reset_input(void)
+{
+    memset(ctrl_state, 0, sizeof(ctrl_state));
+    memset(gamepad_state, 0, sizeof(gamepad_state));
 }
 
 void pg_poll_input(void)
@@ -163,7 +181,7 @@ void pg_poll_input(void)
                 ctrl_changes[ctrl_changed++] = PG_MOUSEWHEEL_DOWN;
             }
         } else if(e.type == SDL_TEXTINPUT && text_mode && text_len < 16) {
-            int len = strnlen(e.text.text, 32);
+            int len = strlen(e.text.text);
             int buf_left = 16 - text_len;
             strncpy(text_input + text_len, e.text.text, buf_left);
             text_len = MIN(16, text_len + len);
@@ -185,9 +203,10 @@ void pg_poll_input(void)
             gamepad_changes[gamepad_changed++] = e.cbutton.button;
         } else if(e.type == SDL_CONTROLLERDEVICEREMOVED && e.cdevice.which == gamepad_id) {
             printf("Gamepad disconnected.\n");
+            pg_use_gamepad(-1);
             SDL_GameControllerClose(pg_gamepad);
             pg_gamepad = NULL;
-        } else if(e.type == SDL_CONTROLLERDEVICEADDED && !pg_gamepad) {
+        } else if(e.type == SDL_CONTROLLERDEVICEADDED) {
             pg_use_gamepad(e.cdevice.which);
             printf("Gamepad connected.\n");
         }
@@ -218,10 +237,15 @@ void pg_poll_input(void)
         vec2_set(gamepad_stick[1], (float)right[0] / INT16_MAX, (float)right[1] / INT16_MAX);
         gamepad_trigger[0] = trigger[0] / INT16_MAX;
         gamepad_trigger[1] = trigger[1] / INT16_MAX;
+        float pg_stick_live_zone = 1.0f - pg_stick_dead_zone;
         if(fabsf(gamepad_stick[0][0]) < pg_stick_dead_zone) gamepad_stick[0][0] = 0;
+        else gamepad_stick[0][0] = (gamepad_stick[0][0] - pg_stick_dead_zone) / pg_stick_live_zone;
         if(fabsf(gamepad_stick[0][1]) < pg_stick_dead_zone) gamepad_stick[0][1] = 0;
+        else gamepad_stick[0][1] = (gamepad_stick[0][1] - pg_stick_dead_zone) / pg_stick_live_zone;
         if(fabsf(gamepad_stick[1][0]) < pg_stick_dead_zone) gamepad_stick[1][0] = 0;
+        else gamepad_stick[1][0] = (gamepad_stick[1][0] - pg_stick_dead_zone) / pg_stick_live_zone;
         if(fabsf(gamepad_stick[1][1]) < pg_stick_dead_zone) gamepad_stick[1][1] = 0;
+        else gamepad_stick[1][1] = (gamepad_stick[1][1] - pg_stick_dead_zone) / pg_stick_live_zone;
         if(gamepad_trigger[0] < pg_trigger_dead_zone) gamepad_trigger[0] = 0;
         if(gamepad_trigger[1] < pg_trigger_dead_zone) gamepad_trigger[1] = 0;
         /*  Also provide a button-like interface to the joysticks and triggers  */
@@ -356,6 +380,35 @@ const char* pg_input_name(uint8_t ctrl)
         return SDL_GetKeyName(SDL_GetKeyFromScancode(ctrl));
     }
 }
+
+const char* pg_gamepad_name(int8_t ctrl)
+{
+    static const char* gpad_input_names[PG_CONTROLLER_MAX] = {
+        [SDL_CONTROLLER_BUTTON_A] = "A",
+        [SDL_CONTROLLER_BUTTON_B] = "B",
+        [SDL_CONTROLLER_BUTTON_X] = "X",
+        [SDL_CONTROLLER_BUTTON_Y] = "Y",
+        [SDL_CONTROLLER_BUTTON_BACK] = "BACK",
+        [SDL_CONTROLLER_BUTTON_GUIDE] = "GUIDE",
+        [SDL_CONTROLLER_BUTTON_START] = "START",
+        [SDL_CONTROLLER_BUTTON_LEFTSTICK] = "Left Stick",
+        [SDL_CONTROLLER_BUTTON_RIGHTSTICK] = "Right Stick",
+        [SDL_CONTROLLER_BUTTON_LEFTSHOULDER] = "Left Shoulder",
+        [SDL_CONTROLLER_BUTTON_RIGHTSHOULDER] = "R Shoulder",
+        [SDL_CONTROLLER_BUTTON_DPAD_UP] = "D-Pad Up",
+        [SDL_CONTROLLER_BUTTON_DPAD_DOWN] = "D-Pad Down",
+        [SDL_CONTROLLER_BUTTON_DPAD_LEFT] = "D-Pad Left",
+        [SDL_CONTROLLER_BUTTON_DPAD_RIGHT] = "D-Pad Right",
+        [SDL_CONTROLLER_BUTTON_MAX] = "<none>",
+        [PG_LEFT_STICK] = "Left Joystick",
+        [PG_RIGHT_STICK] = "Right Joystick",
+        [PG_LEFT_TRIGGER] = "Left Trigger",
+        [PG_RIGHT_TRIGGER] = "Right Trigger" };
+    if(ctrl == SDL_CONTROLLER_BUTTON_INVALID) return "<none>";
+    else if(ctrl > PG_RIGHT_TRIGGER) return "<none>";
+    else return gpad_input_names[ctrl];
+}
+
 void pg_mouse_mode(int grab)
 {
     if(grab) {
@@ -380,6 +433,10 @@ void pg_mouse_motion(vec2 out)
 
 void pg_use_gamepad(int gpad_idx)
 {
+    if(gpad_idx == -1) {
+        gamepad_id = -1;
+        return;
+    }
     pg_gamepad = SDL_GameControllerOpen(gpad_idx);
     if(!pg_gamepad) {
         printf("procgame failed to open gamepad %d\n", gpad_idx);
@@ -406,10 +463,9 @@ void pg_gamepad_config(float stick_dead_zone, float stick_threshold,
     pg_trigger_threshold = trigger_threshold;
 }
 
-int pg_check_gamepad(uint8_t ctrl, uint8_t state)
+int pg_check_gamepad(int8_t ctrl, uint8_t state)
 {
     if(gamepad_state[ctrl] & state) return 1;
-    //printf("Button state for %d: %d, checking for %d\n", (int)ctrl, (int)gamepad_state[ctrl], (int)state);
     int changes = 0;
     int i;
     for(i = 0; i < gamepad_changed; ++i) {
@@ -417,6 +473,15 @@ int pg_check_gamepad(uint8_t ctrl, uint8_t state)
         if(changes > 1) return 1;
     }
     return 0;
+}
+
+int8_t pg_first_gamepad(void)
+{
+    if(!gamepad_changed) return 0;
+    int i = 0;
+    while(i < gamepad_changed && gamepad_state[gamepad_changes[i]] == PG_CONTROL_RELEASED) ++i;
+    if(i == gamepad_changed) return 0;
+    return gamepad_changes[i];
 }
 
 void pg_gamepad_stick(int side, vec2 out)
