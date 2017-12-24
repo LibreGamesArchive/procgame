@@ -21,35 +21,53 @@ extensively in real-time (for example, if you're trying to use this to
 generate audio in real-time, don't get mad if it turns out to be too slow).
 
 ## Basic usage:
-You can sample a basic wave like this:
+You can sample a basic wave function like this, using
+`pg_wave_sample(struct pg_wave* wave, int dimensions, float* p)`:
 ```
-    float sample = pg_wave_sample(my_wave_ptr, 3, (vec4){ x, y, z });
-    float sample = pg_wave_sample(&PG_WAVE_PERLIN(), 2, (vec4){ x, y });
-    float sample = pg_wave_sample(&PG_WAVE_PERLIN(.frequency = { 2, 2 }),
-                                  2, (vec4){ x, y });
+    /*  As a variable   */
+    struct pg_wave my_wave =
+        PG_WAVE_FUNC_PERLIN(.frequency = { 4, 4, 4, 4 }, .phase = { 1, 1, 1, 1 },
+                       .scale = 0.5, .add = 0.5);
+    float 4d_sample = pg_wave_sample(&my_wave, 4, (vec4){ x, y, z, w });
+    /*  Or directly to the sample function */
+    float 3d_sample = pg_wave_sample(&PG_WAVE_FUNC_PERLIN(),
+                                  3, (vec3){ x, y, z });
+    float 2d_sample = pg_wave_sample(&PG_WAVE_FUNC_PERLIN(.frequency = { 2, 2 }),
+                                  2, (vec2){ x, y });
+    float 1d_sample = pg_wave_sample(&PG_WAVE_FUNC_SINE(), 1, &x);
 ```
 
-Built-in wave defs allow you to specify non-default wave parameters.
-The available parameters are: `scale` and `add`, which are applied to the final
-sample (scale, then add); `phase[4]`, which are added to each of the sample
-point's coordinates; and `frequency[4]`. `frequency` and `scale` always default
-to 1, while `add` and `phase` default to 0.
+`PG_WAVE_*` macros all evaluate to a single `struct pg_wave`. With only one
+`struct pg_wave`, you are limited to a single sample of a single wave function
+(see built-in wave functions below). However, all waves have four attributes
+which can always be set with additional *designated* arguments:
+`vec4 frequency`, `vec4 phase`, `float scale`, and `float add` (listed here
+in the order they are applied). `phase` and `add` default to 0, `frequency` and
+`scale` to 1. Note that if you designate a `frequency` or `phase`  argument
+with fewer than 4 members, the unspecified members will revert to 0. Also note
+that none of these macros will result in any dynamic memory allocations so
+no cleanup code will ever be required after using them.
+
+The built-in basic wave functions are:
+*   `PG_WAVE_FUNC_SINE()`
+*   `PG_WAVE_FUNC_SAW()`
+*   `PG_WAVE_FUNC_TRIANGLE()`
+*   `PG_WAVE_FUNC_SQUARE()`
+*   `PG_WAVE_FUNC_PERLIN()`
+*   `PG_WAVE_FUNC_DISTANCE()`
+*   `PG_WAVE_FUNC_MAX()`
+*   `PG_WAVE_FUNC_MIN()`
 
 ## More complex wave generators
 To get more complex behavior, you will need to combine multiple wave
-objects, using wave arrays.  Construct a wave array like (this is 3 octaves
+functions, using wave arrays. Construct a wave array like (this is 3 octaves
 of sine wave, with faint perlin noise):
 ```
     struct pg_wave w[] = {
-        PG_WAVE_PERLIN(.scale = 0.1),
-        { PG_WAVE_MODIFIER, .mod = PG_WAVE_MOD_OCTAVES,
-            .octaves = 3, .ratio = 2, .decay = 0.5 },
-        PG_WAVE_SINE() };
-```
-
-Then sample the array like:
-```
-    float sample = pg_wave_sample(PG_WAVE_ARRAY(w, 3), 1, (vec4){ s });
+        PG_WAVE_FUNC_PERLIN(.scale = 0.1),
+        PG_WAVE_MOD_EXPAND(.op = PG_WAVE_EXPAND_ADD, .mode = PG_WAVE_EXPAND_AFTER),
+        PG_WAVE_FUNC_SINE() };
+    float sample = pg_wave_sample(&PG_WAVE_ARRAY(w, 4), 3, (vec3){ x, y, z });
 ```
 
 You can see how the `PG_WAVE_ARRAY` macro logically collapses the array of
@@ -57,43 +75,22 @@ wave objects into a single conceptual wave function. Unless a mixing modifier
 is used, waves are simply added to each other, and the array is processed in
 sequential order, with modifiers affecting the waves after them in the array.
 
+Also note the use of the `PG_WAVE_MOD_EXPAND` modifier. This modifier expands
+one dimension up to 2, 3, or 4, in a way described by its `op` and `mode`
+arguments. The available operations are `PG_WAVE_EXPAND_ADD`, `...SUB`, `...MUL`,
+`...DIV`, and `...AVG`. The available modes are `PG_WAVE_EXPAND_BEFORE` and
+`...AFTER`. The two combined describe the format of the transformation used
+to expand the coordinate: `ADD, BEFORE` results in func2(x + y, x + y),
+while `MUL, AFTER` results in func1(x) * func1(y); `ADD, AFTER` with a sine
+wave (sin(x) + sin(y)) produces a field of circular blobs. This wave function
+might be useful for generating an infinite grid of circular islands. Read on
+for more info about the various wave modifiers and how to use them.
+
 ### Using wave modifiers
 Modifiers can dramatically change the behavior of a wave function. For example,
-the `PG_WAVE_MOD_SEAMLESS_2D` modifier can produce a seamlessly repeating 2d
+the `PG_WAVE_SEAMLESS_2D` modifier can produce a seamlessly repeating 2d
 wave from any 4d noise function, and `PG_WAVE_MOD_EXPAND` can expand a naturally
 1d wave function (like a sine wave) to multiple dimensions.
-
-For example, to get a sine-wave with more than just one dimension, this
-modifier allows you to specify how the coordinates should be transformed into a
-single sample point. For example to get a n-d sine wave of the form
-`(sin(x) + sin(y) + ...)`, construct the wave array like this:
-```
-    struct pg_wave w[] = {
-        { PG_WAVE_MODIFIER, .mod = PG_WAVE_MOD_EXPAND,
-            .op = PG_WAVE_EXPAND_ADD, .mode = PG_WAVE_EXPAND_AFTER },
-        PG_WAVE_SINE() };
-```
-
-Or to instead have `(sin(x * y * ...))`, construct it like this:
-```
-    struct pg_wave w[] = {
-        { PG_WAVE_MODIFIER, .mod = PG_WAVE_MOD_EXPAND,
-            .op = PG_WAVE_EXPAND_MUL, .mode = PG_WAVE_EXPAND_BEFORE },
-        PG_WAVE_SINE() };
-```
-
-Members in a wave array can themselves be wave arrays as well, allowing
-whatever branching system of wave functions, mixing, distortions, etc.
-that you might want to create. Even without this, though, just building
-a single wave array using the available modifiers is still quite powerful.
-
-### Creating new wave functions
-
-To build your own wave function, just fill in a `struct pg_wave`'s
-`func1`, `func2`, `func3`, and/or `func4` members with function pointers,
-and `dimension_mask` with a bitmask indicating which dimensions your wave
-function supports. The lowest bit is 1d, second bit is 2d, and so on. Look at
-`wave_defs.h` to see how the built-in wave functions are defined.
 
 ## Available modifiers
 The available modifiers and their parameters are:

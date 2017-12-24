@@ -8,7 +8,7 @@
 #include "shader.h"
 
 /*  Shadow state for the currently used OpenGL shader   */
-static struct pg_shader* pg_active_shader;
+static struct pg_shader* pg_active_shader = NULL;
 
 /*  Code for loading shaders dumped to headers  */
 static GLuint compile_glsl_static(const char* src, int len, GLenum type)
@@ -74,14 +74,18 @@ static GLuint compile_glsl(const char* filename, GLenum type)
 {
     /*  Read the file into a buffer */
     FILE* f = fopen(filename, "r");
+    if(!f) {
+        printf("Could not read shader source file: %s\n", filename);
+        return 0;
+    }
     int len;
     fseek(f, 0, SEEK_END);
     len = ftell(f);
     GLchar source[len+1];
     const GLchar* double_ptr = source; /*  GL requires this   */
     fseek(f, 0, SEEK_SET);
-    fread(source, 1, len, f);
-    source[len] = '\0';
+    int r = fread(source, 1, len, f);
+    source[r] = '\0';
     /*  Create a shader and give it the source  */
     GLuint shader = glCreateShader(type);
     glShaderSource(shader, 1, &double_ptr, NULL);
@@ -143,7 +147,7 @@ void pg_shader_link_matrix(struct pg_shader* shader, enum pg_matrix type,
 }
 
 void pg_shader_link_component(struct pg_shader* shader,
-                              enum pg_model_component comp, const char* name)
+                              uint32_t comp, const char* name)
 {
     if(!comp) return;
     int i = LEAST_SIGNIFICANT_BIT(comp);
@@ -155,7 +159,7 @@ void pg_shader_set_matrix(struct pg_shader* shader, enum pg_matrix type,
                           mat4 matrix)
 {
     mat4_dup(shader->matrix[type], matrix);
-    if(shader->mat_idx[type] != -1) {
+    if(pg_active_shader == shader && shader->mat_idx[type] != -1) {
         glUniformMatrix4fv(shader->mat_idx[type], 1, GL_FALSE, *matrix);
     }
 }
@@ -170,8 +174,8 @@ void pg_shader_rebuild_matrices(struct pg_shader* shader)
     }
     if(shader->mat_idx[PG_MODELVIEW_MATRIX] != -1) {
         mat4_mul(shader->matrix[PG_MODELVIEW_MATRIX],
-                 shader->matrix[PG_MODEL_MATRIX],
-                 shader->matrix[PG_VIEW_MATRIX]);
+                 shader->matrix[PG_VIEW_MATRIX],
+                 shader->matrix[PG_MODEL_MATRIX]);
         glUniformMatrix4fv(shader->mat_idx[PG_MODELVIEW_MATRIX], 1, GL_FALSE,
                            *shader->matrix[PG_MODELVIEW_MATRIX]);
     }
@@ -194,10 +198,12 @@ void pg_shader_rebuild_matrices(struct pg_shader* shader)
     }
 }
 
-void pg_shader_buffer_model(struct pg_shader* shader, struct pg_model* model)
+void pg_shader_buffer_model_(struct pg_shader* shader, struct pg_model* model,
+                             const char* file, int line)
 {
     if((shader->components & model->components) != shader->components) {
-        printf("procgl shader error: Incompatible model!\n");
+        printf("procgl shader error: Incompatible model!\n"
+               "    %s:%d\n", file, line);
         return;
     }
     int i;

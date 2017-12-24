@@ -15,12 +15,13 @@
 #include <stdlib.h>
 #include <string.h>
 
-#define ARR_T(T) struct { T* data; size_t cap; size_t len; }
-typedef ARR_T(int)      arr_int_t;
-typedef ARR_T(unsigned) arr_uint_t;
-typedef ARR_T(double)   arr_double_t;
-typedef ARR_T(char)     arr_char_t;
-typedef ARR_T(char*)    arr_str_t;
+#define ARR_T(...) struct { __VA_ARGS__ *data; size_t cap; size_t len; }
+typedef ARR_T(int)              arr_int_t;
+typedef ARR_T(unsigned)         arr_uint_t;
+typedef ARR_T(double)           arr_double_t;
+typedef ARR_T(char)             arr_char_t;
+typedef ARR_T(unsigned char)    arr_uchar_t;
+typedef ARR_T(char*)            arr_str_t;
 
 #define ARR_FAIL    0
 #define ARR_SUCCEED 1
@@ -29,28 +30,39 @@ typedef ARR_T(char*)    arr_str_t;
 #define ARR_INIT(arr) do { (arr).len = 0; (arr).cap = 0; (arr).data = NULL; } \
                       while(0)
 
-#define ARR_DEINIT(arr) do { free((arr).data); ARR_INIT(arr); } while(0)
+#define ARR_DEINIT(arr) \
+    do { \
+        if((arr).data) free((arr).data); \
+        (arr).len = 0; (arr).cap = 0; (arr).data = NULL; \
+    } while(0)
 
 #define ARR_RESERVE(arr, count) \
     ( ((arr).cap > (count)) ? ARR_SUCCEED \
         : ((arr).data = realloc((arr).data, (count) * sizeof(*(arr).data)), \
-           (arr).data ? ((arr).cap = (count), ARR_SUCCEED) : ARR_FAIL) )  
+           (arr).data ? ((arr).cap = (count), ARR_SUCCEED) : ARR_FAIL) )
+
+#define ARR_RESERVE_CLEAR(arr, count) \
+    ( ((arr).cap > (count)) ? ARR_SUCCEED \
+        : ((arr).data = realloc((arr).data, (count) * sizeof(*(arr).data)), \
+        (!(arr).data) ? ARR_FAIL : \
+            ((arr).cap = (count), ARR_TRUNCATE_CLEAR((arr), (arr).len), \
+            ARR_SUCCEED)) )
 
 /*  Adding elements */
-#define ARR_PUSH(arr, val) \
+#define ARR_PUSH(arr, ...) \
     ( !ARR_RESERVE((arr), (arr).len + 1) ? ARR_FAIL \
-        : ((arr).data[(arr).len++] = (val), ARR_SUCCEED) )
+        : ((arr).data[(arr).len++] = (__VA_ARGS__), ARR_SUCCEED) )
 
-#define ARR_INSERT(arr, idx, val) \
+#define ARR_INSERT(arr, idx, ...) \
     ( !ARR_RESERVE((arr), (arr).len + 1) ? ARR_FAIL \
-        : (memmove((arr).data + (idx) + 1, \
-                   (arr).data + (idx), ((arr).len++) - (idx)), \
-            ((arr).data[idx] = (val)), ARR_SUCCEED) )
+        : (memmove((arr).data + (idx) + 1, (arr).data + (idx), \
+                   (((arr).len++) - (idx)) * sizeof(*(arr).data)), \
+            ((arr).data[idx] = (__VA_ARGS__)), ARR_SUCCEED) )
 
-#define ARR_SWAPINSERT(arr, idx, val) \
+#define ARR_SWAPINSERT(arr, idx, ...) \
     ( !ARR_RESERVE((arr), (arr).len + 1) ? ARR_FAIL\
-        : ((arr).data[(arr).len++] = (arr).data[idx], (arr).data[idx] = (val), \
-            ARR_SUCCEED) )
+        : ((arr).data[(arr).len++] = (arr).data[idx], \
+           (arr).data[idx] = (__VA_ARGS__), ARR_SUCCEED) )
 
 #define ARR_CONCAT(arr1, arr2) \
     ( (arr1).data == (arr2).data, \
@@ -106,5 +118,6 @@ typedef ARR_T(char*)    arr_str_t;
     for((idx) = (arr).len - 1; \
         ((idx) >= 0) && ((iter) = &((arr).data[idx]), 1); \
         --(idx))
+#define ARR_FOREACH_REV_PTR ARR_FOREACH_PTR_REV
 
 #endif

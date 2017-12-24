@@ -54,7 +54,7 @@ static void begin(struct pg_shader* shader, struct pg_viewer* view)
         glUniform1i(d->unis.norm_right, d->state.norm_right);
         glUniform1i(d->unis.norm_top, d->state.norm_top);
         glUniform1i(d->unis.norm_bottom, d->state.norm_bottom);
-        glUniform2fv(d->unis.tex_scale, 6, d->state.tex_scale);
+        glUniform2fv(d->unis.tex_scale, 6, (float*)d->state.tex_scale);
         d->tex_dirty = 0;
     }
     /*  Enable depth testing    */
@@ -72,8 +72,8 @@ int pg_shader_cubetex(struct pg_shader* shader)
         cubetex_frag_glsl, cubetex_frag_glsl_len);
 #else
     int load = pg_shader_load(shader,
-                              "src/procgl/shaders/cubetex_vert.glsl",
-                              "src/procgl/shaders/cubetex_frag.glsl");
+                              SHADER_BASE_DIR "cubetex_vert.glsl",
+                              SHADER_BASE_DIR "cubetex_frag.glsl");
 #endif
     if(!load) return 0;
     struct data_cubetex* d = malloc(sizeof(struct data_cubetex));

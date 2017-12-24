@@ -248,7 +248,7 @@ void pg_sdf_tree_parse(struct pg_sdf_tree* sdf, const char* src, unsigned len)
     struct pg_sdf_node root = { PG_SDF_NODE_NULL };
     ARR_PUSH(sdf->op_tree, root);
     const char* end = src + len;
-    const char* src_i = parse_node_recursive(sdf, 0, src, end);
+    parse_node_recursive(sdf, 0, src, end);
 }
 
 static const char* printouts[] = {

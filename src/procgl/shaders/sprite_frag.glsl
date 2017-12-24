@@ -2,9 +2,13 @@
 
 uniform sampler2D tex;
 uniform sampler2D norm;
+uniform vec4 color_mod;
 
+/*  Texture coord for all four textures */
 in vec2 f_tex_coord;
+/*  Vertex normals  */
 in vec3 f_normal;
+/*  Calculated vertex tangent and bitangent  */
 in vec3 f_tangent;
 in vec3 f_bitangent;
 
@@ -20,6 +24,7 @@ void main()
     if(tex_color.a < 0.5) discard;
     vec4 light_tex = texture(norm, f_tex_coord);
     vec4 tex_norm = vec4(light_tex.xyz * 2 - 1, light_tex.w);
-    g_albedo = tex_color;
+    g_albedo = tex_color * color_mod;
     g_normal = vec4(tex_norm.xyz * tbn * 0.5 + 0.5, tex_norm.w);
 }
+

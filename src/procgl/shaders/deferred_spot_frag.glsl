@@ -7,6 +7,7 @@ uniform vec3 eye_pos;
 uniform vec2 clip_planes;
 
 flat in vec4 f_light;
+flat in vec4 f_dir_angle;
 flat in vec3 f_color;
 
 in vec4 pos_cs;
@@ -35,10 +36,15 @@ void main()
     vec4 norm_sample = texture(g_normal, g_tex_coord);
     vec3 norm = norm_sample.xyz * 2 - 1;
     vec3 light_dir = normalize(light_to_pos);
+    float light_angle = acos(dot(light_dir, f_dir_angle.xyz));
     float shininess = norm_sample.w;
     vec3 half_angle = normalize(frag_to_eye - light_dir);
     vec3 specular = f_color * shininess * pow(max(dot(norm, half_angle), 0), 16);
     vec3 diffuse = f_color * max(dot(norm, -light_dir), 0);
     float attenuation = pow(1 - dist / f_light.w, 1.7);
-    frag_color = vec4(attenuation * (diffuse + specular), 0);
+    //attenuation = attenuation * (dist * dist);
+    //dist = dist;
+    //float attenuation = (1 - (dist / f_light.w)) * (f_light.w / (dist * dist));
+    frag_color = vec4(attenuation * (diffuse + specular)
+            * clamp((f_dir_angle.w - light_angle) * 20, 0, 1), 0);
 }

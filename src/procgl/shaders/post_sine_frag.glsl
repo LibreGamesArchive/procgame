@@ -1,7 +1,7 @@
 #version 330
 
 uniform sampler2D color;
-uniform sampler2D depth;
+
 in vec2 f_tex_coord;
 
 out vec4 frag_color;

@@ -1,5 +1,5 @@
 /*  Linear math library originally by github user datenwolf, under the
-    Do What The Fuck You Want To Public License.A
+    Do What The Fuck You Want To Public License.
 
     I have also added some more functions myself for procgame   */
 
@@ -19,8 +19,15 @@
 #ifndef MOD
 #define MOD(a, b) ((a) % (b) < 0 ? ((a) % (b)) + b : (a) % (b))
 #endif
+#ifndef FMOD
+#define FMOD(a, b) (fmod(a, b) < 0 ? (fmod(a, b) + b) : (fmod(a, b)))
+#endif
+#ifndef SGN
+#define SGN(a)  (a < 0 ? -1 : 1)
+#endif
 
-#define SATURATE(x) clamp(x, 0, 1)
+#define CLAMP(x, a, b) ( MIN(MAX(x, a), b) )
+#define SATURATE(x) CLAMP(x, 0, 1)
 static inline float clamp(float f, float a, float b)
 {
     return f < a ? a : (f > b ? b : f);
@@ -61,6 +68,12 @@ static inline void vec##n##_mul(vec##n r, vec##n const a, vec##n const b) \
     for(i=0; i<n; ++i) \
         r[i] = a[i] * b[i]; \
 } \
+static inline void vec##n##_div(vec##n r, vec##n const a, vec##n const b) \
+{ \
+    int i; \
+    for(i=0; i<n; ++i) \
+        r[i] = a[i] / b[i]; \
+} \
 static inline void vec##n##_scale(vec##n r, vec##n const v, float const s) \
 { \
     int i; \
@@ -79,10 +92,31 @@ static inline float vec##n##_len(vec##n const v) \
 { \
     return sqrtf(vec##n##_mul_inner(v,v)); \
 } \
+static inline float vec##n##_dist(vec##n const a, vec##n const b) \
+{ \
+    vec##n diff; \
+    vec##n##_sub(diff, a, b); \
+    return vec##n##_len(diff); \
+} \
+static inline float vec##n##_len2(vec##n const v) \
+{ \
+    return vec##n##_mul_inner(v,v); \
+} \
+static inline float vec##n##_dist2(vec##n const a, vec##n const b) \
+{ \
+    vec##n diff; \
+    vec##n##_sub(diff, a, b); \
+    return vec##n##_len2(diff); \
+} \
 static inline void vec##n##_normalize(vec##n r, vec##n const v) \
 { \
     float k = 1.0 / vec##n##_len(v); \
-    vec##n##_scale(r, v, k); \
+    vec##n##_scale(r,v,k); \
+} \
+static inline void vec##n##_set_len(vec##n r, vec##n const v, float const l) \
+{ \
+    float len = vec##n##_len(v); \
+    if(len != 0) vec##n##_scale(r,v,l/len); \
 } \
 static inline void vec##n##_min(vec##n r, vec##n const a, vec##n const b) \
 { \
@@ -101,6 +135,18 @@ static inline void vec##n##_abs(vec##n r, vec##n const v) \
     int i; \
     for(i=0; i<n; ++i) \
         r[i] = fabsf(v[i]); \
+} \
+static inline void vec##n##_floor(vec##n r, vec##n const v) \
+{ \
+    int i; \
+    for(i=0; i<n; ++i) \
+        r[i] = floor(v[i]); \
+} \
+static inline void vec##n##_ceil(vec##n r, vec##n const v) \
+{ \
+    int i; \
+    for(i=0; i<n; ++i) \
+        r[i] = ceil(v[i]); \
 } \
 static inline float vec##n##_vmax(vec##n const v) \
 { \
@@ -137,7 +183,27 @@ static inline void vec##n##_clamp(vec##n r, vec##n const v, \
     int i; \
     for(i=0; i<n; ++i) \
         r[i] = v[i] < a[i] ? a[i] : (v[i] > b[i] ? b[i] : v[i]); \
-}
+} \
+static inline void vec##n##_swap(vec##n a, vec##n b) \
+{ \
+    int i; \
+    for(i=0; i<n; ++i) { \
+        float tmp = a[i]; \
+        a[i] = b[i]; \
+        b[i] = tmp; \
+    } \
+} \
+static inline int vec##n##_is_zero(vec##n const v) \
+{ \
+    int i; \
+    for(i=0; i<n; ++i) \
+        if(v[i] != 0.0f) return 0; \
+    return 1; \
+} \
+static inline float vec##n##_angle_diff(vec##n const a, vec##n const b) \
+{ \
+    return acosf(vec##n##_mul_inner(a, b) / (vec##n##_len(a) * vec##n##_len(b))); \
+} \
 
 LINMATH_H_DEFINE_VEC(2)
 LINMATH_H_DEFINE_VEC(3)
@@ -164,6 +230,13 @@ static inline void vec4_set(vec4 a, float x, float y, float z, float w)
     a[3] = w;
 }
 
+static inline void vec2_rotate(vec2 r, vec2 const a, float angle)
+{
+    float c = cosf(angle);
+    float s = sinf(angle);
+    r[0] = a[0] * s - a[1] * c;
+    r[1] = a[0] * c + a[1] * s;
+}
 static inline void vec3_mul_cross(vec3 r, vec3 const a, vec3 const b)
 {
     r[0] = a[1]*b[2] - a[2]*b[1];
@@ -177,6 +250,13 @@ static inline void vec3_reflect(vec3 r, vec3 const v, vec3 const n)
     int i;
     for(i=0;i<3;++i)
         r[i] = v[i] - p*n[i];
+}
+
+static inline void vec3_wedge(vec3 r, vec3 const a, vec3 const b)
+{
+    r[0] = (a[1] * b[2]) - (b[1] * a[2]);
+    r[1] = (a[2] * b[0]) - (b[2] * a[0]);
+    r[2] = (a[0] * b[1]) - (b[0] * a[1]);
 }
 
 static inline void vec4_mul_cross(vec4 r, vec4 a, vec4 b)
@@ -193,6 +273,19 @@ static inline void vec4_reflect(vec4 r, vec4 v, vec4 n)
     int i;
     for(i=0;i<4;++i)
         r[i] = v[i] - p*n[i];
+}
+
+static inline void vec2_from_angle(vec2 r, float angle)
+{
+    r[0] = sin(angle);
+    r[1] = cos(angle);
+}
+
+static inline void spherical_to_cartesian(vec3 r, vec2 const v)
+{
+    r[0] = sin(v[1]) * cos(v[0]);
+    r[1] = sin(v[1]) * sin(v[0]);
+    r[2] = cos(v[1]);
 }
 
 typedef vec4 mat4[4];
@@ -270,12 +363,25 @@ static inline void mat4_mul(mat4 M, mat4 a, mat4 b)
 }
 static inline void mat4_mul_vec4(vec4 r, mat4 M, vec4 v)
 {
+    vec4 temp;
     int i, j;
     for(j=0; j<4; ++j) {
-        r[j] = 0.f;
+        temp[j] = 0.f;
         for(i=0; i<4; ++i)
-            r[j] += M[i][j] * v[i];
+            temp[j] += M[i][j] * v[i];
     }
+    vec4_dup(r, temp);
+}
+static inline void mat3_mul_vec3(vec3 r, mat4 M, vec3 v)
+{
+    vec3 temp;
+    int i, j;
+    for(j=0; j<3; ++j) {
+        temp[j] = 0.f;
+        for(i=0; i<3; ++i)
+            temp[j] += M[i][j] * v[i];
+    }
+    vec3_dup(r, temp);
 }
 static inline void mat4_translate(mat4 T, float x, float y, float z)
 {
@@ -536,6 +642,10 @@ static inline void mat4_look_at(mat4 m, vec3 eye, vec3 center, vec3 up)
 }
 
 typedef float quat[4];
+#define quat_set vec4_set
+#define quat_normalize vec4_normalize
+#define quat_lerp vec4_lerp
+#define quat_dup vec4_dup
 static inline void quat_identity(quat q)
 {
     q[0] = q[1] = q[2] = 0.f;
@@ -553,15 +663,14 @@ static inline void quat_sub(quat r, quat a, quat b)
     for(i=0; i<4; ++i)
         r[i] = a[i] - b[i];
 }
-static inline void quat_mul(quat r, quat p, quat q)
+static inline void quat_mul(quat r, quat a, quat b)
 {
-    vec3 w;
-    vec3_mul_cross(r, p, q);
-    vec3_scale(w, p, q[3]);
-    vec3_add(r, r, w);
-    vec3_scale(w, q, p[3]);
-    vec3_add(r, r, w);
-    r[3] = p[3]*q[3] - vec3_mul_inner(p, q);
+    quat tmp;
+    tmp[0] = a[3]*b[0] + a[1]*b[2] - a[2]*b[1] + a[0]*b[3];
+    tmp[1] = a[3]*b[1] + a[1]*b[3] + a[2]*b[0] - a[0]*b[2];
+    tmp[2] = a[3]*b[2] - a[1]*b[0] + a[2]*b[3] + a[0]*b[1];
+    tmp[3] = a[3]*b[3] - a[1]*b[1] - a[2]*b[2] - a[0]*b[0];
+    quat_dup(r, tmp);
 }
 static inline void quat_scale(quat r, quat v, float s)
 {
@@ -584,7 +693,8 @@ static inline void quat_conj(quat r, quat q)
         r[i] = -q[i];
     r[3] = q[3];
 }
-static inline void quat_rotate(quat r, float angle, vec3 axis) {
+static inline void quat_rotate(quat r, float angle, vec3 axis)
+{
     vec3 v;
     vec3_scale(v, axis, sinf(angle / 2));
     int i;
@@ -592,14 +702,25 @@ static inline void quat_rotate(quat r, float angle, vec3 axis) {
         r[i] = v[i];
     r[3] = cosf(angle / 2);
 }
-#define quat_norm vec4_norm
+static inline void quat_vec3_to_vec3(quat q, vec3 const a, vec3 const b)
+{
+    float r = vec3_mul_inner(a, b) + 1.0f;
+    vec3 w;
+    if (r < 0.00001) {
+        r = 0.0f;
+        if(fabsf(a[0]) > fabsf(a[2])) vec3_set(w, -a[1], a[0], 0.0f);
+        else vec3_set(w, 0.0f, -a[2], a[1]);
+    } else {
+        vec3_mul_cross(w, a, b);
+    }
+    quat_set(q, w[0], w[1], w[2], r);
+    quat_normalize(q, q);
+}   
 static inline void quat_mul_vec3(vec3 r, quat q, vec3 v)
 {
-/*
- * Method by Fabian 'ryg' Giessen (of Farbrausch)
-t = 2 * cross(q.xyz, v)
-v' = v + q.w * t + cross(q.xyz, t)
- */
+/*  Method by Fabian 'ryg' Giessen (of Farbrausch)
+    t = 2 * cross(q.xyz, v)
+    v' = v + q.w * t + cross(q.xyz, t) */
     vec3 t;
     vec3 q_xyz = {q[0], q[1], q[2]};
     vec3 u = {q[0], q[1], q[2]};
@@ -643,16 +764,13 @@ static inline void mat4_from_quat(mat4 M, quat q)
     M[3][3] = 1.f;
 }
 
-static inline void mat4o_mul_quat(mat4 R, mat4 M, quat q)
+static inline void mat4_mul_quat(mat4 R, mat4 M, quat q)
 {
 /*  XXX: The way this is written only works for othogonal matrices. */
 /* TODO: Take care of non-orthogonal case. */
     quat_mul_vec3(R[0], q, M[0]);
     quat_mul_vec3(R[1], q, M[1]);
     quat_mul_vec3(R[2], q, M[2]);
-
-    R[3][0] = R[3][1] = R[3][2] = 0.f;
-    R[3][3] = 1.f;
 }
 static inline void quat_from_mat4(quat q, mat4 M)
 {
@@ -682,6 +800,55 @@ static inline void quat_from_mat4(quat q, mat4 M)
     q[1] = (M[p[0]][p[1]] - M[p[1]][p[0]])/(2.f*r);
     q[2] = (M[p[2]][p[0]] - M[p[0]][p[2]])/(2.f*r);
     q[3] = (M[p[2]][p[1]] - M[p[1]][p[2]])/(2.f*r);
+}
+
+typedef vec3 box[2];
+static inline void box_bound(box out, box a, box b)
+{
+    out[0][0] = MIN(MIN(a[0][0], a[1][0]), MIN(b[0][0], b[1][0]));
+    out[0][1] = MIN(MIN(a[0][1], a[1][1]), MIN(b[0][1], b[1][1]));
+    out[0][2] = MIN(MIN(a[0][2], a[1][2]), MIN(b[0][2], b[1][2]));
+    out[1][0] = MAX(MAX(a[0][0], a[1][0]), MAX(b[0][0], b[1][0]));
+    out[1][1] = MAX(MAX(a[0][1], a[1][1]), MAX(b[0][1], b[1][1]));
+    out[1][2] = MAX(MAX(a[0][2], a[1][2]), MAX(b[0][2], b[1][2]));
+}
+
+static inline void box_dup(box out, box a)
+{
+    vec3_dup(out[0], a[0]);
+    vec3_dup(out[1], a[1]);
+}
+
+static inline void box_add_vec3(box out, box a, vec3 v)
+{
+    vec3_add(out[0], a[0], v);
+    vec3_add(out[1], a[1], v);
+}
+
+static inline void box_sub_vec3(box out, box a, vec3 v)
+{
+    vec3_sub(out[0], a[0], v);
+    vec3_sub(out[1], a[1], v);
+}
+
+static inline void box_mul_vec3(box out, box a, vec3 v)
+{
+    vec3_mul(out[0], a[0], v);
+    vec3_mul(out[1], a[1], v);
+}
+
+static inline void box_div_vec3(box out, box a, vec3 v)
+{
+    vec3_div(out[0], a[0], v);
+    vec3_div(out[1], a[1], v);
+}
+
+static inline int box_contains_point(box a, vec3 v)
+{
+    if(v[0] >= a[0][0] && v[0] < a[1][0]
+    && v[1] >= a[0][1] && v[1] < a[1][1]
+    && v[2] >= a[0][2] && v[2] < a[1][2]) return 1;
+    else return 0;
 }
 
 #endif

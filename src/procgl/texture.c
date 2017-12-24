@@ -10,14 +10,11 @@
 #include "heightmap.h"
 #include "texture.h"
 
-
-
-
 void pg_texture_init_from_file(struct pg_texture* tex,
                                const char* diffuse_file, const char* light_file)
 {
     unsigned w0, h0, w1, h1;
-    lodepng_decode32_file(&tex->diffuse, &w0, &h0, diffuse_file);
+    lodepng_decode32_file((unsigned char**)&tex->diffuse, &w0, &h0, diffuse_file);
     tex->w = w0;
     tex->h = h0;
     tex->diffuse_slot = 0;
@@ -32,7 +29,7 @@ void pg_texture_init_from_file(struct pg_texture* tex,
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
     if(light_file) {
-        lodepng_decode32_file(&tex->light, &w1, &h1, light_file);
+        lodepng_decode32_file((unsigned char**)&tex->light, &w1, &h1, light_file);
         if(w0 != w1 || h0 != h1) {
             printf("Warning: colormap and normalmap size mismatch:\n"
                    "    colormap: %s\n    normalmap: %s\n",
@@ -45,8 +42,8 @@ void pg_texture_init_from_file(struct pg_texture* tex,
                      GL_UNSIGNED_BYTE, tex->light);
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
     } else {
         tex->light = NULL;
         tex->light_slot = -1;
@@ -119,8 +116,29 @@ void pg_texture_buffer(struct pg_texture* tex)
     }
 }
 
-void pg_texture_generate_normals(struct pg_texture* tex,
-                                 struct pg_heightmap* hmap, float intensity)
+void pg_texture_wave_to_colors(struct pg_texture* tex, struct pg_wave* wave,
+        void (*func)(vec4 out, vec2 s, struct pg_wave* wave))
+{
+    if(!tex->diffuse) return;
+    int x, y;
+    for(x = 0; x < tex->w; ++x) {
+        for(y = 0; y < tex->h; ++y) {
+            vec2 p = { (float)x / (float)tex->w * 2 - 1,
+                       (float)y / (float)tex->h * 2 - 1};
+            vec4 color;
+            func(color, p, wave);
+            vec4_max(color, color, (vec4){});
+            vec4_min(color, color, (vec4){1,1,1,1});
+            vec4_scale(color, color, 255.0f);
+            pg_texel_set(tex->diffuse[x + y * tex->w],
+                color[0], color[1], color[2], color[3]);
+        }
+    }
+}
+
+
+void pg_texture_hmap_to_normals(struct pg_texture* tex,
+                                struct pg_heightmap* hmap, float intensity)
 {
     if(!tex->light) return;
     int x, y;
@@ -146,4 +164,42 @@ void pg_texture_set_atlas(struct pg_texture* tex, int frame_w, int frame_h)
 {
     tex->frame_w = frame_w;
     tex->frame_h = frame_h;
+    tex->frame_aspect_ratio = (float)frame_w / (float)frame_h;
+}
+
+void pg_texture_get_frame(struct pg_texture* tex, int frame, vec4 out)
+{
+    int frames_wide = tex->w / tex->frame_w;
+    float frame_u = (float)tex->frame_w / tex->w;
+    float frame_v = (float)tex->frame_h / tex->h;
+    float frame_x = (float)(frame % frames_wide) * frame_u;
+    float frame_y = (float)(frame / frames_wide) * frame_v;
+    vec4_set(out, frame_x, frame_y, frame_x + frame_u, frame_y + frame_v);
+}
+
+void pg_texture_frame_flip(vec4 out, vec4 const in, int x, int y)
+{
+    vec4 tmp = { in[0], in[1], in[2], in[3] };
+    if(x) {
+        tmp[0] = in[2];
+        tmp[2] = in[0];
+    }
+    if(y) {
+        tmp[1] = in[3];
+        tmp[3] = in[1];
+    }
+    vec4_dup(out, tmp);
+}
+
+void pg_texture_frame_tx(vec4 out, vec4 const in,
+                         vec2 const scale, vec2 const offset)
+{
+    vec4 tmp = { in[0], in[1], in[2], in[3] };
+    vec2 diff;
+    vec2_sub(diff, in + 2, in);
+    vec2_mul(diff, diff, scale);
+    vec2_add(tmp + 2, tmp, (vec2){ diff[0], diff[1] });
+    vec2_add(tmp, tmp, offset);
+    vec2_add(tmp + 2, tmp + 2, offset);
+    vec4_dup(out, tmp);
 }

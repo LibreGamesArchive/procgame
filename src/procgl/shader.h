@@ -1,3 +1,6 @@
+struct pg_model;
+struct pg_viewer;
+
 enum pg_matrix {
     PG_MODEL_MATRIX,
     PG_NORMAL_MATRIX,
@@ -38,9 +41,12 @@ void pg_shader_set_matrix(struct pg_shader* shader, enum pg_matrix type,
                           mat4 matrix);
 void pg_shader_rebuild_matrices(struct pg_shader* shader);
 void pg_shader_link_component(struct pg_shader* shader,
-                              enum pg_model_component comp, const char* name);
+                              uint32_t comp, const char* name);
 /*  Generates a VBO and VAO based on the shader and model components    */
-void pg_shader_buffer_model(struct pg_shader* shader, struct pg_model* model);
+#define pg_shader_buffer_model(shader, model) \
+    pg_shader_buffer_model_(shader, model, __FILE__, __LINE__)
+void pg_shader_buffer_model_(struct pg_shader* shader, struct pg_model* model,
+                             const char* file, int line);
 /*  Check if a shader is currently active   */
 int pg_shader_is_active(struct pg_shader* shader);
 
