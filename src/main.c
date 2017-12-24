@@ -1,10 +1,13 @@
 #include <stdio.h>
 #include <time.h>
 #include "procgl/procgl.h"
-#include "game/game_fps.h"
+#include "game/game_example.h"
+#include "handle_crash.h"
 
 int main(int argc, char *argv[])
 {
+    program_name = argv[0];
+    set_signal_handler();
     /*  Read the options file   */
     FILE* config = fopen("./options.txt", "r");
     int w, h, fullscreen;
@@ -17,9 +20,9 @@ int main(int argc, char *argv[])
     srand(time(0));
     /*  Init example game   */
     struct pg_game_state game;
-    fps_game_start(&game);
+    example_game_start(&game);
     /*  Main loop   */
-    while(game.tick) {
+    while(game.running) {
         glEnable(GL_DEPTH_TEST);
         glDepthMask(1);
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);

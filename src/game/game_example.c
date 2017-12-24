@@ -3,54 +3,56 @@
 #include "procgl/procgl.h"
 
 struct example_game_renderer {
-    struct pg_shader shader_text;
+    struct pg_shader shader_2d;
 };
 
 struct example_game_assets {
     struct pg_texture font;
-    struct pg_audio_chunk sound;
+    struct pg_model quad;
 };
 
 struct example_game_data {
     struct example_game_renderer rend;
     struct example_game_assets assets;
-    const uint8_t* kb_state;
     vec2 player_pos, player_vel;
 };
 
+void example_game_update(struct pg_game_state*, float);
 void example_game_tick(struct pg_game_state*);
 void example_game_draw(struct pg_game_state*);
 void example_game_deinit(void*);
-
-static void example_game_gen_audio(struct pg_audio_chunk* snd)
-{
-    struct pg_wave wave;
-    pg_wave_init_sine(&wave);
-    wave.frequency[0] = 440;
-    wave.scale = 0.25;
-    struct pg_audio_envelope env = {
-        .attack_time = 0.01,
-        .max = 2,
-        .decay_time = 0.01,
-        .sustain = 1,
-        .release_time = 0.2 };
-    pg_audio_alloc(snd, 0.25);
-    pg_audio_generate(snd, 0.25, &wave, &env);
-    pg_audio_save(snd, "test.wav");
-}
 
 void example_game_start(struct pg_game_state* state)
 {
     pg_game_state_init(state, pg_time(), 30, 3);
     struct example_game_data* d = malloc(sizeof(*d));
-    d->kb_state = SDL_GetKeyboardState(NULL);
-    vec2_set(d->player_pos, 100, 100);
+    vec2_set(d->player_pos, 0, 0);
     vec2_set(d->player_vel, 0, 0);
-    example_game_gen_audio(&d->assets.sound);
-    pg_texture_init_from_file(&d->assets.font, "font_8x8.png", NULL, 0, -1);
+    pg_texture_init_from_file(&d->assets.font, "res/font_8x8.png", NULL);
+    pg_texture_bind(&d->assets.font, 0, -1);
     pg_texture_set_atlas(&d->assets.font, 8, 8);
-    pg_shader_text(&d->rend.shader_text);
-    pg_shader_text_set_font(&d->rend.shader_text, &d->assets.font);
+    pg_shader_2d(&d->rend.shader_2d);
+    pg_shader_2d_texture(&d->rend.shader_2d, &d->assets.font);
+    /*  Basic centered quad */
+    pg_model_init(&d->assets.quad);
+    pg_model_quad(&d->assets.quad, (vec2){ 1, 1 });
+    mat4 transform;
+    mat4_identity(transform);
+    mat4_scale_aniso(transform, transform, 1, -1, 0);
+    pg_model_transform(&d->assets.quad, transform);
+    pg_model_reserve_component(&d->assets.quad,
+        PG_MODEL_COMPONENT_COLOR | PG_MODEL_COMPONENT_HEIGHT);
+    vec4_t* color;
+    float* f;
+    int i;
+    ARR_FOREACH_PTR(d->assets.quad.height, f, i) {
+        *f = 1.0f;
+    }
+    ARR_FOREACH_PTR(d->assets.quad.color, color, i) {
+        vec4_set(color->v, 1, 1, 1, 1);
+    }
+    pg_shader_buffer_model(&d->rend.shader_2d, &d->assets.quad);
+    /*  Fill in state structure */
     state->data = d;
     state->tick = example_game_tick;
     state->draw = example_game_draw;
@@ -60,27 +62,23 @@ void example_game_start(struct pg_game_state* state)
 void example_game_tick(struct pg_game_state* state)
 {
     struct example_game_data* d = state->data;
-    if(d->kb_state[SDL_SCANCODE_LEFT]) {
-        d->player_vel[0] -= 10;
+    pg_poll_input();
+    if(pg_user_exit()) state->running = 0;
+    if(pg_check_input(SDL_SCANCODE_LEFT, PG_CONTROL_HELD)) {
+        d->player_vel[0] -= 0.01;
     }
-    if(d->kb_state[SDL_SCANCODE_RIGHT]) {
-        d->player_vel[0] += 10;
+    if(pg_check_input(SDL_SCANCODE_RIGHT, PG_CONTROL_HELD)) {
+        d->player_vel[0] += 0.01;
     }
-    if(d->kb_state[SDL_SCANCODE_UP]) {
-        d->player_vel[1] -= 10;
+    if(pg_check_input(SDL_SCANCODE_UP, PG_CONTROL_HELD)) {
+        d->player_vel[1] -= 0.01;
     }
-    if(d->kb_state[SDL_SCANCODE_DOWN]) {
-        d->player_vel[1] += 10;
-    }
-    SDL_Event e;
-    while(SDL_PollEvent(&e)) {
-        if(e.type == SDL_QUIT) state->tick = NULL;
-        else if(e.type == SDL_KEYDOWN) {
-            pg_audio_play(&d->assets.sound, 1);
-        }
+    if(pg_check_input(SDL_SCANCODE_DOWN, PG_CONTROL_HELD)) {
+        d->player_vel[1] += 0.01;
     }
     vec2_add(d->player_pos, d->player_pos, d->player_vel);
     vec2_scale(d->player_vel, d->player_vel, 0.8);
+    pg_flush_input();
 }
 
 void example_game_draw(struct pg_game_state* state)
@@ -89,16 +87,22 @@ void example_game_draw(struct pg_game_state* state)
     float t = state->tick_over;
     pg_screen_dst();
     vec2 vel_lerp = { d->player_vel[0] * t, d->player_vel[1] * t };
-    vec2 pos = { d->player_pos[0] + vel_lerp[0] - 16,
-                 d->player_pos[1] + vel_lerp[1] - 16 };
-    pg_shader_begin(&d->rend.shader_text, NULL);
-    pg_shader_text_write(&d->rend.shader_text, "@", pos, (vec2){ 32, 32 }, 0);
+    vec2 pos = { d->player_pos[0] + vel_lerp[0],
+                 d->player_pos[1] + vel_lerp[1] };
+    pg_shader_begin(&d->rend.shader_2d, NULL);
+    pg_shader_2d_resolution(&d->rend.shader_2d, (vec2){ 1, 1 });
+    pg_shader_2d_transform(&d->rend.shader_2d, pos, (vec2){ 0.1, 0.1 }, 0);
+    pg_shader_2d_set_light(&d->rend.shader_2d, (vec2){}, (vec3){}, (vec3){ 1, 1, 1 });
+    pg_shader_2d_tex_frame(&d->rend.shader_2d, '@' - 32);
+    pg_model_begin(&d->assets.quad, &d->rend.shader_2d);
+    pg_model_draw(&d->assets.quad, NULL);
 }
 
 void example_game_deinit(void* data)
 {
     struct example_game_data* d = data;
-    pg_shader_deinit(&d->rend.shader_text);
+    pg_shader_deinit(&d->rend.shader_2d);
     pg_texture_deinit(&d->assets.font);
+    pg_model_deinit(&d->assets.quad);
     free(d);
 }
