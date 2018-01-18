@@ -1,5 +1,10 @@
 #version 330
 
+#define model_matrix pg_matrix_model
+#define normal_matrix pg_matrix_normal
+#define view_matrix pg_matrix_view
+#define projview_matrix pg_matrix_projview
+#define tex_tx pg_tex_rect_0
 uniform mat4 model_matrix;
 uniform mat4 normal_matrix;
 uniform mat4 view_matrix;

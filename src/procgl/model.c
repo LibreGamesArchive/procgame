@@ -1,13 +1,16 @@
 #include "procgl.h"
 
-void pg_vertex_transform(struct pg_vertex_full* out, struct pg_vertex_full* src,
+#if 0
+void pg_vertex_transform(struct pg_model_vertex* out, struct pg_model_vertex* src,
                          mat4 transform)
 {
     mat4 inv;
     mat4_invert(inv, transform);
     mat4 normal_matrix;
     mat4_transpose(normal_matrix, inv);
-    out->components = src->components;
+    int i;
+    if(src->attribs[PG_ATTRIB_POSITION].used) {
+        src->attribs[PG_ATTRIB_POSITION].v3.data
     if(src->components & PG_MODEL_COMPONENT_POSITION) {
         vec4 old = { src->pos[0], src->pos[1], src->pos[2], 1.0f };
         vec4 new;
@@ -42,109 +45,317 @@ void pg_vertex_transform(struct pg_vertex_full* out, struct pg_vertex_full* src,
         out->height = src->height;
     }
 }
-
-static void pg_model_reset_buffers(struct pg_model* model);
+#endif
 
 /*  Setup+cleanup   */
 void pg_model_init(struct pg_model* model)
 {
-    model->components = 0;
-    model->v_count = 0;
-    model->active = -1;
-    model->dirty_tris = 1;
-    model->ebo = 0;
-    glGenBuffers(1, &model->ebo);
-    ARR_INIT(model->pos);
-    ARR_INIT(model->color);
-    ARR_INIT(model->uv);
-    ARR_INIT(model->normal);
-    ARR_INIT(model->tangent);
-    ARR_INIT(model->bitangent);
-    ARR_INIT(model->height);
-    ARR_INIT(model->buffers);
-    ARR_INIT(model->tris);
+    *model = (struct pg_model){};
+    int i;
+    for(i = 0; i < PG_NUM_ATTRIBS; ++i) {
+        model->attribs[i].type = PG_SHADER_ATTRIBUTE_INFO[i].type;
+    }
+}
+
+static void reset_attrib_array(struct pg_model_attribute_array* arr)
+{
+    switch(arr->type) {
+        case PG_BYTE: ARR_TRUNCATE(arr->b1, 0); break;
+        case PG_BVEC2: ARR_TRUNCATE(arr->b2, 0); break;
+        case PG_BVEC3: ARR_TRUNCATE(arr->b3, 0); break;
+        case PG_BVEC4: ARR_TRUNCATE(arr->b4, 0); break;
+        case PG_UBYTE: ARR_TRUNCATE(arr->ub1, 0); break;
+        case PG_UBVEC2: ARR_TRUNCATE(arr->ub2, 0); break;
+        case PG_UBVEC3: ARR_TRUNCATE(arr->ub3, 0); break;
+        case PG_UBVEC4: ARR_TRUNCATE(arr->ub4, 0); break;
+        case PG_INT: ARR_TRUNCATE(arr->i1, 0); break;
+        case PG_IVEC2: ARR_TRUNCATE(arr->i2, 0); break;
+        case PG_IVEC3: ARR_TRUNCATE(arr->i3, 0); break;
+        case PG_IVEC4: ARR_TRUNCATE(arr->i4, 0); break;
+        case PG_UINT: ARR_TRUNCATE(arr->u1, 0); break;
+        case PG_UVEC2: ARR_TRUNCATE(arr->u2, 0); break;
+        case PG_UVEC3: ARR_TRUNCATE(arr->u3, 0); break;
+        case PG_UVEC4: ARR_TRUNCATE(arr->u4, 0); break;
+        case PG_FLOAT: ARR_TRUNCATE(arr->f1, 0); break;
+        case PG_VEC2: ARR_TRUNCATE(arr->f2, 0); break;
+        case PG_VEC3: ARR_TRUNCATE(arr->f3, 0); break;
+        case PG_VEC4: ARR_TRUNCATE(arr->f4, 0); break;
+        default: break;
+    }
+}
+
+static void deinit_attrib_array(struct pg_model_attribute_array* arr)
+{
+    switch(arr->type) {
+        case PG_BYTE: ARR_DEINIT(arr->b1); break;
+        case PG_BVEC2: ARR_DEINIT(arr->b2); break;
+        case PG_BVEC3: ARR_DEINIT(arr->b3); break;
+        case PG_BVEC4: ARR_DEINIT(arr->b4); break;
+        case PG_UBYTE: ARR_DEINIT(arr->ub1); break;
+        case PG_UBVEC2: ARR_DEINIT(arr->ub2); break;
+        case PG_UBVEC3: ARR_DEINIT(arr->ub3); break;
+        case PG_UBVEC4: ARR_DEINIT(arr->ub4); break;
+        case PG_INT: ARR_DEINIT(arr->i1); break;
+        case PG_IVEC2: ARR_DEINIT(arr->i2); break;
+        case PG_IVEC3: ARR_DEINIT(arr->i3); break;
+        case PG_IVEC4: ARR_DEINIT(arr->i4); break;
+        case PG_UINT: ARR_DEINIT(arr->u1); break;
+        case PG_UVEC2: ARR_DEINIT(arr->u2); break;
+        case PG_UVEC3: ARR_DEINIT(arr->u3); break;
+        case PG_UVEC4: ARR_DEINIT(arr->u4); break;
+        case PG_FLOAT: ARR_DEINIT(arr->f1); break;
+        case PG_VEC2: ARR_DEINIT(arr->f2); break;
+        case PG_VEC3: ARR_DEINIT(arr->f3); break;
+        case PG_VEC4: ARR_DEINIT(arr->f4); break;
+        default: break;
+    }
 }
 
 void pg_model_reset(struct pg_model* model)
 {
-    ARR_TRUNCATE(model->pos, 0);
-    ARR_TRUNCATE(model->color, 0);
-    ARR_TRUNCATE(model->uv, 0);
-    ARR_TRUNCATE(model->normal, 0);
-    ARR_TRUNCATE(model->tangent, 0);
-    ARR_TRUNCATE(model->bitangent, 0);
-    ARR_TRUNCATE(model->height, 0);
-    pg_model_reset_buffers(model);
+    int i;
+    for(i = 0; i < PG_NUM_ATTRIBS; ++i) {
+        reset_attrib_array(&model->attribs[i]);
+    }
     ARR_TRUNCATE(model->tris, 0);
-    model->components = 0;
     model->v_count = 0;
 }
 
 void pg_model_deinit(struct pg_model* model)
 {
-    ARR_DEINIT(model->pos);
-    ARR_DEINIT(model->color);
-    ARR_DEINIT(model->uv);
-    ARR_DEINIT(model->normal);
-    ARR_DEINIT(model->tangent);
-    ARR_DEINIT(model->bitangent);
-    ARR_DEINIT(model->height);
-    pg_model_reset_buffers(model);
-    ARR_DEINIT(model->buffers);
+    int i;
+    for(i = 0; i < PG_NUM_ATTRIBS; ++i) {
+        deinit_attrib_array(&model->attribs[i]);
+    }
     ARR_DEINIT(model->tris);
-    glDeleteBuffers(1, &model->ebo);
+    model->v_count = 0;
+    if(model->buf.ebo) glDeleteBuffers(1, &model->buf.ebo);
+    if(model->buf.vbo) glDeleteBuffers(1, &model->buf.vbo);
+    if(model->buf.vao) glDeleteVertexArrays(1, &model->buf.vao);
+    if(model->buf.buffer) free(model->buf.buffer);
 }
 
 /*  Shader handling */
 void pg_model_buffer(struct pg_model* model)
 {
-    glBindVertexArray(0);
-    if(model->dirty_tris) {
-        /*  We use the same index buffer for every one  */
-        glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, model->ebo);
-        glBufferData(GL_ELEMENT_ARRAY_BUFFER,
-                     model->tris.len * sizeof(*model->tris.data),
-                     model->tris.data, GL_STATIC_DRAW);
-    }
-    model->dirty_tris = 0;
-    struct pg_model_buffer* buf;
     int i;
-    ARR_FOREACH_PTR(model->buffers, buf, i) buf->dirty_buffers = 1;
-    ARR_FOREACH_PTR(model->buffers, buf, i) {
-        if(buf->dirty_buffers) {
-            pg_shader_buffer_model(buf->shader, model);
+    size_t vert_size = 0;
+    size_t attr_offset[PG_NUM_ATTRIBS] = {};
+    size_t attr_stride[PG_NUM_ATTRIBS] = {};
+    for(i = 0; i < PG_NUM_ATTRIBS; ++i) {
+        if(!model->attribs[i].used) continue;
+        const struct pg_shader_attribute_info* attr_info = &PG_SHADER_ATTRIBUTE_INFO[i];
+        attr_offset[i] = vert_size;
+        vert_size += attr_info->size;
+    }
+    size_t buf_size = vert_size * model->v_count;
+    model->buf.buffer = realloc(model->buf.buffer, buf_size);
+    for(i = 0; i < PG_NUM_ATTRIBS; ++i) {
+        if(!model->attribs[i].used) continue;
+        printf("Copying attr %d to CPU buffer\n", i);
+        const struct pg_shader_attribute_info* attr_info = &PG_SHADER_ATTRIBUTE_INFO[i];
+        size_t data_size = attr_info->size;
+        attr_stride[i] = vert_size;
+        void* v_data;
+        switch(attr_info->type) {
+            case PG_BYTE: v_data = model->attribs[i].b1.data; break;
+            case PG_BVEC2: v_data = model->attribs[i].b2.data; break;
+            case PG_BVEC3: v_data = model->attribs[i].b3.data; break;
+            case PG_BVEC4: v_data = model->attribs[i].b4.data; break;
+            case PG_UBYTE: v_data = model->attribs[i].ub1.data; break;
+            case PG_UBVEC2: v_data = model->attribs[i].ub2.data; break;
+            case PG_UBVEC3: v_data = model->attribs[i].ub3.data; break;
+            case PG_UBVEC4: v_data = model->attribs[i].ub4.data; break;
+            case PG_INT: v_data = model->attribs[i].i1.data; break;
+            case PG_IVEC2: v_data = model->attribs[i].i2.data; break;
+            case PG_IVEC3: v_data = model->attribs[i].i3.data; break;
+            case PG_IVEC4: v_data = model->attribs[i].i4.data; break;
+            case PG_UINT: v_data = model->attribs[i].u1.data; break;
+            case PG_UVEC2: v_data = model->attribs[i].u2.data; break;
+            case PG_UVEC3: v_data = model->attribs[i].u3.data; break;
+            case PG_UVEC4: v_data = model->attribs[i].u4.data; break;
+            case PG_FLOAT: v_data = model->attribs[i].f1.data; break;
+            case PG_VEC2: v_data = model->attribs[i].f2.data; break;
+            case PG_VEC3: v_data = model->attribs[i].f3.data; break;
+            case PG_VEC4: v_data = model->attribs[i].f4.data; break;
+            default: v_data = NULL; break;
+        }
+        if(!v_data) continue;
+        size_t buf_idx = attr_offset[i];
+        size_t v_idx = 0;
+        int j;
+        for(j = 0; j < model->v_count; ++j) {
+            memcpy(model->buf.buffer + buf_idx, v_data + v_idx, data_size);
+            buf_idx += vert_size;
+            v_idx += data_size;
         }
     }
+    if(model->buf.ebo == 0) glGenBuffers(1, &model->buf.ebo);
+    if(model->buf.vao == 0) glGenVertexArrays(1, &model->buf.vao);
+    if(model->buf.vbo == 0) glGenBuffers(1, &model->buf.vbo);
+    glBindVertexArray(model->buf.vao);
+    glBindBuffer(GL_ARRAY_BUFFER, model->buf.vbo);
+    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, model->buf.ebo);
+    glBufferData(GL_ELEMENT_ARRAY_BUFFER,
+                 model->tris.len * sizeof(*model->tris.data),
+                 model->tris.data, GL_STATIC_DRAW);
+    printf("Copying vertex data to GPU: size: %zu\n", buf_size);
+    glBufferData(GL_ARRAY_BUFFER, buf_size, model->buf.buffer, GL_STATIC_DRAW);
+    for(i = 0; i < PG_NUM_ATTRIBS; ++i) {
+        if(!model->attribs[i].used) continue;
+        const struct pg_shader_attribute_info* attr_info = &PG_SHADER_ATTRIBUTE_INFO[i];
+        if(attr_info->as_integer) {
+            glVertexAttribIPointer(i, attr_info->elements, attr_info->gltype,
+                                   attr_stride[i], (void*)attr_offset[i]);
+        } else {
+            glVertexAttribPointer(i, attr_info->elements,
+                                  attr_info->gltype, attr_info->normalized,
+                                  attr_stride[i], (void*)attr_offset[i]);
+        }
+        glEnableVertexAttribArray(i);
+    }
+    glBindVertexArray(0);
 }
 
 void pg_model_begin(struct pg_model* model, struct pg_shader* shader)
 {
-    struct pg_model_buffer* m_i;
-    int i;
-    ARR_FOREACH_PTR(model->buffers, m_i, i) {
-        if(m_i->shader == shader) break;
-    }
-    if(m_i->shader != shader) {
-        printf("procgl render error: model has not been buffered for shader\n");
-        return;
-    }
-    glBindVertexArray(m_i->vao);
-    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, model->ebo);
-    model->active = i;
+    glBindVertexArray(model->buf.vao);
+    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, model->buf.ebo);
 }
 
 void pg_model_draw(struct pg_model* model, mat4 transform)
 {
+/*
     if(model->active < 0) return;
     struct pg_shader* m_shader = model->buffers.data[model->active].shader;
     if(transform) {
         pg_shader_set_matrix(m_shader, PG_MODEL_MATRIX, transform);
         pg_shader_rebuild_matrices(m_shader);
     }
-    glDrawElements(GL_TRIANGLES, model->tris.len * 3, GL_UNSIGNED_INT, 0);
+    glDrawElements(GL_TRIANGLES, model->tris.len * 3, GL_UNSIGNED_INT, 0);*/
 }
 
 /*  Raw vertex/triangle building    */
+
+void pg_model_transform(struct pg_model* model, mat4 transform)
+{
+    int i;
+    mat4 inv, normal_tx;
+    mat4_invert(inv, transform);
+    mat4_transpose(normal_tx, inv);
+    vec3* v;
+    if(model->attribs[PG_ATTRIB_POSITION].used) {
+        for(i = 0; i < model->v_count; ++i) {
+            v = &model->attribs[PG_ATTRIB_POSITION].f3.data[i].v;
+            mat4_mul_vec3(*v, transform, *v);
+        }
+    }
+    if(model->attribs[PG_ATTRIB_NORMAL].used) {
+        for(i = 0; i < model->v_count; ++i) {
+            v = &model->attribs[PG_ATTRIB_NORMAL].f3.data[i].v;
+            mat3_mul_vec3(*v, normal_tx, *v);
+        }
+    }
+    if(model->attribs[PG_ATTRIB_TANGENT].used) {
+        for(i = 0; i < model->v_count; ++i) {
+            v = &model->attribs[PG_ATTRIB_TANGENT].f3.data[i].v;
+            mat3_mul_vec3(*v, normal_tx, *v);
+        }
+    }
+    if(model->attribs[PG_ATTRIB_BITANGENT].used) {
+        for(i = 0; i < model->v_count; ++i) {
+            v = &model->attribs[PG_ATTRIB_BITANGENT].f3.data[i].v;
+            mat3_mul_vec3(*v, normal_tx, *v);
+        }
+    }
+}
+
+void pg_model_reserve_attrib(struct pg_model* model,
+                             enum pg_shader_attribute attr, unsigned count)
+{
+    const struct pg_shader_attribute_info* attr_info = 
+        &PG_SHADER_ATTRIBUTE_INFO[attr];
+    model->attribs[attr].used = 1;
+    switch(attr_info->type) {
+        case PG_BYTE: ARR_RESERVE_CLEAR(model->attribs[attr].b1, count); break;
+        case PG_BVEC2: ARR_RESERVE_CLEAR(model->attribs[attr].b2, count); break;
+        case PG_BVEC3: ARR_RESERVE_CLEAR(model->attribs[attr].b3, count); break;
+        case PG_BVEC4: ARR_RESERVE_CLEAR(model->attribs[attr].b4, count); break;
+        case PG_UBYTE: ARR_RESERVE_CLEAR(model->attribs[attr].ub1, count); break;
+        case PG_UBVEC2: ARR_RESERVE_CLEAR(model->attribs[attr].ub2, count); break;
+        case PG_UBVEC3: ARR_RESERVE_CLEAR(model->attribs[attr].ub3, count); break;
+        case PG_UBVEC4: ARR_RESERVE_CLEAR(model->attribs[attr].ub4, count); break;
+        case PG_INT: ARR_RESERVE_CLEAR(model->attribs[attr].i1, count); break;
+        case PG_IVEC2: ARR_RESERVE_CLEAR(model->attribs[attr].i2, count); break;
+        case PG_IVEC3: ARR_RESERVE_CLEAR(model->attribs[attr].i3, count); break;
+        case PG_IVEC4: ARR_RESERVE_CLEAR(model->attribs[attr].i4, count); break;
+        case PG_UINT: ARR_RESERVE_CLEAR(model->attribs[attr].u1, count); break;
+        case PG_UVEC2: ARR_RESERVE_CLEAR(model->attribs[attr].u2, count); break;
+        case PG_UVEC3: ARR_RESERVE_CLEAR(model->attribs[attr].u3, count); break;
+        case PG_UVEC4: ARR_RESERVE_CLEAR(model->attribs[attr].u4, count); break;
+        case PG_FLOAT: ARR_RESERVE_CLEAR(model->attribs[attr].f1, count); break;
+        case PG_VEC2: ARR_RESERVE_CLEAR(model->attribs[attr].f2, count); break;
+        case PG_VEC3: ARR_RESERVE_CLEAR(model->attribs[attr].f3, count); break;
+        case PG_VEC4: ARR_RESERVE_CLEAR(model->attribs[attr].f4, count); break;
+        default: break;
+    }
+}
+
+void pg_model_reserve_verts(struct pg_model* model, unsigned count)
+{
+    int i;
+    for(i = 0; i < PG_NUM_ATTRIBS; ++i) {
+        if(!model->attribs[i].used) continue;
+        pg_model_reserve_attrib(model, i, count);
+    }
+}
+
+void pg_model_set_attrib(struct pg_model* model,
+                         enum pg_shader_attribute attr, unsigned idx,
+                         struct pg_model_attribute* set)
+{
+    const struct pg_shader_attribute_info* attr_info = 
+        &PG_SHADER_ATTRIBUTE_INFO[attr];
+    if(idx > model->v_count || !model->attribs[attr].used) return;
+    switch(attr_info->type) {
+        case PG_BYTE: model->attribs[attr].b1.data[idx] = set->b[0]; break;
+        case PG_BVEC2: vec2_dup(model->attribs[attr].b2.data[idx].v, set->b); break;
+        case PG_BVEC3: vec3_dup(model->attribs[attr].b3.data[idx].v, set->b); break;
+        case PG_BVEC4: vec4_dup(model->attribs[attr].b4.data[idx].v, set->b); break;
+        case PG_UBYTE: model->attribs[attr].ub1.data[idx] = set->ub[0]; break;
+        case PG_UBVEC2: vec2_dup(model->attribs[attr].ub2.data[idx].v, set->ub); break;
+        case PG_UBVEC3: vec3_dup(model->attribs[attr].ub3.data[idx].v, set->ub); break;
+        case PG_UBVEC4: vec4_dup(model->attribs[attr].ub4.data[idx].v, set->ub); break;
+        case PG_INT: model->attribs[attr].i1.data[idx] = set->i[0]; break;
+        case PG_IVEC2: vec2_dup(model->attribs[attr].i2.data[idx].v, set->i); break;
+        case PG_IVEC3: vec3_dup(model->attribs[attr].i3.data[idx].v, set->i); break;
+        case PG_IVEC4: vec4_dup(model->attribs[attr].i4.data[idx].v, set->i); break;
+        case PG_UINT: model->attribs[attr].u1.data[idx] = set->u[0]; break;
+        case PG_UVEC2: vec2_dup(model->attribs[attr].u2.data[idx].v, set->u); break;
+        case PG_UVEC3: vec3_dup(model->attribs[attr].u3.data[idx].v, set->u); break;
+        case PG_UVEC4: vec4_dup(model->attribs[attr].u4.data[idx].v, set->u); break;
+        case PG_FLOAT: model->attribs[attr].f1.data[idx] = set->i[0]; break;
+        case PG_VEC2: vec2_dup(model->attribs[attr].f2.data[idx].v, set->f); break;
+        case PG_VEC3: vec3_dup(model->attribs[attr].f3.data[idx].v, set->f); break;
+        case PG_VEC4: vec4_dup(model->attribs[attr].f4.data[idx].v, set->f); break;
+        default: break;
+    }
+}
+
+void pg_model_reserve_tris(struct pg_model* model, unsigned count)
+{
+    ARR_RESERVE(model->tris, count);
+    model->tris.len = count;
+}
+
+void pg_model_add_triangle(struct pg_model* model, unsigned v0,
+                           unsigned v1, unsigned v2)
+{
+    struct pg_tri tri = { { v0, v1, v2 } };
+    ARR_PUSH(model->tris, tri);
+}
+
+#if 0
 void pg_model_reserve_verts(struct pg_model* model, unsigned count)
 {
     model->v_count = count;
@@ -211,13 +422,7 @@ void pg_model_reserve_component(struct pg_model* model, uint32_t comp)
     model->components |= comp;
 }
 
-void pg_model_reserve_tris(struct pg_model* model, unsigned count)
-{
-    ARR_RESERVE(model->tris, count);
-    model->tris.len = count;
-}
-
-void pg_model_set_vertex(struct pg_model* model, struct pg_vertex_full* v,
+void pg_model_set_vertex(struct pg_model* model, struct pg_model_vertex* v,
                          unsigned i)
 {
     if(i >= model->v_count) return;
@@ -244,7 +449,7 @@ void pg_model_set_vertex(struct pg_model* model, struct pg_vertex_full* v,
     }
 }
 
-unsigned pg_model_add_vertex(struct pg_model* model, struct pg_vertex_full* v)
+unsigned pg_model_add_vertex(struct pg_model* model, struct pg_model_vertex* v)
 {
     if(v->components & model->components & PG_MODEL_COMPONENT_POSITION) {
         vec3_t vs = {{ v->pos[0], v->pos[1], v->pos[2] }};
@@ -276,11 +481,11 @@ unsigned pg_model_add_vertex(struct pg_model* model, struct pg_vertex_full* v)
     return model->v_count++;
 }
 
-void pg_model_get_vertex(struct pg_model* model, struct pg_vertex_full* out,
+void pg_model_get_vertex(struct pg_model* model, struct pg_model_vertex* out,
                          unsigned i)
 {
     if(i >= model->v_count) return;
-    *out = (struct pg_vertex_full){ .components = model->components };
+    *out = (struct pg_model_vertex){ .components = model->components };
     if(model->components & PG_MODEL_COMPONENT_POSITION) {
         vec3_dup(out->pos, model->pos.data[i].v);
     }
@@ -340,19 +545,12 @@ static void pg_model_remove_vertex(struct pg_model* model, unsigned v)
     }
 }
 
-void pg_model_add_triangle(struct pg_model* model, unsigned v0,
-                           unsigned v1, unsigned v2)
-{
-    struct pg_tri tri = { { v0, v1, v2 } };
-    ARR_PUSH(model->tris, tri);
-}
-
 /*  Compos/transformation  */
 void pg_model_append(struct pg_model* dst, struct pg_model* src,
                      mat4 transform)
 {
     unsigned dst_v = dst->v_count;
-    struct pg_vertex_full src_vert, new_vert;
+    struct pg_model_vertex src_vert, new_vert;
     int src_i;
     for(src_i = 0; src_i < src->v_count; ++src_i) {
         pg_model_get_vertex(src, &src_vert, src_i);
@@ -366,17 +564,6 @@ void pg_model_append(struct pg_model* dst, struct pg_model* src,
         struct pg_tri dtri =
             { { tri->t[0] + dst_v, tri->t[1] + dst_v, tri->t[2] + dst_v } };
         ARR_PUSH(dst->tris, dtri);
-    }
-}
-
-void pg_model_transform(struct pg_model* model, mat4 transform)
-{
-    int i;
-    struct pg_vertex_full old_vert, new_vert;
-    for(i = 0; i < model->v_count; ++i) {
-        pg_model_get_vertex(model, &old_vert, i);
-        pg_vertex_transform(&new_vert, &old_vert, transform);
-        pg_model_set_vertex(model, &new_vert, i);
     }
 }
 
@@ -472,7 +659,7 @@ void pg_model_seams_tris(struct pg_model* model)
     struct pg_model new_model;
     pg_model_init(&new_model);
     new_model.components = model->components;
-    struct pg_vertex_full tmp;
+    struct pg_model_vertex tmp;
     int i;
     struct pg_tri* tri;
     ARR_FOREACH_PTR(model->tris, tri, i) {
@@ -563,26 +750,6 @@ void pg_model_join_duplicates(struct pg_model* model, float t)
             --j;
         }
     }
-}
-
-static void pg_model_reset_buffers(struct pg_model* model)
-{
-    struct pg_model_buffer* buf;
-    int i;
-    ARR_FOREACH_PTR(model->buffers, buf, i) {
-        int j;
-        glDeleteVertexArrays(1, &buf->vao);
-        buf->vao = 0;
-        if(!buf->vbo) break;
-        for(j = i + 1; j < model->buffers.len; ++j) {
-            if(model->buffers.data[j].vbo == buf->vbo)
-                model->buffers.data[j].vbo = 0;
-        }
-        glDeleteBuffers(1, &buf->vbo);
-        buf->vbo = 0;
-        buf->shader = NULL;
-    }
-    ARR_TRUNCATE(model->buffers, 0);
 }
 
 void pg_model_get_face_normal(struct pg_model* model, unsigned t, vec3 out)
@@ -764,3 +931,4 @@ int pg_model_collide_ellipsoid_sub(struct pg_model* model, vec3 out, vec3 const 
     return tri_idx;
 }
 
+#endif

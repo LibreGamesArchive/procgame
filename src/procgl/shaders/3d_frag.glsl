@@ -1,5 +1,8 @@
 #version 330
 
+#define tex     pg_texture_0
+#define norm    pg_texture_1
+
 uniform sampler2D tex;
 uniform sampler2D norm;
 

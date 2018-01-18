@@ -217,7 +217,7 @@ void pg_poll_input(void)
         vec2 motion = { (float)mx, (float)my };
         vec2_add(mouse_motion, mouse_motion, motion);
         vec2_add(mouse_pos, mouse_pos, motion);
-        vec2_clamp(mouse_pos, mouse_pos, (vec2){}, (vec2){ render_w, render_h });
+        vec2_clamp(mouse_pos, mouse_pos, vec2(), vec2(render_w, render_h));
     } else {
         SDL_GetMouseState(&mx, &my);
         mx = ((float)mx / screen_w) * render_w;

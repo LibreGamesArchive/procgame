@@ -3,19 +3,60 @@
 void pg_model_quad(struct pg_model* model, vec2 tex_scale)
 {
     pg_model_reset(model);
-    uint32_t c = PG_MODEL_COMPONENT_POSITION | PG_MODEL_COMPONENT_UV;
-    model->components = c;
-    pg_model_add_vertex(model, &(struct pg_vertex_full) { c,
-        .pos = { -0.5, -0.5, 0 }, .uv = { 0, tex_scale[1] } });
-    pg_model_add_vertex(model, &(struct pg_vertex_full) { c,
-        .pos = { -0.5, 0.5, 0 }, .uv = { 0, 0 } });
-    pg_model_add_vertex(model, &(struct pg_vertex_full) { c,
-        .pos = { 0.5, -0.5, 0 }, .uv = { tex_scale[0], tex_scale[1] } });
-    pg_model_add_vertex(model, &(struct pg_vertex_full) { c,
-        .pos = { 0.5, 0.5, 0 }, .uv = { tex_scale[0], 0 } });
-    pg_model_add_triangle(model, 0, 2, 1);
-    pg_model_add_triangle(model, 1, 2, 3);
+    model->v_count = 4;
+    pg_model_reserve_attrib(model, PG_ATTRIB_POSITION, 4);
+    pg_model_reserve_attrib(model, PG_ATTRIB_TEXCOORD, 4);
+    struct pg_model_attribute pos_verts[4] = {
+        { .f = { -0.5, -0.5 } },
+        { .f = { -0.5, 0.5 } },
+        { .f = { 0.5, -0.5 } },
+        { .f = { 0.5, 0.5 } } };
+    struct pg_model_attribute uv_verts[4] = {
+        { .f = { 0, 0 } },
+        { .f = { 0, tex_scale[1] } },
+        { .f = { tex_scale[0], 0 } },
+        { .f = { tex_scale[0], tex_scale[1] } } };
+    int i;
+    for(i = 0; i < 4; ++i) {
+        pg_model_set_attrib(model, PG_ATTRIB_POSITION, i, &pos_verts[i]);
+        pg_model_set_attrib(model, PG_ATTRIB_TEXCOORD, i, &uv_verts[i]);
+    }
+    pg_model_add_triangle(model, 0, 1, 2);
+    pg_model_add_triangle(model, 2, 1, 3);
 }
+
+void pg_model_quad_2d(struct pg_model* model, vec2 tex_scale)
+{
+    pg_model_reset(model);
+    model->v_count = 4;
+    pg_model_reserve_attrib(model, PG_ATTRIB_POSITION, 4);
+    pg_model_reserve_attrib(model, PG_ATTRIB_TEXCOORD, 4);
+    pg_model_reserve_attrib(model, PG_ATTRIB_HEIGHT, 4);
+    pg_model_reserve_attrib(model, PG_ATTRIB_COLOR, 4);
+    struct pg_model_attribute pos_verts[4] = {
+        { .f = { -0.5, -0.5 } },
+        { .f = { -0.5, 0.5 } },
+        { .f = { 0.5, -0.5 } },
+        { .f = { 0.5, 0.5 } } };
+    struct pg_model_attribute uv_verts[4] = {
+        { .f = { 0, 0 } },
+        { .f = { 0, tex_scale[1] } },
+        { .f = { tex_scale[0], 0 } },
+        { .f = { tex_scale[0], tex_scale[1] } } };
+    struct pg_model_attribute color = { .ub = { 255, 255, 255, 255 } };
+    struct pg_model_attribute height = { .f = { 1 } };
+    int i;
+    for(i = 0; i < 4; ++i) {
+        pg_model_set_attrib(model, PG_ATTRIB_POSITION, i, &pos_verts[i]);
+        pg_model_set_attrib(model, PG_ATTRIB_TEXCOORD, i, &uv_verts[i]);
+        pg_model_set_attrib(model, PG_ATTRIB_HEIGHT, i, &height);
+        pg_model_set_attrib(model, PG_ATTRIB_COLOR, i, &color);
+    }
+    pg_model_add_triangle(model, 0, 1, 2);
+    pg_model_add_triangle(model, 2, 1, 3);
+}
+
+#if 0
 
 void pg_model_cube(struct pg_model* model, vec2 tex_scale)
 {
@@ -234,3 +275,5 @@ void pg_model_cone_trunc(struct pg_model* model, int n, float t, vec3 warp,
         pg_model_add_triangle(model, i * 4 + 1, i * 4 + 2, i * 4 + 3);
     }
 }
+
+#endif

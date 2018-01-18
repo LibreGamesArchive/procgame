@@ -1,13 +1,17 @@
 #version 330
 
-uniform mat4 normal_matrix;
-uniform sampler2D tex;
-uniform sampler2D norm;
 uniform float tex_weight;
 uniform vec4 color_mod;
 uniform vec4 color_add;
 uniform vec3 light_color;
 uniform vec3 ambient_color;
+
+#define normal_matrix   pg_matrix_normal
+#define tex             pg_texture_0
+#define norm            pg_texture_1
+uniform mat4 normal_matrix;
+uniform sampler2D tex;
+uniform sampler2D norm;
 
 in vec4 f_color;
 in vec2 f_tex_coord;
@@ -30,11 +34,17 @@ void main()
     float spec = max(0, pow(dot(-light_dir, norm), 32)) * tex_norm.a;
     light += spec;
     vec4 final;
+    final = tex_color;
     if(tex_norm.w == 1) final = tex_color;
     else {
         final = vec4(tex_color.rgb *
             (light_color * light + ambient_color), tex_color.a);
     }
     frag_color = clamp(final, 0, 1);
+    //frag_color[0] = tex_weight;
+    //frag_color[1] = f_tex_weight;
+    //frag_color = vec4(1,1,1,1);
+    //frag_color = vec4(f_tex_coord.x, f_tex_coord.y, 0, 1);
+    //frag_color = vec4(1, 0, 0, 1);
 }
 

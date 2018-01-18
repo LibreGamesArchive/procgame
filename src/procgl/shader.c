@@ -3,6 +3,105 @@
 /*  Shadow state for the currently used OpenGL shader   */
 static struct pg_shader* pg_active_shader = NULL;
 
+static inline void pg_shader_clear(struct pg_shader* shader)
+{
+    *shader = (struct pg_shader){};
+    int i;
+    for(i = 0; i < PG_COMMON_MATRICES; ++i) shader->matrix[i] = HTABLE_INVALID_ENTRY;
+    for(i = 0; i < 8; ++i) shader->tex[i] = HTABLE_INVALID_ENTRY;
+    for(i = 0; i < 8; ++i) shader->tex_rect[i] = HTABLE_INVALID_ENTRY;
+    HTABLE_INIT(shader->uniforms, 8);
+}
+
+static void pg_shader_gather_uniforms(struct pg_shader* shader)
+{
+    GLint i, count, size;
+    GLenum type; // type of the variable (float, vec3 or mat4, etc)
+    const GLsizei bufSize = 32; // maximum name length
+    GLchar name[bufSize]; // variable name in GLSL
+    GLsizei length; // name length
+    glGetProgramiv(shader->prog, GL_ACTIVE_UNIFORMS, &count);
+    printf("Active Uniforms: %d\n", count);
+    for (i = 0; i < count; i++)
+    {
+        glGetActiveUniform(shader->prog, (GLuint)i, bufSize, &length, &size, &type, name);
+        if(strncmp(name, "pg_texture_", sizeof("pg_texture_") - 1) == 0) {
+            int tex_id = name[sizeof("pg_texture_") - 1] - '0';
+            if(tex_id < 0 || tex_id >= 8) {
+                printf("Shader error: bad pg_texture id: %d\n", tex_id);
+                continue;
+            }
+            printf("Caught pg_texture_%d\n", tex_id);
+            HTABLE_SET(shader->uniforms, name, (struct pg_shader_uniform) {
+                .type = PG_TEXTURE, .array_len = 1, .idx = i});
+            HTABLE_GET_ENTRY(shader->uniforms, name, shader->tex[tex_id]);
+        } else if(strncmp(name, "pg_tex_rect_", sizeof("pg_tex_rect_") - 1) == 0) {
+            int tex_id = name[sizeof("pg_tex_rect_") - 1] - '0';
+            if(tex_id < 0 || tex_id >= 8) {
+                printf("Shader error: bad pg_tex_rect id: %d\n", tex_id);
+                continue;
+            }
+            printf("Caught pg_tex_rect_%d\n", tex_id);
+            HTABLE_SET(shader->uniforms, name, (struct pg_shader_uniform) {
+                .type = PG_VEC4, .array_len = 1, .idx = i});
+            HTABLE_GET_ENTRY(shader->uniforms, name, shader->tex_rect[tex_id]);
+        } else if(strncmp(name, "pg_matrix_", sizeof("pg_matrix_") - 1) == 0) {
+            static const char* mat_names[] = {
+                [PG_MODEL_MATRIX] = "model",
+                [PG_NORMAL_MATRIX] = "normal",
+                [PG_VIEW_MATRIX] = "view",
+                [PG_PROJECTION_MATRIX] = "projection",
+                [PG_MODELVIEW_MATRIX] = "modelview",
+                [PG_PROJECTIONVIEW_MATRIX] = "projview",
+                [PG_MVP_MATRIX] = "mvp" };
+            int j;
+            for(j = 0; j < PG_COMMON_MATRICES; ++j) {
+                char* name_offset = name + sizeof("pg_matrix_") - 1;
+                int max_len = 32 - sizeof("pg_matrix_") - 1;
+                if(strncmp(name_offset, mat_names[j], max_len) == 0) {
+                    printf("Caught pg_matrix_%s\n", mat_names[j]);
+                    HTABLE_SET(shader->uniforms, name, (struct pg_shader_uniform) {
+                        .type = PG_MATRIX, .array_len = 1, .idx = i});
+                    HTABLE_GET_ENTRY(shader->uniforms, name, shader->matrix[j]);
+                    break;
+                }
+            }
+        } else {
+            enum pg_data_type pg_type = PG_NULL;
+            switch(type) {
+                case GL_INT: pg_type = PG_INT; break;
+                case GL_INT_VEC2: pg_type = PG_IVEC2; break;
+                case GL_INT_VEC3: pg_type = PG_IVEC3; break;
+                case GL_INT_VEC4: pg_type = PG_IVEC4; break;
+                case GL_UNSIGNED_INT: pg_type = PG_UINT; break;
+                case GL_UNSIGNED_INT_VEC2: pg_type = PG_UVEC2; break;
+                case GL_UNSIGNED_INT_VEC3: pg_type = PG_UVEC3; break;
+                case GL_UNSIGNED_INT_VEC4: pg_type = PG_UVEC4; break;
+                case GL_FLOAT: pg_type = PG_FLOAT; break;
+                case GL_FLOAT_VEC2: pg_type = PG_VEC2; break;
+                case GL_FLOAT_VEC3: pg_type = PG_VEC3; break;
+                case GL_FLOAT_VEC4: pg_type = PG_VEC4; break;
+                case GL_FLOAT_MAT4: pg_type = PG_MATRIX; break;
+                case GL_SAMPLER_2D: pg_type = PG_TEXTURE; break;
+                default: break;
+            }
+            if(pg_type) {
+                if(size > 1) {
+                    char* arr_def = strchr(name, '[');
+                    if(arr_def) arr_def[0] = '\0';
+                    printf("    Array length %d\n", size);
+                }
+                HTABLE_SET(shader->uniforms, name,
+                    (struct pg_shader_uniform){
+                        .type = pg_type, .idx = i, .array_len = size });
+                printf("Found custom uniform %s\n", name);
+            } else {
+                printf("Unrecognized uniform type for %s\n", name);
+            }
+        }
+    }
+}
+
 /*  Code for loading shaders dumped to headers  */
 static GLuint compile_glsl_static(const char* src, int len, GLenum type)
 {
@@ -55,9 +154,7 @@ int pg_shader_load_static(struct pg_shader* shader,
                           const char* vert, int vert_len,
                           const char* frag, int frag_len)
 {
-    *shader = (struct pg_shader){
-        .mat_idx = { -1, -1, -1, -1, -1, -1, -1 },
-        .component_idx = { -1, -1, -1, -1, -1, -1, -1, -1 } };
+    pg_shader_clear(shader);
     return pg_compile_glsl_static(&shader->vert, &shader->frag, &shader->prog,
                                   vert, vert_len, frag, frag_len);
 }
@@ -100,6 +197,17 @@ static GLuint compile_glsl(const char* filename, GLenum type)
     return shader;
 }
 
+static void shader_bind_attribs(GLuint prog)
+{
+    glBindAttribLocation(prog, PG_ATTRIB_POSITION, "v_position");
+    glBindAttribLocation(prog, PG_ATTRIB_COLOR, "v_color");
+    glBindAttribLocation(prog, PG_ATTRIB_TEXCOORD, "v_tex_coord");
+    glBindAttribLocation(prog, PG_ATTRIB_NORMAL, "v_normal");
+    glBindAttribLocation(prog, PG_ATTRIB_TANGENT, "v_tangent");
+    glBindAttribLocation(prog, PG_ATTRIB_BITANGENT, "v_bitangent");
+    glBindAttribLocation(prog, PG_ATTRIB_HEIGHT, "v_height");
+}
+
 int pg_compile_glsl(GLuint* vert, GLuint* frag, GLuint* prog,
                    const char* vert_filename, const char* frag_filename)
 {
@@ -107,6 +215,7 @@ int pg_compile_glsl(GLuint* vert, GLuint* frag, GLuint* prog,
     *frag = compile_glsl(frag_filename, GL_FRAGMENT_SHADER);
     if(!(*vert) || !(*frag)) return 0;
     *prog = glCreateProgram();
+    shader_bind_attribs(*prog);
     glAttachShader(*prog, *vert);
     glAttachShader(*prog, *frag);
     glLinkProgram(*prog);
@@ -127,229 +236,115 @@ int pg_compile_glsl(GLuint* vert, GLuint* frag, GLuint* prog,
 int pg_shader_load(struct pg_shader* shader,
                    const char* vert_filename, const char* frag_filename)
 {
-    *shader = (struct pg_shader){ .mat_idx = { -1, -1, -1, -1, -1, -1, -1 } };
-    return pg_compile_glsl(&shader->vert, &shader->frag, &shader->prog,
+    pg_shader_clear(shader);
+    int ret = pg_compile_glsl(&shader->vert, &shader->frag, &shader->prog,
                            vert_filename, frag_filename);
-}
-
-/*  Code for managing created shaders   */
-void pg_shader_link_matrix(struct pg_shader* shader, enum pg_matrix type,
-                           const char* name)
-{
-    shader->mat_idx[type] = glGetUniformLocation(shader->prog, name);
-}
-
-void pg_shader_link_component(struct pg_shader* shader,
-                              uint32_t comp, const char* name)
-{
-    if(!comp) return;
-    int i = LEAST_SIGNIFICANT_BIT(comp);
-    shader->component_idx[i] = glGetAttribLocation(shader->prog, name);
-    shader->components |= comp;
+    if(ret == 1) {
+        pg_shader_gather_uniforms(shader);
+    }
+    return ret;
 }
 
 void pg_shader_set_matrix(struct pg_shader* shader, enum pg_matrix type,
                           mat4 matrix)
 {
-    mat4_dup(shader->matrix[type], matrix);
-    if(pg_active_shader == shader && shader->mat_idx[type] != -1) {
-        glUniformMatrix4fv(shader->mat_idx[type], 1, GL_FALSE, *matrix);
+    struct pg_shader_uniform* dst;
+    HTABLE_ENTRY_PTR(shader->uniforms, shader->matrix[type], dst);
+    if(!dst) return;
+    mat4_dup(dst->data.m, matrix);
+    if(pg_active_shader == shader) {
+        glUniformMatrix4fv(dst->idx, 1, GL_FALSE, *matrix);
     }
 }
 
-void pg_shader_rebuild_matrices(struct pg_shader* shader)
+void pg_shader_set_texture(struct pg_shader* shader,
+                           int idx, struct pg_texture* tex)
 {
-    if(shader->mat_idx[PG_NORMAL_MATRIX] != -1) {
-        mat4_invert(shader->matrix[PG_NORMAL_MATRIX],
-                    shader->matrix[PG_MODEL_MATRIX]);
-        glUniformMatrix4fv(shader->mat_idx[PG_NORMAL_MATRIX], 1, GL_TRUE,
-                           *shader->matrix[PG_NORMAL_MATRIX]);
-    }
-    if(shader->mat_idx[PG_MODELVIEW_MATRIX] != -1) {
-        mat4_mul(shader->matrix[PG_MODELVIEW_MATRIX],
-                 shader->matrix[PG_VIEW_MATRIX],
-                 shader->matrix[PG_MODEL_MATRIX]);
-        glUniformMatrix4fv(shader->mat_idx[PG_MODELVIEW_MATRIX], 1, GL_FALSE,
-                           *shader->matrix[PG_MODELVIEW_MATRIX]);
-    }
-    if(shader->mat_idx[PG_PROJECTIONVIEW_MATRIX] != -1) {
-        mat4_mul(shader->matrix[PG_PROJECTIONVIEW_MATRIX],
-                 shader->matrix[PG_PROJECTION_MATRIX],
-                 shader->matrix[PG_VIEW_MATRIX]);
-        glUniformMatrix4fv(shader->mat_idx[PG_PROJECTIONVIEW_MATRIX], 1, GL_FALSE,
-                           *shader->matrix[PG_PROJECTIONVIEW_MATRIX]);
-    }
-    if(shader->mat_idx[PG_MVP_MATRIX] != -1) {
-        mat4_mul(shader->matrix[PG_MVP_MATRIX],
-                 shader->matrix[PG_MODEL_MATRIX],
-                 shader->matrix[PG_VIEW_MATRIX]);
-        mat4_mul(shader->matrix[PG_MVP_MATRIX],
-                 shader->matrix[PG_PROJECTION_MATRIX],
-                 shader->matrix[PG_MVP_MATRIX]);
-        glUniformMatrix4fv(shader->mat_idx[PG_MVP_MATRIX], 1, GL_FALSE,
-                           *shader->matrix[PG_MVP_MATRIX]);
+    if(idx < 0 || idx >= 8) return;
+    struct pg_shader_uniform* dst;
+    HTABLE_ENTRY_PTR(shader->uniforms, shader->tex[idx], dst);
+    if(!dst) return;
+    dst->data.tex = tex;
+    if(pg_active_shader == shader) {
+        glUniform1i(dst->idx, tex->diffuse_gl);
     }
 }
 
-void pg_shader_buffer_model_(struct pg_shader* shader, struct pg_model* model,
-                             const char* file, int line)
+void pg_shader_set_tex_rect(struct pg_shader* shader,
+                            int idx, vec4 tex_rect)
 {
-    if((shader->components & model->components) != shader->components) {
-        printf("procgl shader error: Incompatible model!\n"
-               "    %s:%d\n", file, line);
-        return;
+    if(idx < 0 || idx >= 8) return;
+    struct pg_shader_uniform* dst;
+    HTABLE_ENTRY_PTR(shader->uniforms, shader->tex[idx], dst);
+    if(!dst) return;
+    vec4_dup(dst->data.f, tex_rect);
+    if(pg_active_shader == shader) {
+        glUniform4f(dst->idx, tex_rect[0], tex_rect[1], tex_rect[2], tex_rect[4]);
     }
-    int i;
-    struct pg_model_buffer* buf = NULL;
-    struct pg_model_buffer* buf_iter;
-    ARR_FOREACH_PTR(model->buffers, buf_iter, i) {
-        if(buf_iter->shader->components == shader->components) {
-            buf_iter->dirty_buffers = 0;
-            buf = buf_iter;
-        }
-    }
-    if(buf && buf->shader != shader) {
-        /*  For shaders with identical requirements, share VBO and EBO  */
-        struct pg_model_buffer new_buf = {
-            .shader = shader, .dirty_buffers = 0, .vbo = buf->vbo };
-        glGenVertexArrays(1, &new_buf.vao);
-        ARR_PUSH(model->buffers, new_buf);
-        buf = &model->buffers.data[model->buffers.len - 1];
-    } else if(!buf) {
-        /*  Initialize a new buffer for this shader-model pair  */
-        struct pg_model_buffer new_buf;
-        glGenBuffers(1, &new_buf.vbo);
-        glGenVertexArrays(1, &new_buf.vao);
-        new_buf.shader = shader;
-        new_buf.dirty_buffers = 1;
-        ARR_PUSH(model->buffers, new_buf);
-        buf = &model->buffers.data[model->buffers.len - 1];
-    }
-    glBindVertexArray(buf->vao);
-    glBindBuffer(GL_ARRAY_BUFFER, buf->vbo);
-    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, model->ebo);
-    /*  Buffer the tris if they're dirty    */
-    if(model->dirty_tris) {
-        /*  We use the same index buffer for every one  */
-        glBufferData(GL_ELEMENT_ARRAY_BUFFER,
-                     model->tris.len * sizeof(*model->tris.data),
-                     model->tris.data, GL_STATIC_DRAW);
-    }
-    model->dirty_tris = 0;
-    size_t c_size[7] = {
-        (shader->components & model->components & PG_MODEL_COMPONENT_POSITION) ?
-            model->pos.len * sizeof(*model->pos.data) : 0,
-        (shader->components & model->components & PG_MODEL_COMPONENT_COLOR) ?
-            model->color.len * sizeof(*model->color.data) : 0,
-        (shader->components & model->components & PG_MODEL_COMPONENT_UV) ?
-            model->uv.len * sizeof(*model->uv.data) : 0,
-        (shader->components & model->components & PG_MODEL_COMPONENT_NORMAL) ?
-            model->normal.len * sizeof(*model->normal.data) : 0,
-        (shader->components & model->components & PG_MODEL_COMPONENT_TAN_BITAN) ?
-            model->tangent.len * sizeof(*model->tangent.data) : 0,
-        (shader->components & model->components & PG_MODEL_COMPONENT_TAN_BITAN) ?
-            model->bitangent.len * sizeof(*model->bitangent.data): 0,
-        (shader->components & model->components & PG_MODEL_COMPONENT_HEIGHT) ?
-            model->height.len * sizeof(*model->height.data) : 0 };
-    size_t full_size = c_size[0] + c_size[1] + c_size[2] + c_size[3] +
-                       c_size[4] + c_size[5] + c_size[6];
-    glBufferData(GL_ARRAY_BUFFER, full_size, NULL, GL_STATIC_DRAW);
-    size_t offset = 0;
-    if(buf->dirty_buffers) {
-        if(c_size[0]) {
-            glBufferSubData(GL_ARRAY_BUFFER, 0, c_size[0], model->pos.data);
-            offset += c_size[0];
-        }
-        if(c_size[1]) {
-            glBufferSubData(GL_ARRAY_BUFFER, offset,
-                            c_size[1], model->color.data);
-            offset += c_size[1];
-        }
-        if(c_size[2]) {
-            glBufferSubData(GL_ARRAY_BUFFER, offset,
-                            c_size[2], model->uv.data);
-            offset += c_size[2];
-        }
-        if(c_size[3]) {
-            glBufferSubData(GL_ARRAY_BUFFER, offset,
-                            c_size[3], model->normal.data);
-            offset += c_size[3];
-        }
-        if(c_size[4]) {
-            glBufferSubData(GL_ARRAY_BUFFER, offset,
-                            c_size[4], model->tangent.data);
-            offset += c_size[4];
-        }
-        if(c_size[5]) {
-            glBufferSubData(GL_ARRAY_BUFFER, offset,
-                            c_size[5], model->bitangent.data);
-            offset += c_size[5];
-        }
-        if(c_size[6]) {
-            glBufferSubData(GL_ARRAY_BUFFER, offset,
-                            c_size[6], model->height.data);
-            offset += c_size[6];
-        }
-    }
-    offset = 0;
-    if(c_size[0]) {
-        glVertexAttribPointer(
-            shader->component_idx[PG_MODEL_COMPONENT_POSITION_I],
-            3, GL_FLOAT, GL_FALSE, 0, (void*)(offset));
-        glEnableVertexAttribArray(shader->component_idx[PG_MODEL_COMPONENT_POSITION_I]);
-        offset += c_size[0];
-    }
-    if(c_size[1]) {
-        glVertexAttribPointer(
-            shader->component_idx[PG_MODEL_COMPONENT_COLOR_I],
-            4, GL_FLOAT, GL_FALSE, 0, (void*)(offset));
-        glEnableVertexAttribArray(shader->component_idx[PG_MODEL_COMPONENT_COLOR_I]);
-        offset += c_size[1];
-    }
-    if(c_size[2]) {
-        glVertexAttribPointer(
-            shader->component_idx[PG_MODEL_COMPONENT_UV_I],
-            2, GL_FLOAT, GL_FALSE, 0, (void*)(offset));
-        glEnableVertexAttribArray(shader->component_idx[PG_MODEL_COMPONENT_UV_I]);
-        offset += c_size[2];
-    }
-    if(c_size[3]) {
-        glVertexAttribPointer(
-            shader->component_idx[PG_MODEL_COMPONENT_NORMAL_I],
-            3, GL_FLOAT, GL_FALSE, 0, (void*)(offset));
-        glEnableVertexAttribArray(shader->component_idx[PG_MODEL_COMPONENT_NORMAL_I]);
-        offset += c_size[3];
-    }
-    if(c_size[4]) {
-        glVertexAttribPointer(
-            shader->component_idx[PG_MODEL_COMPONENT_TANGENT_I],
-            3, GL_FLOAT, GL_FALSE, 0, (void*)(offset));
-        glEnableVertexAttribArray(shader->component_idx[PG_MODEL_COMPONENT_TANGENT_I]);
-        offset += c_size[4];
-    }
-    if(c_size[5]) {
-        glVertexAttribPointer(
-            shader->component_idx[PG_MODEL_COMPONENT_BITANGENT_I],
-            3, GL_FLOAT, GL_FALSE, 0, (void*)(offset));
-        glEnableVertexAttribArray(shader->component_idx[PG_MODEL_COMPONENT_BITANGENT_I]);
-        offset += c_size[5];
-    }
-    if(c_size[6]) {
-        glVertexAttribPointer(
-            shader->component_idx[PG_MODEL_COMPONENT_HEIGHT_I],
-            1, GL_FLOAT, GL_FALSE, 0, (void*)(offset));
-        glEnableVertexAttribArray(shader->component_idx[PG_MODEL_COMPONENT_HEIGHT_I]);
-        offset += c_size[6];
-    }
-    glBindVertexArray(0);
-    glBindBuffer(GL_ARRAY_BUFFER, 0);
-    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0);
-    buf->dirty_buffers = 0;
 }
 
-int pg_shader_is_active(struct pg_shader* shader)
+static void set_uniform(struct pg_shader_uniform* dst, struct pg_uniform* src)
 {
-    return (shader == pg_active_shader);
+    if(!dst || dst->idx == -1) return;
+    switch(dst->type) {
+        case PG_INT: glUniform1i(dst->idx, src->i[0]); break;
+        case PG_IVEC2: glUniform2i(dst->idx, src->i[0], src->i[1]); break;
+        case PG_IVEC3: glUniform3i(dst->idx, src->i[0], src->i[1], src->i[2]); break;
+        case PG_IVEC4: glUniform4i(dst->idx, src->i[0], src->i[1], src->i[2], src->i[3]); break;
+        case PG_UINT: glUniform1i(dst->idx, src->u[0]); break;
+        case PG_UVEC2: glUniform2ui(dst->idx, src->u[0], src->u[1]); break;
+        case PG_UVEC3: glUniform3ui(dst->idx, src->u[0], src->u[1], src->u[2]); break;
+        case PG_UVEC4: glUniform4ui(dst->idx, src->u[0], src->u[1], src->u[2], src->u[3]); break;
+        case PG_FLOAT: glUniform1f(dst->idx, src->f[0]); break;
+        case PG_VEC2: glUniform2f(dst->idx, src->f[0], src->f[1]); break;
+        case PG_VEC3: glUniform3f(dst->idx, src->f[0], src->f[1], src->f[2]); break;
+        case PG_VEC4: glUniform4f(dst->idx, src->f[0], src->f[1], src->f[2], src->f[3]); break;
+        case PG_MATRIX: glUniformMatrix4fv(dst->idx, 1, GL_FALSE, *src->m); break;
+        case PG_TEXTURE: glUniform1i(dst->idx, src->tex->diffuse_gl); break;
+        default: return;
+    }
+    dst->data = *src;
+}
+
+void pg_shader_uniform_by_name(struct pg_shader* shader,
+                               char* name, struct pg_uniform* uni)
+{
+    struct pg_shader_uniform* sh_uni;
+    HTABLE_GET(shader->uniforms, name, sh_uni);
+    set_uniform(sh_uni, uni);
+}
+
+pg_shader_uniform_t pg_shader_get_uniform(struct pg_shader* shader, char* name)
+{
+    pg_shader_uniform_t uni;
+    HTABLE_GET_ENTRY(shader->uniforms, name, uni);
+    return uni;
+}
+
+void pg_shader_uniforms_from_table(struct pg_shader* shader,
+                                   pg_shader_uniform_table_t* table)
+{
+    HTABLE_ITER sh_iter;
+    struct pg_shader_uniform* sh_uni;
+    struct pg_shader_uniform* t_uni;
+    char* key;
+    HTABLE_ITER_BEGIN(shader->uniforms, sh_iter);
+    while(!HTABLE_ITER_END(shader->uniforms, sh_iter)) {
+        HTABLE_ITER_NEXT(shader->uniforms, sh_iter, key, sh_uni);
+        if(sh_uni->idx == -1) continue;
+        HTABLE_GET(*table, key, t_uni);
+        if(!t_uni || sh_uni->type != t_uni->type) continue;
+        set_uniform(sh_uni, &t_uni->data);
+    }
+}
+
+void pg_shader_uniform(struct pg_shader* shader, pg_shader_uniform_t idx,
+                       struct pg_uniform* uni)
+{
+    struct pg_shader_uniform* sh_uni = NULL;
+    HTABLE_ENTRY_PTR(shader->uniforms, idx, sh_uni);
+    if(!sh_uni) return;
+    set_uniform(sh_uni, uni);
 }
 
 void pg_shader_deinit(struct pg_shader* shader)
@@ -357,12 +352,11 @@ void pg_shader_deinit(struct pg_shader* shader)
     glDeleteShader(shader->vert);
     glDeleteShader(shader->frag);
     glDeleteProgram(shader->prog);
-    shader->deinit(shader->data);
+    HTABLE_DEINIT(shader->uniforms);
 }
 
-void pg_shader_begin(struct pg_shader* shader, struct pg_viewer* view)
+void pg_shader_begin(struct pg_shader* shader)
 {
     pg_active_shader = shader;
     glUseProgram(shader->prog);
-    shader->begin(shader, view);
 }
