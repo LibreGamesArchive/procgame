@@ -1,11 +1,4 @@
-#include <stdio.h>
-#include <GL/glew.h>
-#include "ext/linmath.h"
-#include "bitwise.h"
-#include "arr.h"
-#include "viewer.h"
-#include "model.h"
-#include "shader.h"
+#include "procgl.h"
 
 /*  Shadow state for the currently used OpenGL shader   */
 static struct pg_shader* pg_active_shader = NULL;

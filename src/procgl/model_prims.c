@@ -1,13 +1,4 @@
-#include <GL/glew.h>
-#include "ext/linmath.h"
-#include "arr.h"
-#include "procgl_base.h"
-#include "wave.h"
-#include "heightmap.h"
-#include "texture.h"
-#include "viewer.h"
-#include "model.h"
-#include "shader.h"
+#include "procgl.h"
 
 void pg_model_quad(struct pg_model* model, vec2 tex_scale)
 {

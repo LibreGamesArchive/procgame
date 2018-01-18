@@ -1,11 +1,4 @@
-#include <stdlib.h>
-#include <stdio.h>
-#include <string.h>
-#include <SDL2/SDL.h>
-#include "ext/linmath.h"
-#include "arr.h"
-#include "wave.h"
-#include "audio.h"
+#include "procgl.h"
 #include "ext/wavfile.h"
 #include "ext/stb_vorbis.c"
 #define DR_WAV_IMPLEMENTATION

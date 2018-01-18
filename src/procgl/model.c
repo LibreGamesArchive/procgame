@@ -1,13 +1,4 @@
-#include <stdio.h>
-#include <GL/glew.h>
-#include "ext/linmath.h"
-#include "arr.h"
-#include "viewer.h"
-#include "model.h"
-#include "shader.h"
-#include "wave.h"
-#include "heightmap.h"
-#include "texture.h"
+#include "procgl.h"
 
 void pg_vertex_transform(struct pg_vertex_full* out, struct pg_vertex_full* src,
                          mat4 transform)

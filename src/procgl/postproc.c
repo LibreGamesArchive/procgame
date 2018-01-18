@@ -1,11 +1,4 @@
-#include <stdio.h>
-#include <GL/glew.h>
-#include "ext/linmath.h"
-#include "arr.h"
-#include "postproc.h"
-#include "viewer.h"
-#include "model.h"
-#include "shader.h"
+#include "procgl.h"
 
 void pg_ppbuffer_init(struct pg_ppbuffer* buf, int w, int h,
                       int color0, int color1)

@@ -1,10 +1,4 @@
-#include <stdio.h>
-#include <stdlib.h>
-#include <GL/glew.h>
-#include "procgl/ext/linmath.h"
-#include "procgl/postproc.h"
-#include "procgl/texture.h"
-#include "procgl/shader.h"
+#include "../procgl.h"
 #include "procgl/shaders/shaders.h"
 
 #ifdef PROCGL_STATIC_SHADERS
