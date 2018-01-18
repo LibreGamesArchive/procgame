@@ -1,12 +1,22 @@
 /*  Linear math library originally by github user datenwolf, under the
     Do What The Fuck You Want To Public License.
 
-    I have also added some more functions myself for procgame   */
+    This is a significantly modified version of the original.
+
+    It now supports vectors of several types, and all the inline functions
+    are replaced with macros, to allow vectors of different types to be
+    mixed and matched in the vector operations. */
 
 #ifndef LINMATH_H
 #define LINMATH_H
 
-#include <math.h>
+#include <tgmath.h>
+#include <stdint.h>
+
+/****************************/
+/* Single value stuff       */
+/****************************/
+
 #ifndef M_PI
 #define M_PI (3.14159265359)
 #endif
@@ -28,265 +38,335 @@
 
 #define CLAMP(x, a, b) ( MIN(MAX(x, a), b) )
 #define SATURATE(x) CLAMP(x, 0, 1)
-static inline float clamp(float f, float a, float b)
-{
-    return f < a ? a : (f > b ? b : f);
-}
-static inline float lerp(float a, float b, float t)
-{
-    return (1 - t) * a + t * b;
-}
+#define LERP(a, b, t) ((1 - (t)) * (a) + (t) * (b))
+
 static inline float smin(float a, float b, float k)
 {
-    float h = clamp(0.5 + 0.5 * (b - a) / k, 0.0, 1.0);
-    return lerp(b, a, h) - k * h * (1.0 - h);
+    float h = CLAMP(0.5 + 0.5 * (b - a) / k, 0.0, 1.0);
+    return LERP(b, a, h) - k * h * (1.0 - h);
 }
 
-#define LINMATH_H_DEFINE_VEC(n) \
-typedef float vec##n[n]; \
-static inline void vec##n##_dup(vec##n r, vec##n const a) \
-{ \
-    int i; \
-    for(i=0; i<n; ++i) \
-        r[i] = a[i]; \
-} \
-static inline void vec##n##_add(vec##n r, vec##n const a, vec##n const b) \
-{ \
-    int i; \
-    for(i=0; i<n; ++i) \
-        r[i] = a[i] + b[i]; \
-} \
-static inline void vec##n##_sub(vec##n r, vec##n const a, vec##n const b) \
-{ \
-    int i; \
-    for(i=0; i<n; ++i) \
-        r[i] = a[i] - b[i]; \
-} \
-static inline void vec##n##_mul(vec##n r, vec##n const a, vec##n const b) \
-{ \
-    int i; \
-    for(i=0; i<n; ++i) \
-        r[i] = a[i] * b[i]; \
-} \
-static inline void vec##n##_div(vec##n r, vec##n const a, vec##n const b) \
-{ \
-    int i; \
-    for(i=0; i<n; ++i) \
-        r[i] = a[i] / b[i]; \
-} \
-static inline void vec##n##_scale(vec##n r, vec##n const v, float const s) \
-{ \
-    int i; \
-    for(i=0; i<n; ++i) \
-        r[i] = v[i] * s; \
-} \
-static inline float vec##n##_mul_inner(vec##n const a, vec##n const b) \
-{ \
-    float p = 0.; \
-    int i; \
-    for(i=0; i<n; ++i) \
-        p += b[i]*a[i]; \
-    return p; \
-} \
-static inline float vec##n##_len(vec##n const v) \
-{ \
-    return sqrtf(vec##n##_mul_inner(v,v)); \
-} \
-static inline float vec##n##_dist(vec##n const a, vec##n const b) \
-{ \
-    vec##n diff; \
-    vec##n##_sub(diff, a, b); \
-    return vec##n##_len(diff); \
-} \
-static inline float vec##n##_len2(vec##n const v) \
-{ \
-    return vec##n##_mul_inner(v,v); \
-} \
-static inline float vec##n##_dist2(vec##n const a, vec##n const b) \
-{ \
-    vec##n diff; \
-    vec##n##_sub(diff, a, b); \
-    return vec##n##_len2(diff); \
-} \
-static inline void vec##n##_normalize(vec##n r, vec##n const v) \
-{ \
-    float k = 1.0 / vec##n##_len(v); \
-    vec##n##_scale(r,v,k); \
-} \
-static inline void vec##n##_set_len(vec##n r, vec##n const v, float const l) \
-{ \
-    float len = vec##n##_len(v); \
-    if(len != 0) vec##n##_scale(r,v,l/len); \
-} \
-static inline void vec##n##_min(vec##n r, vec##n const a, vec##n const b) \
-{ \
-    int i; \
-    for(i=0; i<n; ++i) \
-        r[i] = a[i]<b[i] ? a[i] : b[i]; \
-} \
-static inline void vec##n##_max(vec##n r, vec##n const a, vec##n const b) \
-{ \
-    int i; \
-    for(i=0; i<n; ++i) \
-        r[i] = a[i]>b[i] ? a[i] : b[i]; \
-} \
-static inline void vec##n##_abs(vec##n r, vec##n const v) \
-{ \
-    int i; \
-    for(i=0; i<n; ++i) \
-        r[i] = fabsf(v[i]); \
-} \
-static inline void vec##n##_floor(vec##n r, vec##n const v) \
-{ \
-    int i; \
-    for(i=0; i<n; ++i) \
-        r[i] = floor(v[i]); \
-} \
-static inline void vec##n##_ceil(vec##n r, vec##n const v) \
-{ \
-    int i; \
-    for(i=0; i<n; ++i) \
-        r[i] = ceil(v[i]); \
-} \
-static inline float vec##n##_vmax(vec##n const v) \
-{ \
-    int i; \
-    float r = v[0]; \
-    for(i=1; i<n; ++i) \
-        r = MAX(r, v[i]); \
-    return r; \
-} \
-static inline float vec##n##_vmin(vec##n const v) \
-{ \
-    int i; \
-    float r = v[0]; \
-    for(i=1; i<n; ++i) \
-        r = MIN(r, v[i]); \
-    return r; \
-} \
-static inline void vec##n##_lerp(vec##n r, vec##n const a, vec##n const b, \
-                                 float t) \
-{ \
-    int i; \
-    for(i=0; i<n; ++i) \
-        r[i] = (1 - t) * a[i] + t * b[i]; \
-} \
-static inline void vec##n##_saturate(vec##n r, vec##n const v) \
-{ \
-    int i; \
-    for(i=0; i<n; ++i) \
-        r[i] = SATURATE(v[i]); \
-} \
-static inline void vec##n##_clamp(vec##n r, vec##n const v, \
-                                  vec##n const a, vec##n const b) \
-{ \
-    int i; \
-    for(i=0; i<n; ++i) \
-        r[i] = v[i] < a[i] ? a[i] : (v[i] > b[i] ? b[i] : v[i]); \
-} \
-static inline void vec##n##_swap(vec##n a, vec##n b) \
+#define LINMATH_H_DEFINE_VEC(n, pre, type) \
+typedef type pre##n[n]; \
+typedef struct { pre##n v; } pre##n##_t; \
+static inline void pre##n##_swap(pre##n a, pre##n b) \
 { \
     int i; \
     for(i=0; i<n; ++i) { \
-        float tmp = a[i]; \
+        type tmp = a[i]; \
         a[i] = b[i]; \
         b[i] = tmp; \
     } \
 } \
-static inline int vec##n##_is_zero(vec##n const v) \
-{ \
-    int i; \
-    for(i=0; i<n; ++i) \
-        if(v[i] != 0.0f) return 0; \
-    return 1; \
-} \
-static inline float vec##n##_angle_diff(vec##n const a, vec##n const b) \
-{ \
-    return acosf(vec##n##_mul_inner(a, b) / (vec##n##_len(a) * vec##n##_len(b))); \
-} \
 
-LINMATH_H_DEFINE_VEC(2)
-LINMATH_H_DEFINE_VEC(3)
-LINMATH_H_DEFINE_VEC(4)
+/****************************/
+/* Vectors of various types */
+/****************************/
 
-static inline void vec2_set(vec2 a, float x, float y)
-{
-    a[0] = x;
-    a[1] = y;
-}
+/*  VECTOR OPERATIONS   op(result, a, b, c, ...)
+ *  swap                a <-> b
+ *  set                 result = (a,b)
+ *  dup                 result = (bx, by)
+ *  add                 result = (ax + bx, ay + by)
+ *  sub                 result = (ax - by, ay - by)
+ *  mul                 result = (ax * bx, ay * by)
+ *  div                 result = (ax / bx, ay / by)
+ *  scale               result = (ax * s, ay * s)
+ *  max                 result = (max(ax, bx), max(ay, by))
+ *  min                 result = (min(ax, bx), min(ay, by))
+ *  reflect             result = reflection(a:ray, b:normal)
+ *  set_len             result = (ax * (k / len(a)), ay * (k / len(a)))
+ *  normalize           result = set_len(1)
+ *  fabs                result = (fabs(ax), fabs(ay))
+ *  abs                 result = (abs(ax), abs(ay))
+ *  ceil                result = (ceil(ax), ceil(ay))
+ *  floor               result = (floor(ax), floor(ay))
+ *  clamp               result = (clamp(ax, bx, cx), clamp(ay, by, cy))
+ *  vclamp              result = (clamp(ax, b, c), clamp(ay, b, c))
+ *  saturate            result = (clamp(ax, 0, 1), clamp(ay, 0, 1))
+ *  mul_inner           return ((ax * bx) + (ay * by))
+ *  vmax                return max(ax, ay)
+ *  vmin                return min(ax, ay)
+ *  angle_diff          return acos(mul_inner(a,b) / (len(a) * len(b)))
+ *  len2                return mul_inner(a,a)
+ *  dist2               return mul_inner((a-b),(a-b))
+ *  len                 return sqrt(len2(a))
+ *  dist                return sqrt(dist2(a,b))
+ *  vec2_rotate         result = a rotated b radians
+ *  vec2_from_angle     result = (sin(angle), cos(angle))
+ *  vec3_mul_cross      result = cross product(a, b)
+ */
 
-static inline void vec3_set(vec3 a, float x, float y, float z)
-{
-    a[0] = x;
-    a[1] = y;
-    a[2] = z;
-}
+LINMATH_H_DEFINE_VEC(2, vec, float)
+LINMATH_H_DEFINE_VEC(2, ivec, int32_t)
+LINMATH_H_DEFINE_VEC(2, uvec, uint32_t)
+LINMATH_H_DEFINE_VEC(2, bvec, int8_t)
+LINMATH_H_DEFINE_VEC(2, ubvec, uint8_t)
 
-static inline void vec4_set(vec4 a, float x, float y, float z, float w)
-{
-    a[0] = x;
-    a[1] = y;
-    a[2] = z;
-    a[3] = w;
-}
+LINMATH_H_DEFINE_VEC(3, vec, float)
+LINMATH_H_DEFINE_VEC(3, ivec, int32_t)
+LINMATH_H_DEFINE_VEC(3, uvec, uint32_t)
+LINMATH_H_DEFINE_VEC(3, bvec, int8_t)
+LINMATH_H_DEFINE_VEC(3, ubvec, uint8_t)
 
-static inline void vec2_rotate(vec2 r, vec2 const a, float angle)
-{
-    float c = cosf(angle);
-    float s = sinf(angle);
-    r[0] = a[0] * s - a[1] * c;
-    r[1] = a[0] * c + a[1] * s;
-}
-static inline void vec3_mul_cross(vec3 r, vec3 const a, vec3 const b)
-{
-    r[0] = a[1]*b[2] - a[2]*b[1];
-    r[1] = a[2]*b[0] - a[0]*b[2];
-    r[2] = a[0]*b[1] - a[1]*b[0];
-}
+LINMATH_H_DEFINE_VEC(4, vec, float)
+LINMATH_H_DEFINE_VEC(4, ivec, int32_t)
+LINMATH_H_DEFINE_VEC(4, uvec, uint32_t)
+LINMATH_H_DEFINE_VEC(4, bvec, int8_t)
+LINMATH_H_DEFINE_VEC(4, ubvec, uint8_t)
 
-static inline void vec3_reflect(vec3 r, vec3 const v, vec3 const n)
-{
-    float p  = 2.f*vec3_mul_inner(v, n);
-    int i;
-    for(i=0;i<3;++i)
-        r[i] = v[i] - p*n[i];
-}
+#define vec2(...)  ((vec2){ __VA_ARGS__ })
+#define ivec2(...)  ((ivec2){ __VA_ARGS__ })
+#define uvec2(...)  ((uvec2){ __VA_ARGS__ })
+#define bvec2(...)  ((bvec2){ __VA_ARGS__ })
+#define ubvec2(...)  ((ubvec2){ __VA_ARGS__ })
 
-static inline void vec3_wedge(vec3 r, vec3 const a, vec3 const b)
-{
-    r[0] = (a[1] * b[2]) - (b[1] * a[2]);
-    r[1] = (a[2] * b[0]) - (b[2] * a[0]);
-    r[2] = (a[0] * b[1]) - (b[0] * a[1]);
-}
+#define vec3(...)  ((vec3){ __VA_ARGS__ })
+#define ivec3(...)  ((ivec3){ __VA_ARGS__ })
+#define uvec3(...)  ((uvec3){ __VA_ARGS__ })
+#define bvec3(...)  ((bvec3){ __VA_ARGS__ })
+#define ubvec3(...)  ((ubvec3){ __VA_ARGS__ })
 
-static inline void vec4_mul_cross(vec4 r, vec4 a, vec4 b)
-{
-    r[0] = a[1]*b[2] - a[2]*b[1];
-    r[1] = a[2]*b[0] - a[0]*b[2];
-    r[2] = a[0]*b[1] - a[1]*b[0];
-    r[3] = 1.f;
-}
+#define vec4(...)  ((vec4){ __VA_ARGS__ })
+#define ivec4(...)  ((ivec4){ __VA_ARGS__ })
+#define uvec4(...)  ((uvec4){ __VA_ARGS__ })
+#define bvec4(...)  ((bvec4){ __VA_ARGS__ })
+#define ubvec4(...)  ((ubvec4){ __VA_ARGS__ })
 
-static inline void vec4_reflect(vec4 r, vec4 v, vec4 n)
-{
-    float p  = 2.f*vec4_mul_inner(v, n);
-    int i;
-    for(i=0;i<4;++i)
-        r[i] = v[i] - p*n[i];
-}
+#define vec2_set(a, x, y) do { (a)[0] = x; (a)[1] = y; } while(0)
+#define vec3_set(a, x, y, z)  do { (a)[0] = x; (a)[1] = y; (a)[2] = z; } while(0)
+#define vec4_set(a, x, y, z, w) do { (a)[0] = x; (a)[1] = y; (a)[2] = z; (a)[3] = w; } while(0)
 
-static inline void vec2_from_angle(vec2 r, float angle)
-{
-    r[0] = sin(angle);
-    r[1] = cos(angle);
-}
+#define vec2_dup(a, b) do { (a)[0] = (b)[0]; (a)[1] = (b)[1]; } while(0)
+#define vec3_dup(a, b) do { (a)[0] = (b)[0]; (a)[1] = (b)[1]; (a)[2] = (b)[2]; } while(0)
+#define vec4_dup(a, b) do { (a)[0] = (b)[0]; (a)[1] = (b)[1]; (a)[2] = (b)[2]; (a)[3] = (b)[3]; } while(0)
 
-static inline void spherical_to_cartesian(vec3 r, vec2 const v)
-{
-    r[0] = sin(v[1]) * cos(v[0]);
-    r[1] = sin(v[1]) * sin(v[0]);
-    r[2] = cos(v[1]);
-}
+#define vec2_add(r, a, b) \
+    do { (r)[0]=(a)[0]+(b)[0]; (r)[1]=(a)[1]+(b)[1]; } while(0)
+#define vec3_add(r, a, b) \
+    do { (r)[0]=(a)[0]+(b)[0]; (r)[1]=(a)[1]+(b)[1]; \
+         (r)[2]=(a)[2]+(b)[2]; } while(0)
+#define vec4_add(r, a, b) \
+    do { (r)[0]=(a)[0]+(b)[0]; (r)[1]=(a)[1]+(b)[1]; \
+         (r)[2]=(a)[2]+(b)[2]; (r)[3]=(a)[3]+(b)[3]; } while(0)
+
+#define vec2_sub(r, a, b) \
+    do { (r)[0]=(a)[0]-(b)[0]; (r)[1]=(a)[1]-(b)[1]; } while(0)
+#define vec3_sub(r, a, b) \
+    do { (r)[0]=(a)[0]-(b)[0]; (r)[1]=(a)[1]-(b)[1]; \
+         (r)[2]=(a)[2]-(b)[2]; } while(0)
+#define vec4_sub(r, a, b) \
+    do { (r)[0]=(a)[0]-(b)[0]; (r)[1]=(a)[1]-(b)[1]; \
+         (r)[2]=(a)[2]-(b)[2]; (r)[3]=(a)[3]-(b)[3]; } while(0)
+
+#define vec2_mul(r, a, b) \
+    do { (r)[0]=(a)[0]*(b)[0]; (r)[1]=(a)[1]*(b)[1]; } while(0)
+#define vec3_mul(r, a, b) \
+    do { (r)[0]=(a)[0]*(b)[0]; (r)[1]=(a)[1]*(b)[1]; \
+         (r)[2]=(a)[2]*(b)[2]; } while(0)
+#define vec4_mul(r, a, b) \
+    do { (r)[0]=(a)[0]*(b)[0]; (r)[1]=(a)[1]*(b)[1]; \
+         (r)[2]=(a)[2]*(b)[2]; (r)[3]=(a)[3]*(b)[3]; } while(0)
+
+#define vec2_div(r, a, b) \
+    do { (r)[0]=(a)[0]/(b)[0]; (r)[1]=(a)[1]/(b)[1]; } while(0)
+#define vec3_div(r, a, b) \
+    do { (r)[0]=(a)[0]/(b)[0]; (r)[1]=(a)[1]/(b)[1]; \
+         (r)[2]=(a)[2]/(b)[2]; } while(0)
+#define vec4_div(r, a, b) \
+    do { (r)[0]=(a)[0]/(b)[0]; (r)[1]=(a)[1]/(b)[1]; \
+         (r)[2]=(a)[2]/(b)[2]; (r)[3]=(a)[3]/(b)[3]; } while(0)
+
+#define vec2_scale(r, a, s) \
+    do { (r)[0]=(a)[0]*s; (r)[1]=(a)[1]*s; } while(0)
+#define vec3_scale(r, a, s) \
+    do { (r)[0]=(a)[0]*s; (r)[1]=(a)[1]*s; (r)[2]=(a)[2]*s; } while(0)
+#define vec4_scale(r, a, s) \
+    do { (r)[0]=(a)[0]*s; (r)[1]=(a)[1]*s; \
+         (r)[2]=(a)[2]*s; (r)[3]=(a)[3]*s; } while(0)
+
+#define vec2_max(r, a, b) \
+    do { (r)[0] = MAX((a)[0], (b)[0]); (r)[1] = MAX((a)[1], (b)[1]); } while(0)
+#define vec3_max(r, a, b) \
+    do { (r)[0] = MAX((a)[0], (b)[0]); (r)[1] = MAX((a)[1], (b)[1]); \
+         (r)[2] = MAX((a)[2], (b)[2]); } while(0)
+#define vec4_max(r, a, b) \
+    do { (r)[0] = MAX((a)[0], (b)[0]); (r)[1] = MAX((a)[1], (b)[1]); \
+         (r)[2] = MAX((a)[2], (b)[2]); (r)[3] = MAX((a)[3], (b)[3]); } while(0)
+
+#define vec2_min(r, a, b) \
+    do { (r)[0] = MIN((a)[0], (b)[0]); (r)[1] = MIN((a)[1], (b)[1]); } while(0)
+#define vec3_min(r, a, b) \
+    do { (r)[0] = MIN((a)[0], (b)[0]); (r)[1] = MIN((a)[1], (b)[1]); \
+         (r)[2] = MIN((a)[2], (b)[2]); } while(0)
+#define vec4_min(r, a, b) \
+    do { (r)[0] = MIN((a)[0], (b)[0]); (r)[1] = MIN((a)[1], (b)[1]); \
+         (r)[2] = MIN((a)[2], (b)[2]); (r)[3] = MIN((a)[3], (b)[3]); } while(0)
+
+#define vec2_saturate(r, a) \
+    do { (r)[0] = SATURATE((a)[0]); (r)[1] = SATURATE((a)[1]); } while(0)
+#define vec3_saturate(r, a) \
+    do { (r)[0] = SATURATE((a)[0]); (r)[1] = SATURATE((a)[1]); \
+         (r)[2] = SATURATE((a)[2]); } while(0)
+#define vec4_saturate(r, a) \
+    do { (r)[0] = SATURATE((a)[0]); (r)[1] = SATURATE((a)[1]); \
+         (r)[2] = SATURATE((a)[2]); (r)[3] = SATURATE((a)[3]); } while(0)
+
+#define vec2_vclamp(r, v, a, b) \
+    do { (r)[0] = CLAMP((v)[0], a, b); (r)[1] = CLAMP((v)[1], a, b); } while(0)
+#define vec3_vclamp(r, v, a, b) \
+    do { (r)[0] = CLAMP((v)[0], a, b); (r)[1] = CLAMP((v)[1], a, b); \
+         (r)[2] = CLAMP((v)[2], a, b); } while(0)
+#define vec4_vclamp(r, v, a, b) \
+    do { (r)[0] = CLAMP((v)[0], a, b); (r)[1] = CLAMP((v)[1], a, b); \
+         (r)[2] = CLAMP((v)[2], a, b); (r)[3] = CLAMP((v)[3], a, b); } while(0)
+
+#define vec2_clamp(r, v, a, b) \
+    do { (r)[0] = CLAMP(v[0], (a)[0], (b)[0]); (r)[1] = CLAMP(v[1], (a)[1], (b)[1]); } while(0)
+#define vec3_clamp(r, v, a, b) \
+    do { (r)[0] = CLAMP(v[0], (a)[0], (b)[0]); (r)[1] = CLAMP(v[1], (a)[1], (b)[1]); \
+      (r)[2] = CLAMP(v[2], (a)[2], (b)[2]); } while(0)
+#define vec4_clamp(r, v, a, b) \
+    do { (r)[0] = CLAMP(v[0], (a)[0], (b)[0]); (r)[1] = CLAMP(v[1], (a)[1], (b)[1]); \
+      (r)[2] = CLAMP(v[2], (a)[2], (b)[2]); (r)[3] = CLAMP(v[3], (a)[3], (b)[3]); } while(0)
+
+#define vec2_reflect(r, a, b) \
+    do { float p = 2.f*vec2_mul_inner(a, b); \
+      (r)[0] = (a)[0] - p * (b)[0]; (r)[1] = (a)[1] - p * (b)[1]; } while(0)
+#define vec3_reflect(r, a, b) \
+    do { float p = 2.f*vec3_mul_inner(a, b); \
+         (r)[0] = (a)[0] - p * (b)[0]; (r)[1] = (a)[1] - p * (b)[1]; \
+         (r)[2] = (a)[2] - p * (b)[2]; } while(0)
+#define vec4_reflect(r, a, b) \
+    do { float p = 2.f*vec4_mul_inner(a, b); \
+      (r)[0] = (a)[0] - p * (b)[0]; (r)[1] = (a)[1] - p * (b)[1]; \
+      (r)[2] = (a)[2] - p * (b)[2]; (r)[3] = (a)[3] - p * (b)[3]; } while(0)
+
+#define vec2_lerp(r, a, b, t) \
+    do { (r)[0] = LERP((a)[0], (b)[0], t); (r)[1] = LERP((a)[1], (b)[1], t); } while(0)
+#define vec3_lerp(r, a, b, t) \
+    do { (r)[0] = LERP((a)[0], (b)[0], t); (r)[1] = LERP((a)[1], (b)[1], t); \
+         (r)[2] = LERP((a)[2], (b)[2], t); } while(0)
+#define vec4_lerp(r, a, b, t) \
+    do { (r)[0] = LERP((a)[0], (b)[0], t); (r)[1] = LERP((a)[1], (b)[1], t); \
+         (r)[2] = LERP((a)[2], (b)[2], t); (r)[3] = LERP((a)[3], (b)[3], t); } while(0)
+
+#define vec2_set_len(r, a, l) \
+    do { float k = l / vec2_len(a); vec2_scale(r, a, k); } while(0)
+#define vec3_set_len(r, a, l) \
+    do { float k = l / vec3_len(a); vec3_scale(r, a, k); } while(0)
+#define vec4_set_len(r, a, l) \
+    do { float k = l / vec4_len(a); vec4_scale(r, a, k); } while(0)
+
+#define vec2_normalize(r, a) vec2_set_len(r, a, 1)
+#define vec3_normalize(r, a) vec3_set_len(r, a, 1)
+#define vec4_normalize(r, a) vec4_set_len(r, a, 1)
+
+#define vec2_fabs(r, a) \
+    do { (r)[0] = fabs((a)[0]); (r)[1] = fabs((a)[1]); } while(0)
+#define vec3_fabs(r, a) \
+    do { (r)[0] = fabs((a)[0]); (r)[1] = fabs((a)[1]); \
+         (r)[2] = fabs((a)[2]); } while(0)
+#define vec4_fabs(r, a) \
+    do { (r)[0] = fabs((a)[0]); (r)[1] = fabs((a)[1]); \
+         (r)[2] = fabs((a)[2]); (r)[3] = fabs((a)[3]); } while(0)
+
+#define vec2_abs(r, a) \
+    do { (r)[0] = abs((a)[0]); (r)[1] = abs((a)[1]); } while(0)
+#define vec3_abs(r, a) \
+    do { (r)[0] = abs((a)[0]); (r)[1] = abs((a)[1]); \
+         (r)[2] = abs((a)[2]); } while(0)
+#define vec4_abs(r, a) \
+    do { (r)[0] = abs((a)[0]); (r)[1] = abs((a)[1]); \
+         (r)[2] = abs((a)[2]); (r)[3] = abs((a)[3]); } while(0)
+
+#define vec2_floor(r, a) \
+    do { (r)[0] = floor((a)[0]); (r)[1] = floor((a)[1]); } while(0)
+#define vec3_floor(r, a) \
+    do { (r)[0] = floor((a)[0]); (r)[1] = floor((a)[1]); \
+         (r)[2] = floor((a)[2]); } while(0)
+#define vec4_floor(r, a) \
+    do { (r)[0] = floor((a)[0]); (r)[1] = floor((a)[1]); \
+         (r)[2] = floor((a)[2]); (r)[3] = floor((a)[3]); } while(0)
+
+#define vec2_ceil(r, a) \
+    do { (r)[0] = ceil((a)[0]); (r)[1] = ceil((a)[1]); } while(0)
+#define vec3_ceil(r, a) \
+    do { (r)[0] = ceil((a)[0]); (r)[1] = ceil((a)[1]); \
+         (r)[2] = ceil((a)[2]); } while(0)
+#define vec4_ceil(r, a) \
+    do { (r)[0] = ceil((a)[0]); (r)[1] = ceil((a)[1]); \
+         (r)[2] = ceil((a)[2]); (r)[3] = ceil((a)[3]); } while(0)
+
+#define vec2_angle_diff(a, b) \
+    ( acos(vec2_mul_inner(a, b) / (vec2_len(a) * vec2_len(b)) )
+#define vec3_angle_diff(a, b) \
+    ( acos(vec3_mul_inner(a, b) / (vec3_len(a) * vec3_len(b)) )
+#define vec4_angle_diff(a, b) \
+    ( acos(vec4_mul_inner(a, b) / (vec4_len(a) * vec4_len(b)) )
+
+#define vec2_is_zero(v) (v[0] == 0 && v[1] == 0)
+#define vec3_is_zero(v) (v[0] == 0 && v[1] == 0 && v[2] == 0)
+#define vec4_is_zero(v) (v[0] == 0 && v[1] == 0 && v[2] == 0 && v[3] == 0)
+
+#define vec2_mul_inner(a, b) \
+    ( ((a)[0] * (b)[0]) + ((a)[1] * (b)[1]) )
+#define vec3_mul_inner(a, b) \
+    ( ((a)[0] * (b)[0]) + ((a)[1] * (b)[1]) + ((a)[2] * (b)[2]) )
+#define vec4_mul_inner(a, b) \
+    ( ((a)[0] * (b)[0]) + ((a)[1] * (b)[1]) + ((a)[2] * (b)[2]) + ((a)[3] * (b)[3]) )
+
+#define vec2_len2(v) ( vec2_mul_inner(v, v) )
+#define vec3_len2(v) ( vec3_mul_inner(v, v) )
+#define vec4_len2(v) ( vec4_mul_inner(v, v) )
+#define vec2_len(v) ( sqrtf(vec2_mul_inner(v, v)) )
+#define vec3_len(v) ( sqrtf(vec3_mul_inner(v, v)) )
+#define vec4_len(v) ( sqrtf(vec4_mul_inner(v, v)) )
+
+#define vec2_dist2(a, b) \
+    ( vec2_len2(vec2((a)[0] - (b)[0], (a)[1] - (b)[1])) )
+#define vec3_dist2(a, b) \
+    ( vec3_len2(vec3((a)[0] - (b)[0], (a)[1] - (b)[1], (a)[2] - (b)[2])) )
+#define vec4_dist2(a, b) \
+    ( vec4_len2(vec4((a)[0] - (b)[0], (a)[1] - (b)[1], \
+                     (a)[2] - (b)[2], (a)[3] - (b)[3])) )
+#define vec2_dist(a, b) \
+    ( vec2_len(vec2((a)[0] - (b)[0], (a)[1] - (b)[1])) )
+#define vec3_dist(a, b) \
+    ( vec3_len(vec3((a)[0] - (b)[0], (a)[1] - (b)[1], (a)[2] - (b)[2])) )
+#define vec4_dist(a, b) \
+    ( vec4_len(vec4((a)[0] - (b)[0], (a)[1] - (b)[1], \
+                     (a)[2] - (b)[2], (a)[3] - (b)[3])) )
+
+#define vec2_vmax(a) ( MAX((a)[0], (a)[1]) )
+#define vec3_vmax(a) ( MAX(MAX((a)[0], (a)[1]), (a)[2]) )
+#define vec4_vmax(a) ( MAX(MAX(MAX((a)[0], (a)[1]), (a)[2]), (a)[3]) )
+
+#define vec2_vmin(a) ( MIN((a)[0], (a)[1]) )
+#define vec3_vmin(a) ( MIN(MIN((a)[0], (a)[1]), (a)[2]) )
+#define vec4_vmin(a) ( MIN(MIN(MIN((a)[0], (a)[1]), (a)[2]), (a)[3]) )
+
+#define vec2_rotate(r, a, b) \
+    do { float c = cos(b), s = sin(b); \
+         (r)[0] = (a)[0] * s - (a)[1] * c; \
+         (r)[1] = (a)[0] * c + (a)[1] * s; } while(0)
+
+#define vec3_mul_cross(r, a, b) \
+    do { (r)[0] = (a)[1]*(b)[2] - (a)[2]*(b)[1]; \
+         (r)[1] = (a)[2]*(b)[0] - (a)[0]*(b)[2]; \
+         (r)[2] = (a)[0]*(b)[1] - (a)[1]*(b)[0]; } while(0)
+
+#define vec4_mul_cross(r, a, b) \
+    do { (r)[0] = (a)[1]*(b)[2] - (a)[2]*(b)[1]; \
+         (r)[1] = (a)[2]*(b)[0] - (a)[0]*(b)[2]; \
+         (r)[2] = (a)[0]*(b)[1] - (a)[1]*(b)[0]; (r)[3] = 1; } while(0)
+
+#define vec2_from_angle(r, a) \
+    do { (r)[0] = sin(a); (r)[1] = cos(a); } while(0)
+
+/****************************/
+/* Matrix                   */
+/****************************/
 
 typedef vec4 mat4[4];
 static inline void mat4_identity(mat4 M)
@@ -372,6 +452,18 @@ static inline void mat4_mul_vec4(vec4 r, mat4 M, vec4 v)
     }
     vec4_dup(r, temp);
 }
+static inline void mat4_mul_vec3(vec3 r, mat4 M, vec3 v)
+{
+    vec4 v4 = { v[0], v[1], v[2], 1 };
+    vec4 temp;
+    int i, j;
+    for(j=0; j<4; ++j) {
+        temp[j] = 0.f;
+        for(i=0; i<4; ++i)
+            temp[j] += M[i][j] * v4[i];
+    }
+    vec3_dup(r, temp);
+}
 static inline void mat3_mul_vec3(vec3 r, mat4 M, vec3 v)
 {
     vec3 temp;
@@ -434,7 +526,7 @@ static inline void mat4_rotate(mat4 R, mat4 M, float x, float y, float z, float 
         mat4_add(T, T, C);
         mat4_add(T, T, S);
 
-        T[3][3] = 1.;       
+        T[3][3] = 1.;
         mat4_mul(R, M, T);
     } else {
         mat4_dup(R, M);
@@ -493,10 +585,10 @@ static inline void mat4_invert(mat4 T, mat4 M)
     c[3] = M[2][1]*M[3][2] - M[3][1]*M[2][2];
     c[4] = M[2][1]*M[3][3] - M[3][1]*M[2][3];
     c[5] = M[2][2]*M[3][3] - M[3][2]*M[2][3];
-    
+
     /* Assumes it is invertible */
     float idet = 1.0f/( s[0]*c[5]-s[1]*c[4]+s[2]*c[3]+s[3]*c[2]-s[4]*c[1]+s[5]*c[0] );
-    
+
     T[0][0] = ( M[1][1] * c[5] - M[1][2] * c[4] + M[1][3] * c[3]) * idet;
     T[0][1] = (-M[0][1] * c[5] + M[0][2] * c[4] - M[0][3] * c[3]) * idet;
     T[0][2] = ( M[3][1] * s[5] - M[3][2] * s[4] + M[3][3] * s[3]) * idet;
@@ -524,7 +616,7 @@ static inline void mat4_orthonormalize(mat4 R, mat4 M)
     vec3 h;
 
     vec3_normalize(R[2], R[2]);
-    
+
     s = vec3_mul_inner(R[1], R[2]);
     vec3_scale(h, R[2], s);
     vec3_sub(R[1], R[1], h);
@@ -545,7 +637,7 @@ static inline void mat4_frustum(mat4 M, float l, float r, float b, float t, floa
 {
     M[0][0] = 2.f*n/(r-l);
     M[0][1] = M[0][2] = M[0][3] = 0.f;
-    
+
     M[1][1] = 2.*n/(t-b);
     M[1][0] = M[1][2] = M[1][3] = 0.f;
 
@@ -553,7 +645,7 @@ static inline void mat4_frustum(mat4 M, float l, float r, float b, float t, floa
     M[2][1] = (t+b)/(t-b);
     M[2][2] = -(f+n)/(f-n);
     M[2][3] = -1.f;
-    
+
     M[3][2] = -2.f*(f*n)/(f-n);
     M[3][0] = M[3][1] = M[3][3] = 0.f;
 }
@@ -567,7 +659,7 @@ static inline void mat4_ortho(mat4 M, float l, float r, float b, float t, float 
 
     M[2][2] = -2.f/(f-n);
     M[2][0] = M[2][1] = M[2][3] = 0.f;
-    
+
     M[3][0] = -(r+l)/(r-l);
     M[3][1] = -(t+b)/(t-b);
     M[3][2] = -(f+n)/(f-n);
@@ -608,9 +700,9 @@ static inline void mat4_look_at(mat4 m, vec3 eye, vec3 center, vec3 up)
     /* TODO: The negation of of can be spared by swapping the order of
      *       operands in the following cross products in the right way. */
     vec3 f;
-    vec3_sub(f, center, eye);   
-    vec3_normalize(f, f);    
-    
+    vec3_sub(f, center, eye);
+    vec3_normalize(f, f);
+
     vec3 s;
     vec3_mul_cross(s, f, up);
     vec3_normalize(s, s);
@@ -640,6 +732,10 @@ static inline void mat4_look_at(mat4 m, vec3 eye, vec3 center, vec3 up)
 
     mat4_translate_in_place(m, -eye[0], -eye[1], -eye[2]);
 }
+
+/****************************/
+/* Quaternion               */
+/****************************/
 
 typedef float quat[4];
 #define quat_set vec4_set
@@ -715,7 +811,7 @@ static inline void quat_vec3_to_vec3(quat q, vec3 const a, vec3 const b)
     }
     quat_set(q, w[0], w[1], w[2], r);
     quat_normalize(q, q);
-}   
+}
 static inline void quat_mul_vec3(vec3 r, quat q, vec3 v)
 {
 /*  Method by Fabian 'ryg' Giessen (of Farbrausch)
@@ -744,7 +840,7 @@ static inline void mat4_from_quat(mat4 M, quat q)
     float b2 = b*b;
     float c2 = c*c;
     float d2 = d*d;
-    
+
     M[0][0] = a2 + b2 - c2 - d2;
     M[0][1] = 2.f*(b*c + a*d);
     M[0][2] = 2.f*(b*d - a*c);
