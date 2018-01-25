@@ -1,33 +1,50 @@
 #include "procgl.h"
 
-void pg_render_texture_init(struct pg_render_texture* tex, int w, int h,
-                            GLenum iformat, GLenum pixformat, GLenum type)
-{
-    tex->w = w;
-    tex->h = h;
-    glGenTextures(1, &tex->handle);
-    glActiveTexture(GL_TEXTURE0);
-    glBindTexture(GL_TEXTURE_2D, tex->handle);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-    glTexImage2D(GL_TEXTURE_2D, 0, iformat, w, h, 0, pixformat, type, NULL);
-}
-
 void pg_renderer_init(struct pg_renderer* rend)
 {
     /*  Load the base shaders and populate the shader table with them   */
     struct pg_shader shader;
+    glGenVertexArrays(1, &rend->dummy_vao);
     ARR_INIT(rend->passes);
     HTABLE_INIT(rend->common_uniforms, 8);
     HTABLE_INIT(rend->shaders, 8);
+    /*  2d shader   */
     int load = pg_shader_load(&shader,
         "src/procgl/shaders/2d_vert.glsl", "src/procgl/shaders/2d_frag.glsl");
     if(!load) printf("Failed to load 2d shader.\n");
     else HTABLE_SET(rend->shaders, "2d", shader);
+    /*  Sine-wave distortion post-effect    */
+    load = pg_shader_load(&shader,
+        "src/procgl/shaders/screen_vert.glsl", "src/procgl/shaders/post_sine_frag.glsl");
+    if(!load) printf("Failed to load sine-wave shader.\n");
+    else {
+        shader.static_verts = 1;
+        shader.is_postproc = 1;
+        HTABLE_SET(rend->shaders, "post_sine", shader);
+    }
+    /*  Blur post-effect    */
+    load = pg_shader_load(&shader,
+        "src/procgl/shaders/screen_vert.glsl", "src/procgl/shaders/post_blur7_frag.glsl");
+    if(!load) printf("Failed to load blur shader.\n");
+    else {
+        shader.static_verts = 1;
+        shader.is_postproc = 1;
+        HTABLE_SET(rend->shaders, "post_blur", shader);
+    }
+    /*  Pass-thru shader    */
+    load = pg_shader_load(&shader,
+        "src/procgl/shaders/screen_vert.glsl", "src/procgl/shaders/post_screen_frag.glsl");
+    if(!load) printf("Failed to load pass-thru shader.\n");
+    else {
+        shader.static_verts = 1;
+        shader.is_postproc = 1;
+        HTABLE_SET(rend->shaders, "passthru", shader);
+    }
 }
 
 void pg_renderer_deinit(struct pg_renderer* rend)
 {
+    *rend = (struct pg_renderer){};
     struct pg_shader* shader;
     ARR_DEINIT(rend->passes);
     HTABLE_DEINIT(rend->common_uniforms);
@@ -41,8 +58,7 @@ void pg_renderer_deinit(struct pg_renderer* rend)
 }
 
 void pg_renderpass_init(struct pg_renderer* rend, struct pg_renderpass* pass,
-                         char* shader, struct pg_render_target* target,
-                         GLbitfield clear_buffers)
+                         char* shader, GLbitfield clear_buffers)
 {
     pg_shader_ref_t shader_ref;
     HTABLE_GET_ENTRY(rend->shaders, shader, shader_ref);
@@ -52,7 +68,6 @@ void pg_renderpass_init(struct pg_renderer* rend, struct pg_renderpass* pass,
     }
     *pass = (struct pg_renderpass) {
         .shader = shader_ref,
-        .target = target,
         .clear_buffers = clear_buffers };
     HTABLE_INIT(pass->uniforms, 8);
 }
@@ -60,15 +75,22 @@ void pg_renderpass_init(struct pg_renderer* rend, struct pg_renderpass* pass,
 void pg_renderpass_deinit(struct pg_renderpass* pass)
 {
     HTABLE_DEINIT(pass->uniforms);
-    ARR_DEINIT(pass->groups);
+    ARR_DEINIT(pass->draws);
 }
 
 void pg_renderpass_reset(struct pg_renderpass* pass)
 {
     pass->target = NULL;
     pass->clear_buffers = 0;
+    pass->model = NULL;
+    int i;
+    for(i = 0; i < 8; ++i) {
+        pass->tex[i] = NULL;
+        pass->draw_uniform[i][0] = '\0';
+        pass->per_draw = NULL;
+    }
     HTABLE_CLEAR(pass->uniforms);
-    ARR_TRUNCATE_CLEAR(pass->groups, 0);
+    ARR_TRUNCATE_CLEAR(pass->draws, 0);
 }
 
 void pg_renderpass_uniform(struct pg_renderpass* pass, char* name,
@@ -78,67 +100,48 @@ void pg_renderpass_uniform(struct pg_renderpass* pass, char* name,
         (struct pg_shader_uniform){ .type = type, .data = *data });
 }
 
-void pg_rendergroup_init(struct pg_rendergroup* group, struct pg_model* model)
+void pg_renderpass_model(struct pg_renderpass* pass, struct pg_model* model)
 {
-    *group = (struct pg_rendergroup){ .model = model };
-    HTABLE_INIT(group->common_uniforms, 8);
+    pass->model = model;
 }
 
-void pg_rendergroup_deinit(struct pg_rendergroup* group)
-{
-    HTABLE_DEINIT(group->common_uniforms);
-    ARR_DEINIT(group->draws);
-}
-
-void pg_rendergroup_uniform(struct pg_rendergroup* group, char* name,
-                            enum pg_data_type type, struct pg_uniform* data)
-{
-    HTABLE_SET(group->common_uniforms, name,
-        (struct pg_shader_uniform){ .type = type, .data = *data });
-}
-
-void pg_rendergroup_add_draw(struct pg_rendergroup* group, int n,
-                             struct pg_uniform* draw_unis)
-{
-    ARR_RESERVE(group->draws, group->draws.len + n);
-    memcpy(group->draws.data + group->draws.len, draw_unis, n * sizeof(*draw_unis));
-    group->draws.len += n;
-}
-
-void pg_renderer_reset(struct pg_renderer* rend)
-{
-    ARR_TRUNCATE_CLEAR(rend->passes, 0);
-}
-
-void pg_rendergroup_model(struct pg_rendergroup* group, struct pg_model* model)
-{
-    group->model = model;
-}
-
-void pg_rendergroup_texture(struct pg_rendergroup* group, int n, ...)
+void pg_renderpass_texture(struct pg_renderpass* pass, int n, ...)
 {
     va_list args;
     va_start(args, n);
     int i;
     for(i = 0; i < 8; ++i) {
-        if(i >= n) group->tex[i] = NULL;
-        else group->tex[i] = va_arg(args, struct pg_texture*);
+        if(i >= n) pass->tex[i] = NULL;
+        else pass->tex[i] = va_arg(args, struct pg_texture*);
     }
     va_end(args);
 }
 
-void pg_rendergroup_drawformat(struct pg_rendergroup* group,
-                               pg_rendergroup_drawfunc_t per_draw, int n, ...)
+void pg_renderpass_drawformat(struct pg_renderpass* pass,
+                               pg_render_drawfunc_t per_draw, int n, ...)
 {
-    group->per_draw = per_draw;
+    pass->per_draw = per_draw;
     va_list args;
     va_start(args, n);
     int i;
     for(i = 0; i < 8 && i < n; ++i) {
         char* u = va_arg(args, char*);
-        strncpy(group->draw_uniform[i], u, 32);
+        strncpy(pass->draw_uniform[i], u, 32);
     }
     va_end(args);
+}
+
+void pg_renderpass_add_draw(struct pg_renderpass* pass, int n,
+                             struct pg_uniform* draw_unis)
+{
+    ARR_RESERVE(pass->draws, pass->draws.len + n);
+    memcpy(pass->draws.data + pass->draws.len, draw_unis, n * sizeof(*draw_unis));
+    pass->draws.len += n;
+}
+
+void pg_renderer_reset(struct pg_renderer* rend)
+{
+    ARR_TRUNCATE_CLEAR(rend->passes, 0);
 }
 
 static inline void copymats(mat4* dst, mat4* src)
@@ -197,116 +200,119 @@ static inline void shader_model_mats(struct pg_shader* shader, mat4 mat)
     }
 }*/
 
-static inline void shader_textures(struct pg_shader* shader,
-                                   struct pg_rendergroup* group)
+static inline void shader_textures(struct pg_shader* shader, int n,
+                                   struct pg_texture** tex_array)
 {
+    n = MIN(n, 8);
+    struct pg_shader_uniform* uni;
+    int i;
+    for(i = 0; i < n; ++i) {
+        if(!tex_array[i]) continue;
+        glActiveTexture(GL_TEXTURE0 + i);
+        glBindTexture(GL_TEXTURE_2D, tex_array[i]->handle);
+        HTABLE_ENTRY_PTR(shader->uniforms, shader->tex[i], uni);
+        if(!uni || uni->idx == -1) continue;
+        uni->data.tex = tex_array[i];
+        glUniform1i(uni->idx, i);
+    }
+}
+
+static inline void shader_fbtextures(struct pg_shader* shader,
+                                     struct pg_rendertarget* target)
+{
+    struct pg_renderbuffer* buf = target->buf[1 - target->cur_dst];
+    if(!buf) return;
     struct pg_shader_uniform* uni;
     int i;
     for(i = 0; i < 8; ++i) {
-        if(!group->tex[i]) continue;
-        glActiveTexture(GL_TEXTURE0 + i);
-        glBindTexture(GL_TEXTURE_2D, group->tex[i]->diffuse_gl);
-        HTABLE_ENTRY_PTR(shader->uniforms, shader->tex[i], uni);
+        if(!buf->outputs[i]) continue;
+        glActiveTexture(GL_TEXTURE8 + i);
+        glBindTexture(GL_TEXTURE_2D, buf->outputs[i]->handle);
+        HTABLE_ENTRY_PTR(shader->uniforms, shader->fbtex[i], uni);
         if(!uni || uni->idx == -1) continue;
-        uni->data.tex = group->tex[i];
-        glUniform1i(uni->idx, i);
+        uni->data.tex = buf->outputs[i];
+        glUniform1i(uni->idx, 8 + i);
+    }
+    if(buf->depth) {
+        glActiveTexture(GL_TEXTURE16);
+        glBindTexture(GL_TEXTURE_2D, buf->depth->handle);
+        HTABLE_ENTRY_PTR(shader->uniforms, shader->fbdepth, uni);
+        if(uni && uni->idx == -1) {
+            uni->data.tex = buf->depth;
+            glUniform1i(uni->idx, 16);
+        }
     }
 }
 
 void pg_renderer_draw_frame(struct pg_renderer* rend)
 {
-    struct pg_renderpass* pass;
-    struct pg_rendergroup* group;
+    struct pg_shader* lastshader = NULL;
+    struct pg_shader* shader;
+    struct pg_renderpass* pass = NULL;
     struct pg_model* model;
     int i, j, k;
     ARR_FOREACH(rend->passes, pass, i) {
-        struct pg_shader* shader;
         HTABLE_ENTRY_PTR(rend->shaders, pass->shader, shader);
         if(!shader) continue;
-        /*  Render to the current pass' target, or the screen if it's unset */
-        if(pass->target) pg_render_target_dst(pass->target);
-        else pg_screen_dst();
-        /*  Active shader = current pass' shader    */
-        pg_shader_begin(shader);
-        /*  Set the base matrices from the pass. These will not change with
-            each draw, most likely (but if they are, they will change with
-            EVERY draw, and it's assumed the user knows what they're doing  */
+        if(shader != lastshader) pg_shader_begin(shader);
+        lastshader = shader;
+        if(pass->model && pass->model != model) pg_model_begin(pass->model, shader);
+        else if(shader->static_verts) glBindVertexArray(rend->dummy_vao);
+        model = pass->model;
+        if(!pass->swaptarget) {
+            if(pass->target) pg_rendertarget_dst(pass->target);
+            else pg_screen_dst();
+            glClear(pass->clear_buffers);
+        } else {
+        //    pg_rendertarget_swap(pass->target);
+        //    pg_rendertarget_dst(pass->target);
+        //    shader_fbtextures(shader, pass->target);
+        }
         shader_base_mats(shader, pass->mats);
+        shader_textures(shader, 8, pass->tex);
         pg_shader_uniforms_from_table(shader, &pass->uniforms);
         GLint uni_idx[8];
-        mat4 mats[PG_COMMON_MATRICES];
-        ARR_FOREACH(pass->groups, group, j) {
-            /*  The scratch-space matrices: these will be the model, modelview,
-                and MVP matrices which get changed each draw (by default)   */
-            memcpy(mats, pass->mats, sizeof(mat4) * PG_COMMON_MATRICES);
-            /*  Group common uniforms   */
-            pg_shader_uniforms_from_table(shader, &group->common_uniforms);
-            shader_textures(shader, group);
-            /*  Bind the group model    */
-            pg_model_begin(group->model, shader);
-            model = group->model;
-            /*  Set up the uniform indices which are passed to per_draw */
-            for(k = 0; k < 8; ++k) {
-                struct pg_shader_uniform* sh_uni;
-                HTABLE_GET(shader->uniforms, group->draw_uniform[k], sh_uni);
-                if(!sh_uni) {
-                    uni_idx[k] = -1;
-                    continue;
-                } else uni_idx[k] = sh_uni->idx;
+        /*  Set up the uniform indices which are passed to per_draw */
+        for(j = 0; j < 8; ++j) {
+            struct pg_shader_uniform* sh_uni;
+            HTABLE_GET(shader->uniforms, pass->draw_uniform[j], sh_uni);
+            if(!sh_uni) {
+                uni_idx[j] = -1;
+                continue;
+            } else uni_idx[j] = sh_uni->idx;
+        }
+        /*  The inner draw loop */
+        j = 0;
+        while(j < pass->draws.len) {
+            if(pass->swaptarget) {
+                pg_rendertarget_swap(pass->target);
+                pg_rendertarget_dst(pass->target);
+                shader_fbtextures(shader, pass->target);
+                glClear(pass->clear_buffers);
             }
-            /*  The inner draw loop */
-            k = 0;
-            while(k < group->draws.len) {
-                k += group->per_draw(group->draws.data + k, shader,
-                                     (const mat4*)mats, uni_idx);
-                glDrawElements(GL_TRIANGLES, model->tris.len * 3, GL_UNSIGNED_INT, 0);
-            }
+            j += pass->per_draw(pass->draws.data + j, shader,
+                                 (const mat4*)pass->mats, uni_idx);
+            if(shader->static_verts) continue;
+            glDrawElements(GL_TRIANGLES, model->tris.len * 3, GL_UNSIGNED_INT, 0);
         }
+        //if(pass->swaptarget) pg_rendertarget_swap(pass->target);
+    }
+    if(pass && pass->target) {
+        HTABLE_GET(rend->shaders, "passthru", shader);
+        pg_shader_begin(shader);
+        glBindVertexArray(rend->dummy_vao);
+        pg_rendertarget_swap(pass->target);
+        shader_fbtextures(shader, pass->target);
+        pg_screen_dst();
+        glClear(GL_COLOR_BUFFER_BIT);
+        glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
     }
 }
 
-void pg_render_target_init(struct pg_render_target* target)
+void pg_renderpass_target(struct pg_renderpass* pass,
+                          struct pg_rendertarget* target, int swap)
 {
-    *target = (struct pg_render_target){};
-    glGenFramebuffers(1, &target->fbo);
+    pass->target = target;
+    pass->swaptarget = swap;
 }
 
-void pg_render_target_attach(struct pg_render_target* target,
-                             struct pg_render_texture* tex,
-                             int idx, GLenum attachment)
-{
-    if(attachment == GL_DEPTH_ATTACHMENT
-    || attachment == GL_DEPTH_STENCIL_ATTACHMENT) {
-        target->depth = tex;
-        target->depth_attachment = tex ? attachment : GL_NONE;
-    } else {
-        target->outputs[idx] = tex;
-        target->attachments[idx] = tex ? attachment : GL_NONE;
-    }
-    target->dirty = 1;
-}
-
-void pg_render_target_dst(struct pg_render_target* target)
-{
-    glBindFramebuffer(GL_FRAMEBUFFER, target->fbo);
-    int w = -1, h = -1;
-    if(target->dirty) {
-        target->dirty = 0;
-        int i;
-        for(i = 0; i < 8; ++i) {
-            if(!target->outputs[i]) continue;
-            if(w < 0) w = target->outputs[i]->w;
-            else w = MIN(w, target->outputs[i]->w);
-            if(h < 0) h = target->outputs[i]->h;
-            else h = MIN(h, target->outputs[i]->h);
-            glFramebufferTexture2D(GL_FRAMEBUFFER, target->attachments[i],
-                                   GL_TEXTURE_2D, target->outputs[i]->handle, 0);
-        }
-        if(target->depth) {
-            glFramebufferTexture2D(GL_FRAMEBUFFER, target->depth_attachment,
-                                   GL_TEXTURE_2D, target->depth->handle, 0);
-        }
-    }
-    glDrawBuffers(8, target->attachments);
-    glViewport(0, 0, w, h);
-}

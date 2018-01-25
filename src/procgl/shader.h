@@ -93,8 +93,14 @@ enum pg_matrix {
 struct pg_shader {
     /*  Handles for the shader program  */
     GLuint vert, frag, prog;
+    /*  Set if shader has static vertices; should not use a model   */
+    int static_verts;
+    /*  Set if the shader should only draw once with a full-screen quad */
+    int is_postproc;
     /*  Uniforms: matrices, textures, and a generic string->index table */
     pg_shader_uniform_t matrix[PG_COMMON_MATRICES];
+    pg_shader_uniform_t fbdepth;
+    pg_shader_uniform_t fbtex[8];
     pg_shader_uniform_t tex[8];
     pg_shader_uniform_t tex_rect[8];
     pg_shader_uniform_table_t uniforms;

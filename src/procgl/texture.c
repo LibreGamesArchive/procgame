@@ -1,163 +1,114 @@
+/*
 #include <math.h>
 #include <stdlib.h>
 #include <stdio.h>
 #include <GL/glew.h>
 
 #include "ext/noise1234.h"
-#include "ext/lodepng.h"
 #include "ext/linmath.h"
 #include "wave.h"
 #include "heightmap.h"
-#include "texture.h"
+#include "texture.h"*/
 
-void pg_texture_init_from_file(struct pg_texture* tex,
-                               const char* diffuse_file, const char* light_file)
+#include "procgl.h"
+#include "ext/lodepng.h"
+
+void pg_texture_init_from_file(struct pg_texture* tex, const char* file)
 {
-    unsigned w0, h0, w1, h1;
-    lodepng_decode32_file((unsigned char**)&tex->diffuse, &w0, &h0, diffuse_file);
-    tex->w = w0;
-    tex->h = h0;
-    tex->diffuse_slot = 0;
-    tex->light_slot = 0;
-    glGenTextures(1, &tex->diffuse_gl);
+    unsigned w, h;
+    lodepng_decode32_file((uint8_t**)&tex->data, &w, &h, file);
+    tex->type = PG_UBYTE;
+    tex->channels = 4;
+    tex->w = w;
+    tex->h = h;
+    tex->frame_w = w;
+    tex->frame_h = h;
+    tex->frame_aspect_ratio = (float)w / (float)h;
+    glGenTextures(1, &tex->handle);
     glActiveTexture(GL_TEXTURE0);
-    glBindTexture(GL_TEXTURE_2D, tex->diffuse_gl);
-    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, tex->w, tex->h, 0, GL_RGBA,
-                 GL_UNSIGNED_BYTE, tex->diffuse);
+    glBindTexture(GL_TEXTURE_2D, tex->handle);
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA8, tex->w, tex->h, 0, GL_RGBA,
+                 GL_UNSIGNED_BYTE, tex->data);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
-    if(light_file) {
-        lodepng_decode32_file((unsigned char**)&tex->light, &w1, &h1, light_file);
-        if(w0 != w1 || h0 != h1) {
-            printf("Warning: colormap and normalmap size mismatch:\n"
-                   "    colormap: %s\n    normalmap: %s\n",
-                   diffuse_file, light_file);
-        }
-        glGenTextures(1, &tex->light_gl);
-        glActiveTexture(GL_TEXTURE0);
-        glBindTexture(GL_TEXTURE_2D, tex->light_gl);
-        glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, tex->w, tex->h, 0, GL_RGBA,
-                     GL_UNSIGNED_BYTE, tex->light);
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
-    } else {
-        tex->light = NULL;
-        tex->light_slot = -1;
-    }
 }
 
-void pg_texture_init(struct pg_texture* tex, int w, int h)
+static const struct tex_format {
+    int channels;
+    enum pg_data_type pgtype;
+    GLenum iformat, pixformat, type;
+    size_t size;
+} gl_tex_formats[] = {
+    [PG_UBYTE] = { 1, PG_UBYTE, GL_R8, GL_RED, GL_UNSIGNED_BYTE, sizeof(uint8_t) },
+    [PG_UBVEC2] = { 2, PG_UBYTE, GL_RG8, GL_RG, GL_UNSIGNED_BYTE, sizeof(uint8_t) * 2 },
+    [PG_UBVEC3] = { 3, PG_UBYTE, GL_RGB8, GL_RGB, GL_UNSIGNED_BYTE, sizeof(uint8_t) * 3 },
+    [PG_UBVEC4] = { 4, PG_UBYTE, GL_RGBA8, GL_RGBA, GL_UNSIGNED_BYTE, sizeof(uint8_t) * 4 },
+    [PG_UINT] = { 1, PG_UINT, GL_R32UI, GL_RED, GL_UNSIGNED_INT, sizeof(uint32_t) },
+    [PG_UVEC2] = { 2, PG_UINT, GL_RG32UI, GL_RG, GL_UNSIGNED_INT, sizeof(uint32_t) * 2 },
+    [PG_UVEC3] = { 3, PG_UINT, GL_RGB32UI, GL_RGB, GL_UNSIGNED_INT, sizeof(uint32_t) * 3 },
+    [PG_UVEC4] = { 4, PG_UINT, GL_RGBA32UI, GL_RGBA, GL_UNSIGNED_INT, sizeof(uint32_t) * 4 },
+    [PG_INT] = { 1, PG_INT, GL_R32I, GL_RED, GL_INT, sizeof(int32_t) },
+    [PG_IVEC2] = { 2, PG_INT, GL_RG32I, GL_RG, GL_INT, sizeof(int32_t) * 2 },
+    [PG_IVEC3] = { 3, PG_INT, GL_RGB32I, GL_RGB, GL_INT, sizeof(int32_t) * 3 },
+    [PG_IVEC4] = { 4, PG_INT, GL_RGBA32I, GL_RGBA, GL_INT, sizeof(int32_t) * 4 },
+    [PG_FLOAT] = { 1, PG_FLOAT, GL_R32F, GL_RED, GL_FLOAT, sizeof(float) },
+    [PG_VEC2] = { 2, PG_FLOAT, GL_RG32F, GL_RG, GL_FLOAT, sizeof(float) * 2 },
+    [PG_VEC3] = { 3, PG_FLOAT, GL_RGB32F, GL_RGB, GL_FLOAT, sizeof(float) * 3 },
+    [PG_VEC4] = { 4, PG_FLOAT, GL_RGBA32F, GL_RGBA, GL_FLOAT, sizeof(float) * 4  }
+};
+
+void pg_texture_init(struct pg_texture* tex, int w, int h,
+                     enum pg_data_type type)
 {
-    tex->diffuse = calloc(w * h, sizeof(*tex->diffuse));
-    tex->light = calloc(w * h, sizeof(*tex->light));
+    if(type < PG_UBYTE || type >= PG_MATRIX) {
+        *tex = (struct pg_texture){};
+        return;
+    }
+    const struct tex_format* fmt = &gl_tex_formats[type];
+    tex->type = fmt->pgtype;
+    tex->channels = fmt->channels;
     tex->w = w;
     tex->h = h;
-    tex->diffuse_slot = 0;
-    tex->light_slot = 0;
-    glGenTextures(1, &tex->diffuse_gl);
-    glGenTextures(1, &tex->light_gl);
+    tex->frame_w = w;
+    tex->frame_h = h;
+    tex->frame_aspect_ratio = w / h;
+    tex->data = calloc(w * h, fmt->size);
+    glGenTextures(1, &tex->handle);
     glActiveTexture(GL_TEXTURE0);
-    glBindTexture(GL_TEXTURE_2D, tex->diffuse_gl);
+    glBindTexture(GL_TEXTURE_2D, tex->handle);
+    glTexImage2D(GL_TEXTURE_2D, 0, fmt->iformat, w, h, 0,
+                 fmt->pixformat, fmt->type, NULL);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-    glActiveTexture(GL_TEXTURE0);
-    glBindTexture(GL_TEXTURE_2D, tex->light_gl);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
 }
-
+    
 void pg_texture_deinit(struct pg_texture* tex)
 {
-    glDeleteTextures(1, &tex->diffuse_gl);
-    free(tex->diffuse);
-    if(tex->light) {
-        glDeleteTextures(1, &tex->light_gl);
-        free(tex->light);
-    }
+    if(!tex->data) return;
+    glDeleteTextures(1, &tex->handle);
+    free(tex->data);
 }
 
-void pg_texture_bind(struct pg_texture* tex, int diffuse_slot, int light_slot)
+void pg_texture_bind(struct pg_texture* tex, int slot)
 {
-    tex->diffuse_slot = diffuse_slot;
-    tex->light_slot = light_slot;
-    if(diffuse_slot >= 0) {
-        glActiveTexture(GL_TEXTURE0 + diffuse_slot);
-        glBindTexture(GL_TEXTURE_2D, tex->diffuse_gl);
-    }
-    if(tex->light && light_slot >= 0) {
-        glActiveTexture(GL_TEXTURE0 + light_slot);
-        glBindTexture(GL_TEXTURE_2D, tex->light_gl);
-    }
+    if(tex->type == PG_NULL) return;
+    glActiveTexture(GL_TEXTURE0 + slot);
+    glBindTexture(GL_TEXTURE_2D, tex->handle);
 }
 
 void pg_texture_buffer(struct pg_texture* tex)
 {
-    if(tex->diffuse_slot >= 0) {
-        glActiveTexture(GL_TEXTURE0 + tex->diffuse_slot);
-        glBindTexture(GL_TEXTURE_2D, tex->diffuse_gl);
-        glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, tex->w, tex->h, 0, GL_RGBA,
-                     GL_UNSIGNED_BYTE, tex->diffuse);
-        glGenerateMipmap(GL_TEXTURE_2D);
-    }
-    if(tex->light && tex->light_slot >= 0) {
-        glActiveTexture(GL_TEXTURE0 + tex->light_slot);
-        glBindTexture(GL_TEXTURE_2D, tex->light_gl);
-        glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, tex->w, tex->h, 0, GL_RGBA,
-                     GL_UNSIGNED_BYTE, tex->light);
-        glGenerateMipmap(GL_TEXTURE_2D);
-    }
-}
-
-void pg_texture_wave_to_colors(struct pg_texture* tex, struct pg_wave* wave,
-        void (*func)(vec4 out, vec2 s, struct pg_wave* wave))
-{
-    if(!tex->diffuse) return;
-    int x, y;
-    for(x = 0; x < tex->w; ++x) {
-        for(y = 0; y < tex->h; ++y) {
-            vec2 p = { (float)x / (float)tex->w * 2 - 1,
-                       (float)y / (float)tex->h * 2 - 1};
-            vec4 color;
-            func(color, p, wave);
-            vec4_max(color, color, (vec4){});
-            vec4_min(color, color, (vec4){1,1,1,1});
-            vec4_scale(color, color, 255.0f);
-            pg_texel_set(tex->diffuse[x + y * tex->w],
-                color[0], color[1], color[2], color[3]);
-        }
-    }
-}
-
-
-void pg_texture_hmap_to_normals(struct pg_texture* tex,
-                                struct pg_heightmap* hmap, float intensity)
-{
-    if(!tex->light) return;
-    int x, y;
-    for(x = 0; x < tex->w; ++x) {
-        for(y = 0; y < tex->h; ++y) {
-            float u, d, r, l;
-            u = pg_heightmap_get_height(hmap, x, y - 1) * intensity;
-            d = pg_heightmap_get_height(hmap, x, y + 1) * intensity;
-            l = pg_heightmap_get_height(hmap, x - 1, y) * intensity;
-            r = pg_heightmap_get_height(hmap, x + 1, y) * intensity;
-            vec3 normal = { r - l, d - u, 2.0f };
-            vec3_normalize(normal, normal);
-            pg_texel_set(tex->light[x + y * tex->w],
-                (normal[0] + 1) / 2 * 255,
-                (normal[1] + 1) / 2 * 255,
-                (normal[2] + 1) / 2 * 128 + 127,
-                tex->light[x + y * tex->w][3]);
-        }
-    }
+    if(tex->type == PG_NULL) return;
+    enum pg_data_type fulltype = tex->type + tex->channels - 1;
+    const struct tex_format* fmt = &gl_tex_formats[fulltype];
+    glActiveTexture(GL_TEXTURE0);
+    glBindTexture(GL_TEXTURE_2D, tex->handle);
+    glTexImage2D(GL_TEXTURE_2D, 0, fmt->iformat, tex->w, tex->h, 0,
+                 fmt->pixformat, fmt->type, tex->data);
 }
 
 void pg_texture_set_atlas(struct pg_texture* tex, int frame_w, int frame_h)
@@ -198,8 +149,75 @@ void pg_texture_frame_tx(vec4 out, vec4 const in,
     vec2 diff;
     vec2_sub(diff, in + 2, in);
     vec2_mul(diff, diff, scale);
-    vec2_add(tmp + 2, tmp, (vec2){ diff[0], diff[1] });
+    vec2_add(tmp + 2, tmp, vec2(diff[0], diff[1]));
     vec2_add(tmp, tmp, offset);
     vec2_add(tmp + 2, tmp + 2, offset);
     vec4_dup(out, tmp);
+}
+
+void pg_renderbuffer_init(struct pg_renderbuffer* buffer)
+{
+    *buffer = (struct pg_renderbuffer){};
+    glGenFramebuffers(1, &buffer->fbo);
+}
+
+void pg_renderbuffer_attach(struct pg_renderbuffer* buffer,
+                            struct pg_texture* tex,
+                            int idx, GLenum attachment)
+{
+    if(attachment == GL_DEPTH_ATTACHMENT
+    || attachment == GL_DEPTH_STENCIL_ATTACHMENT) {
+        buffer->depth = tex;
+        buffer->depth_attachment = tex ? attachment : GL_NONE;
+    } else {
+        buffer->outputs[idx] = tex;
+        buffer->attachments[idx] = tex ? attachment : GL_NONE;
+    }
+    buffer->dirty = 1;
+}
+
+void pg_renderbuffer_dst(struct pg_renderbuffer* buffer)
+{
+    glBindFramebuffer(GL_FRAMEBUFFER, buffer->fbo);
+    if(buffer->dirty) {
+        int w = -1, h = -1;
+        buffer->dirty = 0;
+        int i;
+        for(i = 0; i < 8; ++i) {
+            if(!buffer->outputs[i]) continue;
+            if(w < 0) w = buffer->outputs[i]->w;
+            else w = MIN(w, buffer->outputs[i]->w);
+            if(h < 0) h = buffer->outputs[i]->h;
+            else h = MIN(h, buffer->outputs[i]->h);
+            glFramebufferTexture2D(GL_FRAMEBUFFER, buffer->attachments[i],
+                                   GL_TEXTURE_2D, buffer->outputs[i]->handle, 0);
+        }
+        if(buffer->depth) {
+            glFramebufferTexture2D(GL_FRAMEBUFFER, buffer->depth_attachment,
+                                   GL_TEXTURE_2D, buffer->depth->handle, 0);
+        }
+        buffer->w = w;
+        buffer->h = h;
+    }
+    glDrawBuffers(8, buffer->attachments);
+    glViewport(0, 0, buffer->w, buffer->h);
+}
+
+void pg_rendertarget_init(struct pg_rendertarget* target,
+                          struct pg_renderbuffer* b0, struct pg_renderbuffer* b1)
+{
+    target->buf[0] = b0;
+    target->buf[1] = b1;
+    target->cur_dst = 0;
+}
+
+void pg_rendertarget_dst(struct pg_rendertarget* target)
+{
+    pg_renderbuffer_dst(target->buf[target->cur_dst]);
+}
+
+void pg_rendertarget_swap(struct pg_rendertarget* target)
+{
+    if(!target->buf[1]) return;
+    target->cur_dst = 1 - target->cur_dst;
 }

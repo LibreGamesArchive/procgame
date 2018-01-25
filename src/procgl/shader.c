@@ -25,15 +25,35 @@ static void pg_shader_gather_uniforms(struct pg_shader* shader)
     for (i = 0; i < count; i++)
     {
         glGetActiveUniform(shader->prog, (GLuint)i, bufSize, &length, &size, &type, name);
-        if(strncmp(name, "pg_texture_", sizeof("pg_texture_") - 1) == 0) {
+        GLint location = glGetUniformLocation(shader->prog, name);
+        if(name[0] == '_') continue;
+        if(strncmp(name, "pg_fbtexture_", sizeof("pg_fbtexture_") - 1) == 0) {
+            int tex_id = name[sizeof("pg_fbtexture_") - 1] - '0';
+            if(tex_id < 0 || tex_id >= 8) {
+                char* name_offset = name + sizeof("pg_fbtexture_") - 1;
+                if(strncmp(name_offset, "depth", 8) == 0) {
+                    printf("Caught pg_fbtexture_depth: %d\n", i);
+                    HTABLE_SET(shader->uniforms, name, (struct pg_shader_uniform) {
+                        .type = PG_TEXTURE, .array_len = 1, .idx = location});
+                    HTABLE_GET_ENTRY(shader->uniforms, name, shader->fbdepth);
+                } else {
+                    printf("Shader error: bad pg_fbtexture: %s\n", name_offset);
+                }
+                continue;
+            }
+            printf("Caught pg_fbtexture_%d: %d\n", tex_id, i);
+            HTABLE_SET(shader->uniforms, name, (struct pg_shader_uniform) {
+                .type = PG_TEXTURE, .array_len = 1, .idx = location});
+            HTABLE_GET_ENTRY(shader->uniforms, name, shader->fbtex[tex_id]);
+        } else if(strncmp(name, "pg_texture_", sizeof("pg_texture_") - 1) == 0) {
             int tex_id = name[sizeof("pg_texture_") - 1] - '0';
             if(tex_id < 0 || tex_id >= 8) {
                 printf("Shader error: bad pg_texture id: %d\n", tex_id);
                 continue;
             }
-            printf("Caught pg_texture_%d\n", tex_id);
+            printf("Caught pg_texture_%d: %d\n", tex_id, i);
             HTABLE_SET(shader->uniforms, name, (struct pg_shader_uniform) {
-                .type = PG_TEXTURE, .array_len = 1, .idx = i});
+                .type = PG_TEXTURE, .array_len = 1, .idx = location});
             HTABLE_GET_ENTRY(shader->uniforms, name, shader->tex[tex_id]);
         } else if(strncmp(name, "pg_tex_rect_", sizeof("pg_tex_rect_") - 1) == 0) {
             int tex_id = name[sizeof("pg_tex_rect_") - 1] - '0';
@@ -43,7 +63,7 @@ static void pg_shader_gather_uniforms(struct pg_shader* shader)
             }
             printf("Caught pg_tex_rect_%d\n", tex_id);
             HTABLE_SET(shader->uniforms, name, (struct pg_shader_uniform) {
-                .type = PG_VEC4, .array_len = 1, .idx = i});
+                .type = PG_VEC4, .array_len = 1, .idx = location});
             HTABLE_GET_ENTRY(shader->uniforms, name, shader->tex_rect[tex_id]);
         } else if(strncmp(name, "pg_matrix_", sizeof("pg_matrix_") - 1) == 0) {
             static const char* mat_names[] = {
@@ -61,7 +81,7 @@ static void pg_shader_gather_uniforms(struct pg_shader* shader)
                 if(strncmp(name_offset, mat_names[j], max_len) == 0) {
                     printf("Caught pg_matrix_%s\n", mat_names[j]);
                     HTABLE_SET(shader->uniforms, name, (struct pg_shader_uniform) {
-                        .type = PG_MATRIX, .array_len = 1, .idx = i});
+                        .type = PG_MATRIX, .array_len = 1, .idx = location});
                     HTABLE_GET_ENTRY(shader->uniforms, name, shader->matrix[j]);
                     break;
                 }
@@ -93,7 +113,7 @@ static void pg_shader_gather_uniforms(struct pg_shader* shader)
                 }
                 HTABLE_SET(shader->uniforms, name,
                     (struct pg_shader_uniform){
-                        .type = pg_type, .idx = i, .array_len = size });
+                        .type = pg_type, .idx = location, .array_len = size });
                 printf("Found custom uniform %s\n", name);
             } else {
                 printf("Unrecognized uniform type for %s\n", name);
@@ -266,7 +286,9 @@ void pg_shader_set_texture(struct pg_shader* shader,
     if(!dst) return;
     dst->data.tex = tex;
     if(pg_active_shader == shader) {
-        glUniform1i(dst->idx, tex->diffuse_gl);
+        glActiveTexture(GL_TEXTURE0 + idx);
+        glBindTexture(GL_TEXTURE_2D, tex->handle);
+        glUniform1i(dst->idx, idx);
     }
 }
 
@@ -300,7 +322,7 @@ static void set_uniform(struct pg_shader_uniform* dst, struct pg_uniform* src)
         case PG_VEC3: glUniform3f(dst->idx, src->f[0], src->f[1], src->f[2]); break;
         case PG_VEC4: glUniform4f(dst->idx, src->f[0], src->f[1], src->f[2], src->f[3]); break;
         case PG_MATRIX: glUniformMatrix4fv(dst->idx, 1, GL_FALSE, *src->m); break;
-        case PG_TEXTURE: glUniform1i(dst->idx, src->tex->diffuse_gl); break;
+        case PG_TEXTURE: glUniform1i(dst->idx, src->tex->handle); break;
         default: return;
     }
     dst->data = *src;
