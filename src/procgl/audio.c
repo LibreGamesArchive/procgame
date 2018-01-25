@@ -1,4 +1,5 @@
 #include "procgl.h"
+
 #include "ext/wavfile.h"
 #include "ext/stb_vorbis.c"
 #define DR_WAV_IMPLEMENTATION
@@ -165,7 +166,7 @@ void pg_audio_generate(struct pg_audio_chunk* chunk, float len,
         } else {
             s = s * (env->sustain - (i - sustain_end) / release_time * env->sustain);
         }
-        s = clamp(s, -1.0f, 1.0f);
+        s = CLAMP(s, -1.0f, 1.0f);
         chunk->samples[i] = (int16_t)(s * (INT16_MAX - 1));
     }
 }

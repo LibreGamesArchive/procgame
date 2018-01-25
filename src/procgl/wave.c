@@ -220,7 +220,7 @@ float pg_wave_mix_max_abs(float a, float b, float k)
 }
 float pg_wave_mix_lerp(float a, float b, float k)
 {
-    return lerp(a, b, k);
+    return LERP(a, b, k);
 }
 
 /*  Function definitions for the built-in waves */
