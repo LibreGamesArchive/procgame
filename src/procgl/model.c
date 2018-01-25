@@ -223,18 +223,6 @@ void pg_model_begin(struct pg_model* model, struct pg_shader* shader)
     glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, model->buf.ebo);
 }
 
-void pg_model_draw(struct pg_model* model, mat4 transform)
-{
-/*
-    if(model->active < 0) return;
-    struct pg_shader* m_shader = model->buffers.data[model->active].shader;
-    if(transform) {
-        pg_shader_set_matrix(m_shader, PG_MODEL_MATRIX, transform);
-        pg_shader_rebuild_matrices(m_shader);
-    }
-    glDrawElements(GL_TRIANGLES, model->tris.len * 3, GL_UNSIGNED_INT, 0);*/
-}
-
 /*  Raw vertex/triangle building    */
 
 void pg_model_transform(struct pg_model* model, mat4 transform)
