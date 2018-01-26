@@ -1,39 +1,5 @@
-/*
-#include <math.h>
-#include <stdlib.h>
-#include <stdio.h>
-#include <GL/glew.h>
-
-#include "ext/noise1234.h"
-#include "ext/linmath.h"
-#include "wave.h"
-#include "heightmap.h"
-#include "texture.h"*/
-
 #include "procgl.h"
 #include "ext/lodepng.h"
-
-void pg_texture_init_from_file(struct pg_texture* tex, const char* file)
-{
-    unsigned w, h;
-    lodepng_decode32_file((uint8_t**)&tex->data, &w, &h, file);
-    tex->type = PG_UBYTE;
-    tex->channels = 4;
-    tex->w = w;
-    tex->h = h;
-    tex->frame_w = w;
-    tex->frame_h = h;
-    tex->frame_aspect_ratio = (float)w / (float)h;
-    glGenTextures(1, &tex->handle);
-    glActiveTexture(GL_TEXTURE0);
-    glBindTexture(GL_TEXTURE_2D, tex->handle);
-    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA8, tex->w, tex->h, 0, GL_RGBA,
-                 GL_UNSIGNED_BYTE, tex->data);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
-}
 
 static const struct tex_format {
     int channels;
@@ -59,8 +25,26 @@ static const struct tex_format {
     [PG_VEC4] = { 4, PG_FLOAT, GL_RGBA32F, GL_RGBA, GL_FLOAT, sizeof(float) * 4  }
 };
 
+void pg_texture_init_from_file(struct pg_texture* tex, const char* file,
+                               struct pg_texture_opts* opts)
+{
+    unsigned w, h;
+    lodepng_decode32_file((uint8_t**)&tex->data, &w, &h, file);
+    tex->type = PG_UBYTE;
+    tex->channels = 4;
+    tex->w = w;
+    tex->h = h;
+    tex->frame_w = w;
+    tex->frame_h = h;
+    tex->frame_aspect_ratio = (float)w / (float)h;
+    if(!opts) tex->opts = *PG_TEXTURE_OPTS();
+    else tex->opts = *opts;
+    glGenTextures(1, &tex->handle);
+    pg_texture_buffer(tex);
+}
+
 void pg_texture_init(struct pg_texture* tex, int w, int h,
-                     enum pg_data_type type)
+                     enum pg_data_type type, struct pg_texture_opts* opts)
 {
     if(type < PG_UBYTE || type >= PG_MATRIX) {
         *tex = (struct pg_texture){};
@@ -75,15 +59,10 @@ void pg_texture_init(struct pg_texture* tex, int w, int h,
     tex->frame_h = h;
     tex->frame_aspect_ratio = w / h;
     tex->data = calloc(w * h, fmt->size);
+    if(!opts) tex->opts = *PG_TEXTURE_OPTS();
+    else tex->opts = *opts;
     glGenTextures(1, &tex->handle);
-    glActiveTexture(GL_TEXTURE0);
-    glBindTexture(GL_TEXTURE_2D, tex->handle);
-    glTexImage2D(GL_TEXTURE_2D, 0, fmt->iformat, w, h, 0,
-                 fmt->pixformat, fmt->type, NULL);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+    pg_texture_buffer(tex);
 }
     
 void pg_texture_deinit(struct pg_texture* tex)
@@ -93,11 +72,26 @@ void pg_texture_deinit(struct pg_texture* tex)
     free(tex->data);
 }
 
+void pg_texture_options(struct pg_texture* tex, struct pg_texture_opts* opts)
+{
+    tex->opts = *opts;
+}
+
 void pg_texture_bind(struct pg_texture* tex, int slot)
 {
     if(tex->type == PG_NULL) return;
     glActiveTexture(GL_TEXTURE0 + slot);
     glBindTexture(GL_TEXTURE_2D, tex->handle);
+}
+
+static void pg_texture_buffer_opts(struct pg_texture* tex)
+{
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, tex->opts.wrap_x);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, tex->opts.wrap_y);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, tex->opts.filter_min);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, tex->opts.filter_mag);
+    glTexParameteriv(GL_TEXTURE_2D, GL_TEXTURE_SWIZZLE_RGBA, tex->opts.swizzle);
+    glTexParameterfv(GL_TEXTURE_2D, GL_TEXTURE_BORDER_COLOR, tex->opts.border);
 }
 
 void pg_texture_buffer(struct pg_texture* tex)
@@ -109,6 +103,11 @@ void pg_texture_buffer(struct pg_texture* tex)
     glBindTexture(GL_TEXTURE_2D, tex->handle);
     glTexImage2D(GL_TEXTURE_2D, 0, fmt->iformat, tex->w, tex->h, 0,
                  fmt->pixformat, fmt->type, tex->data);
+    pg_texture_buffer_opts(tex);
+    if(tex->opts.filter_min != GL_LINEAR
+    && tex->opts.filter_min != GL_NEAREST) {
+        glGenerateMipmap(tex->handle);
+    }
 }
 
 void pg_texture_set_atlas(struct pg_texture* tex, int frame_w, int frame_h)

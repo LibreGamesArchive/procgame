@@ -87,15 +87,16 @@ void example_game_start(struct pg_game_state* state)
     /*  The back-buffer */
     int w, h;
     pg_screen_size(&w, &h);
-    pg_texture_init(&d->pptex[0], w, h, PG_UBVEC4);
-    pg_texture_init(&d->pptex[1], w, h, PG_UBVEC4);
+    pg_texture_init(&d->pptex[0], w, h, PG_UBVEC4, NULL);
+    pg_texture_init(&d->pptex[1], w, h, PG_UBVEC4, NULL);
     pg_renderbuffer_init(&d->ppbuf[0]);
     pg_renderbuffer_init(&d->ppbuf[1]);
     pg_renderbuffer_attach(&d->ppbuf[0], &d->pptex[0], 0, GL_COLOR_ATTACHMENT0);
     pg_renderbuffer_attach(&d->ppbuf[1], &d->pptex[1], 0, GL_COLOR_ATTACHMENT0);
     pg_rendertarget_init(&d->target, &d->ppbuf[0], &d->ppbuf[1]);
     /*  Load a font texture */
-    pg_texture_init_from_file(&d->assets.font, "res/font_8x8.png");
+    pg_texture_init_from_file(&d->assets.font, "res/font_8x8.png",
+        PG_TEXTURE_OPTS(.filter_min = GL_NEAREST, .filter_mag = GL_NEAREST));
     pg_texture_set_atlas(&d->assets.font, 8, 8);
     /*  Initialize the renderer and two render passes   */
     pg_renderer_init(&d->rend);
@@ -151,7 +152,7 @@ void example_game_start(struct pg_game_state* state)
     /*  Set up blur effect calls    */
     test_draw[0] = PG_UNIFORM_FLOAT({ 1.0f, 0.0f });
     test_draw[1] = PG_UNIFORM_FLOAT({ 0.0f, 1.0f });
-    pg_renderpass_add_draw(&d->post_blur, 2, test_draw);
+    pg_renderpass_add_draw(&d->post_blur, 0, test_draw);
     /*  Add the rendergroup to the first pass   */
     /*  Add the two passes to the renderer  */
     ARR_PUSH(d->rend.passes, &d->test_pass);
