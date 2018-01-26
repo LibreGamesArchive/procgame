@@ -5,12 +5,11 @@ struct pg_model;
 /*  The basic structure of a render:
     pg_renderer
         pg_renderpass
-            pg_rendertarget                The destination for all draw calls
-            pg_rendergroup
-                pg_model                    The model and texture to be used
-                pg_texture                  for all draws in this bucket.
-                array of pg_uniform data
-                function pointer to advance through uniform array per draw
+            pg_rendertarget                 The destination for all draw calls
+            pg_model                        The model and texture to be used
+            pg_texture                      for all draws in this bucket.
+            array of pg_uniform data
+            draw_func                       Advances through uniform array
 */
 
 typedef int (*pg_render_drawfunc_t)(
@@ -57,9 +56,9 @@ void pg_renderer_reset(struct pg_renderer* rend);
 void pg_renderpass_init(struct pg_renderer* rend, struct pg_renderpass* pass,
                          char* shader, GLbitfield clear_buffers);
 void pg_renderpass_deinit(struct pg_renderpass* pass);
+void pg_renderpass_reset(struct pg_renderpass* pass);
 void pg_renderpass_uniform(struct pg_renderpass* pass, char* name,
                            enum pg_data_type type, struct pg_uniform* data);
-void pg_renderpass_reset(struct pg_renderpass* pass);
 void pg_renderpass_target(struct pg_renderpass* pass,
                           struct pg_rendertarget* target, int swap);
 void pg_renderpass_model(struct pg_renderpass* pass, struct pg_model* model);

@@ -41,10 +41,5 @@ void main()
             (light_color * light + ambient_color), tex_color.a);
     }
     frag_color = clamp(final, 0, 1);
-    //frag_color[0] = tex_weight;
-    //frag_color[1] = f_tex_weight;
-    //frag_color = vec4(1,1,1,1);
-    //frag_color = vec4(f_tex_coord.x, f_tex_coord.y, 0, 1);
-    //frag_color = vec4(1, 0, 0, 1);
 }
 

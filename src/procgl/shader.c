@@ -299,7 +299,7 @@ void pg_shader_set_tex_rect(struct pg_shader* shader,
     struct pg_shader_uniform* dst;
     HTABLE_ENTRY_PTR(shader->uniforms, shader->tex[idx], dst);
     if(!dst) return;
-    vec4_dup(dst->data.f, tex_rect);
+    vec4_dup(dst->data.f[0], tex_rect);
     if(pg_active_shader == shader) {
         glUniform4f(dst->idx, tex_rect[0], tex_rect[1], tex_rect[2], tex_rect[4]);
     }
@@ -309,20 +309,34 @@ static void set_uniform(struct pg_shader_uniform* dst, struct pg_uniform* src)
 {
     if(!dst || dst->idx == -1) return;
     switch(dst->type) {
-        case PG_INT: glUniform1i(dst->idx, src->i[0]); break;
-        case PG_IVEC2: glUniform2i(dst->idx, src->i[0], src->i[1]); break;
-        case PG_IVEC3: glUniform3i(dst->idx, src->i[0], src->i[1], src->i[2]); break;
-        case PG_IVEC4: glUniform4i(dst->idx, src->i[0], src->i[1], src->i[2], src->i[3]); break;
-        case PG_UINT: glUniform1i(dst->idx, src->u[0]); break;
-        case PG_UVEC2: glUniform2ui(dst->idx, src->u[0], src->u[1]); break;
-        case PG_UVEC3: glUniform3ui(dst->idx, src->u[0], src->u[1], src->u[2]); break;
-        case PG_UVEC4: glUniform4ui(dst->idx, src->u[0], src->u[1], src->u[2], src->u[3]); break;
-        case PG_FLOAT: glUniform1f(dst->idx, src->f[0]); break;
-        case PG_VEC2: glUniform2f(dst->idx, src->f[0], src->f[1]); break;
-        case PG_VEC3: glUniform3f(dst->idx, src->f[0], src->f[1], src->f[2]); break;
-        case PG_VEC4: glUniform4f(dst->idx, src->f[0], src->f[1], src->f[2], src->f[3]); break;
-        case PG_MATRIX: glUniformMatrix4fv(dst->idx, 1, GL_FALSE, *src->m); break;
-        case PG_TEXTURE: glUniform1i(dst->idx, src->tex->handle); break;
+        case PG_INT:
+            glUniform1i(dst->idx, src->i[0][0]); break;
+        case PG_IVEC2:
+            glUniform2i(dst->idx, src->i[0][0], src->i[0][1]); break;
+        case PG_IVEC3:
+            glUniform3i(dst->idx, src->i[0][0], src->i[0][1], src->i[0][2]); break;
+        case PG_IVEC4:
+            glUniform4i(dst->idx, src->i[0][0], src->i[0][1], src->i[0][2], src->i[0][3]); break;
+        case PG_UINT:
+            glUniform1ui(dst->idx, src->u[0][0]); break;
+        case PG_UVEC2:
+            glUniform2ui(dst->idx, src->u[0][0], src->u[0][1]); break;
+        case PG_UVEC3:
+            glUniform3ui(dst->idx, src->u[0][0], src->u[0][1], src->u[0][2]); break;
+        case PG_UVEC4:
+            glUniform4ui(dst->idx, src->u[0][0], src->u[0][1], src->u[0][2], src->u[0][3]); break;
+        case PG_FLOAT:
+            glUniform1f(dst->idx, src->f[0][0]); break;
+        case PG_VEC2:
+            glUniform2f(dst->idx, src->f[0][0], src->f[0][1]); break;
+        case PG_VEC3:
+            glUniform3f(dst->idx, src->f[0][0], src->f[0][1], src->f[0][2]); break;
+        case PG_VEC4:
+            glUniform4f(dst->idx, src->f[0][0], src->f[0][1], src->f[0][2], src->f[0][3]); break;
+        case PG_MATRIX:
+            glUniformMatrix4fv(dst->idx, 1, GL_FALSE, *src->m); break;
+        case PG_TEXTURE:
+            glUniform1i(dst->idx, src->tex->handle); break;
         default: return;
     }
     dst->data = *src;

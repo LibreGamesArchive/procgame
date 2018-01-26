@@ -19,6 +19,7 @@ struct example_game_data {
     struct pg_renderpass test_pass;
     struct pg_renderpass post_sine;
     struct pg_renderpass post_blur;
+    struct pg_renderpass text_pass;
     vec2 player_pos, player_vel;
 };
 
@@ -31,18 +32,19 @@ static int drawformat_2d(const struct pg_uniform* unis, const struct pg_shader* 
                          const mat4* mats, const GLint* idx)
 {
     glUniformMatrix4fv(idx[0], 1, GL_FALSE, *unis[0].m);
-    glUniform4f(idx[1], unis[1].f[0], unis[1].f[1], unis[1].f[2], unis[1].f[3]);
-    glUniform2f(idx[2], unis[2].f[0], unis[2].f[1]);
+    glUniform4f(idx[1], unis[1].f[0][0], unis[1].f[0][1],
+                        unis[1].f[0][2], unis[1].f[0][3]);
+    glUniform2f(idx[2], unis[2].f[0][0], unis[2].f[0][1]);
     return 3;
 }
 
 static int drawformat_sine(const struct pg_uniform* unis, const struct pg_shader* shader,
                          const mat4* mats, const GLint* idx)
 {
-    glUniform1f(idx[0], unis[0].f[0]);
-    glUniform1f(idx[1], unis[0].f[1]);
-    glUniform1f(idx[2], unis[0].f[2]);
-    glUniform1i(idx[3], (int)unis[0].f[3]);
+    glUniform1f(idx[0], unis[0].f[0][0]);
+    glUniform1f(idx[1], unis[0].f[0][1]);
+    glUniform1f(idx[2], unis[0].f[0][2]);
+    glUniform1i(idx[3], (int)unis[0].f[0][3]);
     glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
     return 1;
 }
@@ -50,11 +52,25 @@ static int drawformat_sine(const struct pg_uniform* unis, const struct pg_shader
 static int drawformat_blur(const struct pg_uniform* unis, const struct pg_shader* shader,
                          const mat4* mats, const GLint* idx)
 {
-    glUniform2f(idx[0], unis[0].f[0], unis[0].f[1]);
+    glUniform2f(idx[0], unis[0].f[0][0], unis[0].f[0][1]);
     glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
     return 1;
 }
 
+static int drawformat_text(const struct pg_uniform* unis, const struct pg_shader* shader,
+                         const mat4* mats, const GLint* idx)
+{
+    glUniformMatrix4fv(idx[0], 1, GL_FALSE, *mats[PG_VIEW_MATRIX]);
+    glUniform1uiv(idx[1], 16, (unsigned int*)unis[0].str);
+    glUniform4f(idx[2], unis[1].f[0][0], unis[1].f[0][1],
+                        unis[1].f[0][2], unis[1].f[0][3]);
+    glUniform4f(idx[3], unis[1].f[1][0], unis[1].f[1][1],
+                        unis[1].f[1][2], unis[1].f[1][3]);
+    glUniform2f(idx[4], unis[1].f[2][0], unis[1].f[2][1]);
+    int len = MAX(64, (int)unis[1].f[2][2]);
+    glDrawArrays(GL_TRIANGLES, 0, len * 6);
+    return 2;
+}
 
 void example_game_start(struct pg_game_state* state)
 {
@@ -84,9 +100,11 @@ void example_game_start(struct pg_game_state* state)
     /*  Initialize the renderer and two render passes   */
     pg_renderer_init(&d->rend);
     pg_renderpass_init(&d->rend, &d->test_pass, "2d", GL_COLOR_BUFFER_BIT);
+    pg_renderpass_init(&d->rend, &d->text_pass, "text", 0);
     pg_renderpass_init(&d->rend, &d->post_sine, "post_sine", GL_COLOR_BUFFER_BIT);
     pg_renderpass_init(&d->rend, &d->post_blur, "post_blur", GL_COLOR_BUFFER_BIT);
     pg_renderpass_target(&d->test_pass, &d->target, 0);
+    pg_renderpass_target(&d->text_pass, &d->target, 0);
     pg_renderpass_target(&d->post_sine, &d->target, 1);
     pg_renderpass_target(&d->post_blur, &d->target, 1);
     /*  Basic 2d pass texture and drawformat    */
@@ -95,44 +113,59 @@ void example_game_start(struct pg_game_state* state)
     pg_renderpass_drawformat(&d->test_pass, drawformat_2d, 3,
                               "pg_matrix_model", "pg_tex_rect_0",
                               "sprite_size");
+    /*  Text pass texture and drawformat    */
+    pg_renderpass_texture(&d->text_pass, 1, &d->assets.font);
+    pg_renderpass_uniform(&d->text_pass, "font_pitch", PG_UINT,
+                          &PG_UNIFORM_UINT({8}));
+    pg_renderpass_uniform(&d->text_pass, "glyph_size", PG_VEC4,
+                          &PG_UNIFORM_FLOAT({ 8.0f / 64.0f, 8.0f / 96.0f, 1, 1 }));
+    pg_renderpass_drawformat(&d->text_pass, drawformat_text, 5,
+            "pg_matrix_mvp", "chars", "style", "color", "dir");
     /*  Post-effect setup and drawformat    */
     pg_renderpass_drawformat(&d->post_sine, drawformat_sine, 4,
             "amplitude", "frequency", "phase", "axis");
     /*  Blur effect setup and drawformat    */
     pg_renderpass_uniform(&d->post_blur, "resolution", PG_VEC2,
-                &(struct pg_uniform){ .f = { w, h } });
+                &PG_UNIFORM_FLOAT({ w, h }));
     pg_renderpass_drawformat(&d->post_blur, drawformat_blur, 1, "blur_dir");
     /*  Set up a couple test draw calls */
     struct pg_uniform test_draw[3] = {};
     mat4_identity(test_draw[0].m);
-    vec4_set(test_draw[1].f, 0, 0, 1, 1);
-    vec2_set(test_draw[2].f, 0.5f, 1.0f);
+    test_draw[1] = PG_UNIFORM_FLOAT({ 0, 0, 1.0f, 1.0f });
+    test_draw[2] = PG_UNIFORM_FLOAT({ 0.5f, 1.0f });
     pg_renderpass_add_draw(&d->test_pass, 3, test_draw);
     mat4_translate(test_draw[0].m, 0.5, 0, 0);
-    vec4_set(test_draw[1].f, 0, 0, 0.5, 0.5);
-    vec2_set(test_draw[2].f, 0.5f, 1.0f);
+    test_draw[1] = PG_UNIFORM_FLOAT({ 0, 0, 0.5f, 0.5f });
+    test_draw[2] = PG_UNIFORM_FLOAT({ 0.5f, 1.0f });
     pg_renderpass_add_draw(&d->test_pass, 3, test_draw);
+    /*  Set up a text call  */
+    test_draw[0] = PG_UNIFORM_STRING("HELLO, WORLD!");
+    test_draw[1] = PG_UNIFORM_FLOAT(
+            { -1, -0.5, 0.1, 1.2 }, { 1, 0, 0, 1 }, { 1, 1, (float)strlen("HELLO, WORLD!") });
+    pg_renderpass_add_draw(&d->text_pass, 2, test_draw);
     /*  Set up a post-effect call   */
-    vec4_set(test_draw[0].f, 0.02, 50, 0, 1);
-    vec4_set(test_draw[1].f, 0.002, 400, 0, 1);
-    vec4_set(test_draw[2].f, 0.05, 10, 1, 0);
-    pg_renderpass_add_draw(&d->post_sine, 3, test_draw);
+    test_draw[0] = PG_UNIFORM_FLOAT({ 0.005f, 50.0f, 0.0f, 1.0f });
+    test_draw[1] = PG_UNIFORM_FLOAT({ 0.002f, 400.0f, 0.0f, 1.0f });
+    test_draw[2] = PG_UNIFORM_FLOAT({ 0.05f, 1.0f, 1.0f, 0.0f });
+    pg_renderpass_add_draw(&d->post_sine, 1, test_draw);
     /*  Set up blur effect calls    */
-    vec2_set(test_draw[0].f, 2, 0);
-    vec2_set(test_draw[1].f, 0, 2);
+    test_draw[0] = PG_UNIFORM_FLOAT({ 1.0f, 0.0f });
+    test_draw[1] = PG_UNIFORM_FLOAT({ 0.0f, 1.0f });
     pg_renderpass_add_draw(&d->post_blur, 2, test_draw);
     /*  Add the rendergroup to the first pass   */
     /*  Add the two passes to the renderer  */
     ARR_PUSH(d->rend.passes, &d->test_pass);
+    ARR_PUSH(d->rend.passes, &d->text_pass);
     ARR_PUSH(d->rend.passes, &d->post_sine);
     ARR_PUSH(d->rend.passes, &d->post_blur);
     mat4_ortho(d->test_pass.mats[PG_VIEW_MATRIX], -1, 1, 1, -1, -1, 1);
+    mat4_ortho(d->text_pass.mats[PG_VIEW_MATRIX], -1, 1, 1, -1, -1, 1);
     pg_renderpass_uniform(&d->test_pass, "ambient_color", PG_VEC3,
-                           &(struct pg_uniform){ .f = { 1, 1, 1 } });
+                          &PG_UNIFORM_FLOAT({ 1, 1, 1 }));
     pg_renderpass_uniform(&d->test_pass, "color_mod", PG_VEC4,
-                           &(struct pg_uniform){ .f = { 1, 1, 1, 1 } });
+                          &PG_UNIFORM_FLOAT({ 1, 1, 1, 1 }));
     pg_renderpass_uniform(&d->test_pass, "tex_weight", PG_FLOAT,
-                           &(struct pg_uniform){ .f = { 1 } });
+                          &PG_UNIFORM_FLOAT({ 1 }));
     /*  Fill in state structure */
     state->data = d;
     state->tick = example_game_tick;

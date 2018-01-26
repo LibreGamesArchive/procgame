@@ -13,6 +13,15 @@ void pg_renderer_init(struct pg_renderer* rend)
         "src/procgl/shaders/2d_vert.glsl", "src/procgl/shaders/2d_frag.glsl");
     if(!load) printf("Failed to load 2d shader.\n");
     else HTABLE_SET(rend->shaders, "2d", shader);
+    /*  Text shader */
+    load = pg_shader_load(&shader,
+        "src/procgl/shaders/text_vert.glsl", "src/procgl/shaders/text_frag.glsl");
+    if(!load) printf("Failed to load text shader.\n");
+    else {
+        shader.static_verts = 1;
+        shader.is_postproc = 1;
+        HTABLE_SET(rend->shaders, "text", shader);
+    }
     /*  Sine-wave distortion post-effect    */
     load = pg_shader_load(&shader,
         "src/procgl/shaders/screen_vert.glsl", "src/procgl/shaders/post_sine_frag.glsl");
@@ -24,7 +33,7 @@ void pg_renderer_init(struct pg_renderer* rend)
     }
     /*  Blur post-effect    */
     load = pg_shader_load(&shader,
-        "src/procgl/shaders/screen_vert.glsl", "src/procgl/shaders/post_blur7_frag.glsl");
+        "src/procgl/shaders/screen_vert.glsl", "src/procgl/shaders/post_blur_frag.glsl");
     if(!load) printf("Failed to load blur shader.\n");
     else {
         shader.static_verts = 1;
@@ -69,6 +78,8 @@ void pg_renderpass_init(struct pg_renderer* rend, struct pg_renderpass* pass,
     *pass = (struct pg_renderpass) {
         .shader = shader_ref,
         .clear_buffers = clear_buffers };
+    int i;
+    for(i = 0; i < PG_COMMON_MATRICES; ++i) mat4_identity(pass->mats[i]);
     HTABLE_INIT(pass->uniforms, 8);
 }
 
@@ -263,10 +274,6 @@ void pg_renderer_draw_frame(struct pg_renderer* rend)
             if(pass->target) pg_rendertarget_dst(pass->target);
             else pg_screen_dst();
             glClear(pass->clear_buffers);
-        } else {
-        //    pg_rendertarget_swap(pass->target);
-        //    pg_rendertarget_dst(pass->target);
-        //    shader_fbtextures(shader, pass->target);
         }
         shader_base_mats(shader, pass->mats);
         shader_textures(shader, 8, pass->tex);
@@ -295,7 +302,6 @@ void pg_renderer_draw_frame(struct pg_renderer* rend)
             if(shader->static_verts) continue;
             glDrawElements(GL_TRIANGLES, model->tris.len * 3, GL_UNSIGNED_INT, 0);
         }
-        //if(pass->swaptarget) pg_rendertarget_swap(pass->target);
     }
     if(pass && pass->target) {
         HTABLE_GET(rend->shaders, "passthru", shader);

@@ -15,7 +15,6 @@
 #include "shader.h"
 #include "renderer.h"
 #include "model.h"
-#include "postproc.h"
 #include "gbuffer.h"
 #include "audio.h"
 #include "../game/game_state.h"

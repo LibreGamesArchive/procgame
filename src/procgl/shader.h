@@ -61,13 +61,25 @@ static const struct pg_shader_attribute_info {
 
 struct pg_uniform {
     union {
-        ivec4 i;
-        uvec4 u;
-        vec4 f;
+        char str[64];
+        ivec4 i[4];
+        uvec4 u[4];
+        vec4 f[4];
         mat4 m;
         struct pg_texture* tex;
     };
 };
+
+#define PG_UNIFORM_FLOAT(...)   ((struct pg_uniform){ .f = { __VA_ARGS__ } })
+#define PG_UNIFORM_INT(...)     ((struct pg_uniform){ .i = { __VA_ARGS__ } })
+#define PG_UNIFORM_UINT(...)    ((struct pg_uniform){ .u = { __VA_ARGS__ } })
+#define PG_UNIFORM_STRING(STR)  ((struct pg_uniform){ .str = (STR) })
+#define PG_UNIFORM_TEXTURE(TEX) ((struct pg_uniform){ .tex = (TEX) })
+#define PG_UNIFORM_MATRIX(MAT)  ((struct pg_uniform){ .m = \
+        { (MAT)[0][0], (MAT)[0][1], (MAT)[0][2], (MAT)[0][3] }, \
+        { (MAT)[1][0], (MAT)[1][1], (MAT)[1][2], (MAT)[1][3] }, \
+        { (MAT)[2][0], (MAT)[2][1], (MAT)[2][2], (MAT)[2][3] }, \
+        { (MAT)[3][0], (MAT)[3][1], (MAT)[3][2], (MAT)[3][3] } })
 
 struct pg_shader_uniform {
     enum pg_data_type type;

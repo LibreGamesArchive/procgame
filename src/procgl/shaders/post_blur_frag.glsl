@@ -36,8 +36,5 @@ vec4 blur(vec2 uv)
 
 void main()
 {
-    //vec2 uv = f_tex_coord.xy / resolution.xy;
-    vec2 uv = f_tex_coord.xy;
-    frag_color = blur(uv); 
-    //frag_color = vec4(u, 0, 1);
+    frag_color = blur(f_tex_coord.xy); 
 }
