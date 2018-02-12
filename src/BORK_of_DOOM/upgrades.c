@@ -29,11 +29,11 @@ static const struct bork_upgrade_detail BORK_UPGRADE_DETAIL[] = {
         .keep_first = 1 },
     [BORK_UPGRADE_BOTHACK] = { .name = "BOT HACK",
         .description = {
-            "SECURITY ROBOT OVERRIDE PACKAGE",
-            "WHICH CAN TEMPORARILY DISABLE",
-            "MOST ROBOTS IN THE STATION.",
-            "UPGRADED VERSION ALLOWS USER TO",
-            "TRIGGER A ROBOT'S SELF-DESTRUCT." },
+            "ROBOT OVERRIDE PACKAGE DISABLES",
+            "A TARGETED ROBOT TEMPORARILY.",
+            "UPDATE CAN TRIGGER WEAK ROBOTS'",
+            "SELF-DESTRUCT FEATURE, AND HAS",
+            "INCREASED RANGE." },
         .active = { 1, 1 } },
     [BORK_UPGRADE_DECOY] = { .name = "DECOY",
         .description = {
@@ -45,10 +45,10 @@ static const struct bork_upgrade_detail BORK_UPGRADE_DETAIL[] = {
     [BORK_UPGRADE_HEALING] = { .name = "MEDICAL NANO-BOTS",
         .description = {
             "INTEGRATED MEDICAL NANO-BOTS",
-            "TO PROVIDE ON-DEMAND HEALING",
-            "SERVICE. UPDATE PROVIDES",
-            "CONSTANT PASSIVE REGENERATION." },
-        .active = { 1, 0 } },
+            "TO PROVIDE PASSIVE TISSUE",
+            "REGENERATION SERVICE. UPDATE",
+            "INCREASES RATE OF HEALING." },
+        .active = { 0, 0 } },
     [BORK_UPGRADE_HEATSHIELD] = { .name = "HEAT SHIELD",
         .description = {
             "FIRE RETARDANT EXO-SUIT",
@@ -76,7 +76,7 @@ static const struct bork_upgrade_detail BORK_UPGRADE_DETAIL[] = {
         .description = {
             "MUSCLE ENHANCING NANO-BOTS",
             "GREATLY INCREASE MELEE DAMAGE",
-            "AND MITIGATE FIREARM RECOIL." } },
+            "AND MITIGATE FIREARM RECOIL.", } },
     [BORK_UPGRADE_SCANNING] = { .name = "SCANNING",
         .description = {
             "OCULAR IMPLANT PERFORMS ACTIVE",

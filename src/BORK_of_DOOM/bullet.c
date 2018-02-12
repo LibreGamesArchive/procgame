@@ -251,6 +251,7 @@ void bork_bullet_move(struct bork_bullet* blt, struct bork_play_data* d)
             || blt->type == BORK_ITEM_SHELLS_INC - BORK_ITEM_BULLETS)) {
                 bork_map_create_fire(map, blt->pos, 360);
             } else if(hit_obj && hit_obj->type == BORK_MAP_GRATE) {
+                show_tut_message(d, BORK_TUT_CROUCH_FLASHLIGHT);
                 hit_obj->dead = 1;
             }
             bullet_die(blt, d);

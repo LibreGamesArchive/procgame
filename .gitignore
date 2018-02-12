@@ -2,7 +2,8 @@
 *.swp
 *.swo
 *.trace
+Promo/*
 old/*
-release/*
 *.o
 *.glsl.h
+TheCommunistDogifesto/*

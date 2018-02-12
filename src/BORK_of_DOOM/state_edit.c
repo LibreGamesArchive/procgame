@@ -18,6 +18,7 @@ static void bork_editor_draw(struct pg_game_state* state);
 
 void bork_editor_start(struct pg_game_state* state, struct bork_game_core* core)
 {
+    printf("%zu\n", sizeof(struct bork_editor_tile) + sizeof(struct bork_editor_obj));
     /*  Set up the game state, 60 ticks per second, keyboard input   */
     pg_game_state_init(state, pg_time(), 60, 3);
     pg_mouse_mode(0);
@@ -574,6 +575,10 @@ static void bork_editor_draw(struct pg_game_state* state)
             snprintf(text.block[3], 64, "%s | %s", up_d[0]->name, up_d[1]->name);
             vec4_set(text.block_style[3], 1, 0.26, 0.02, 1.2);
             vec4_set(text.block_color[3], 1, 1, 1, 1);
+        } else if(ent->type >= BORK_SOUND_HUM) {
+            snprintf(text.block[3], 64, "SOUND: %s | %d", prof->name, ent->option[0]);
+            vec4_set(text.block_style[3], 1, 0.26, 0.02, 1.2);
+            vec4_set(text.block_color[3], 1, 1, 1, 1);
         } else {
             snprintf(text.block[3], 64, "ENTITY: %s", prof ? prof->name : "NONE");
             vec4_set(text.block_style[3], 1, 0.26, 0.02, 1.2);
@@ -1031,7 +1036,7 @@ void bork_editor_complete_fire(struct bork_map* map, struct bork_editor_map* ed_
     ARR_PUSH(map->fire_objs, new_obj);
     struct bork_sound_emitter snd = {
         .handle = -1,
-        .pos = { pos[0], pos[1], pos[2] * 2 },
+        .pos = { pos[0], pos[1], pos[2] },
         .snd = BORK_SND_FIRE, .volume = 0.75, .area = 12 };
     ARR_PUSH(map->sounds, snd);
 }
@@ -1073,7 +1078,7 @@ void bork_editor_complete_map(struct bork_map* map, struct bork_editor_map* ed_m
                 } else if(newgame && ed_tile->alt_type == BORK_TILE_DUCT) {
                     bork_editor_complete_duct(map, ed_map, i, j, k);
                     tile->type = BORK_TILE_DUCT;
-                } else if(newgame && ed_tile->alt_type == BORK_TILE_PIPES) {
+                } else if(ed_tile->alt_type == BORK_TILE_PIPES) {
                     if(ed_tile->type >= BORK_TILE_EDITOR_FIRE_LOW
                     && ed_tile->type <= BORK_TILE_EDITOR_FIRE_HIGH) {
                         bork_editor_complete_fire(map, ed_map, i, j, k);
@@ -1235,9 +1240,8 @@ void bork_editor_complete_map(struct bork_map* map, struct bork_editor_map* ed_m
             struct bork_sound_emitter snd = {
                 .pos = { (32 - ed_ent->pos[0]) * 2, ed_ent->pos[1] * 2, ed_ent->pos[2] * 2 + 1 },
                 .snd = BORK_SND_HUM + (ed_ent->type - BORK_SOUND_HUM),
-                .area = ed_ent->option[0], .volume = 1 };
+                .area = ed_ent->option[0], .volume = 0.75, .handle = -1 };
             if(ed_ent->type == BORK_SND_HUM) snd.volume = 0.25;
-            else if(ed_ent->type == BORK_SND_HUM2) snd.volume = 1.5;
             ARR_PUSH(map->sounds, snd);
             continue;
         }

@@ -25,11 +25,11 @@ static const struct bork_datapad {
 "RAW MATERIALS YOU CAN TO",
 "GEAR UP AND TAKE THEM DOWN.",
 "I THINK LAIKA HAS HOLED UP",
-"IN THE COMMAND CENTER BUT",
-"I DON'T KNOW THE CODE TO GET",
-"IN." } },
+"IN THE COMMAND CENTER, BUT",
+"YOU WILL NEED AN ACCESS CODE",
+"TO GET UP THERE." } },
 
-    {   .title = "ARE THE DOGS WRONG?", .lines = 27,
+    {   .title = "ARE THE DOGS WRONG?", .lines = 28,
         .text = {
 "WHILE MY COLLEAGUES IN THE",
 "SCIENCE LAB SEEM TO SEE THE",
@@ -56,8 +56,9 @@ static const struct bork_datapad {
 "IS IN CANINE LAB B, BUT I",
 "WAS ONLY ABLE TO CHANGE THE",
 "CODE TO GET IN THROUGH THE",
-"CANINE SCIENCE STORAGE AREA.",
-"THE CODE IS < 1957 >" } },
+"STORAGE AREA BEHIND THE",
+"CANINE LABS. THE CODE IS",
+"< 1957 >" } },
 
     {   .title = "STOP BY SOME TIME", .lines = 9,
         .text = {
@@ -65,7 +66,7 @@ static const struct bork_datapad {
 "WERE ABLE TO GET A SPOT HERE",
 "ON THE STATION! I KNOW WE'RE",
 "NOT SUPPOSED TO DO THIS, BUT",
-"I'M IN ROOM A2, THE CODE IS",
+"I'M IN SUITE A2, THE CODE IS",
 "< 2303 >. MAKE SURE NOT TO",
 "GET SPOTTED WHEN YOU COME",
 "BY, OR WE BOTH MIGHT GET",
@@ -113,7 +114,7 @@ static const struct bork_datapad {
 "TO THE O.R. THE NEW CODE TO",
 "GET IN IS < 1812 >" } },
 
-    {   .title = "WHOSE RESEARCH IS THIS?", .lines = 24,
+    {   .title = "WHOSE RESEARCH IS THIS?", .lines = 23,
         .text = {
 "LATELY IN THE LAB WE HAVE",
 "BEEN WORKING ON A HANDHELD",
@@ -135,10 +136,9 @@ static const struct bork_datapad {
 "IT SEEMS TO HAVE ACCIDENTALLY",
 "LET ONE OF THE DOGS MARK",
 "WITH A PAW OVER THE AUTHOR'S",
-"NAME. I HAVE LEFT THE",
-"RELEVANT MATERIALS IN THE",
-"LAB OFFICE B. THE CODE FOR",
-"THE DOOR IS < 2803 >" } },
+"NAME. I HAVE LEFT ALL THE",
+"DOCUMENTS IN SCI. OFFICE B.",
+"THE DOOR CODE IS < 2803 >" } },
 
     {   .title = "FOOD LIBERATION", .lines = 14,
         .text = {
@@ -199,20 +199,17 @@ static const struct bork_datapad {
 "MAYBE I SHOULD GO DOWN THERE",
 "SOMETIME TO CHECK FOR MYSELF." } },
 
-    {   .title = "SCIENCE STORAGE OVERFLOW", .lines = 12,
+    {   .title = "SCIENCE STORAGE OVERFLOW", .lines = 9,
         .text = {
 "AS YOU CAN PROBABLY TELL, THE",
 "SCIENCE STORAGE AREAS ARE",
 "GETTING A BIT FULL, SO SOME",
 "OF THE OVERFLOW HAS BEEN",
-"MOVED TO THE MAIN CARGO HOLD,",
-"IN SIDE ROOM A. THE CODE IS",
+"MOVED DOWN TO THE CARGO HOLD",
+"RESTRICTED AREA. THE CODE IS",
 "< 9364 >, PLEASE ONLY LET",
 "PEOPLE WITH SCIENCE CLEARANCE",
-"KNOW THIS CODE, CARGO SIDE",
-"ROOM A NOW HAS THE SAME",
-"SECURITY PROTOCOLS AS THE",
-"SCIENCE STORAGE AREAS." } },
+"KNOW THIS CODE.", } },
 
     {   .title = "ANTI-WORKER STATION DESIGN?", .lines = 17,
         .text = {
@@ -232,7 +229,7 @@ static const struct bork_datapad {
 "LIKE LIBERATION TO ME...",
 "FORTUNATELY, I KNOW THE CODE",
 "TO GET ACCESS TO THE COMMAND",
-"STATION STATION: < 1818 >" } },
+"STATION: < 1818 >" } },
 
     {   .title = "SCIENTISTS GO TOO FAR", .lines = 15,
         .text = {
@@ -277,8 +274,8 @@ static const struct bork_datapad {
 "TAKEN CONTROL OF THE STATION,",
 "THE DOCTORS MUST BE ALLOWED",
 "TO RETURN SAFELY TO THEIR",
-"HOMES ON BACK ON EARTH IF",
-"THEY SO CHOOSE." } },
+"HOMES BACK ON EARTH IF THEY",
+"SO CHOOSE." } },
 
     {   .title = "BEAM KNIFE IS GREAT", .lines = 11,
         .text = {

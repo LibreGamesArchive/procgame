@@ -63,6 +63,7 @@ int pg_init(int w, int h, int fullscreen, const char* window_title)
     pg_init_audio();
     /*  Load gamepad mappings   */
     SDL_GameControllerAddMappingsFromFile("gamecontrollerdb.txt");
+    if(SDL_NumJoysticks() >= 1) pg_use_gamepad(0);
     return 1;
 }
 
@@ -394,7 +395,7 @@ const char* pg_gamepad_name(int8_t ctrl)
         [SDL_CONTROLLER_BUTTON_LEFTSTICK] = "Left Stick",
         [SDL_CONTROLLER_BUTTON_RIGHTSTICK] = "Right Stick",
         [SDL_CONTROLLER_BUTTON_LEFTSHOULDER] = "Left Shoulder",
-        [SDL_CONTROLLER_BUTTON_RIGHTSHOULDER] = "R Shoulder",
+        [SDL_CONTROLLER_BUTTON_RIGHTSHOULDER] = "Right Shoulder",
         [SDL_CONTROLLER_BUTTON_DPAD_UP] = "D-Pad Up",
         [SDL_CONTROLLER_BUTTON_DPAD_DOWN] = "D-Pad Down",
         [SDL_CONTROLLER_BUTTON_DPAD_LEFT] = "D-Pad Left",

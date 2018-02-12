@@ -603,14 +603,6 @@ void bork_electronic_die(struct bork_entity* ent, struct bork_play_data* d)
     new_item->counter[3] = 240;
     new_item->flags |= BORK_ENTFLAG_SMOKING;
     bork_map_add_item(&d->map, new_id);
-    new_id = bork_entity_new(1);
-    new_item = bork_entity_get(new_id);
-    bork_entity_init(new_item, BORK_ITEM_SCRAPMETAL);
-    vec3_dup(new_item->pos, ent->pos);
-    vec3_set(new_item->vel, (RANDF - 0.5) * 0.1, (RANDF - 0.5) * 0.1, (RANDF - 0.2) * 0.1);
-    new_item->counter[3] = 240;
-    new_item->flags |= BORK_ENTFLAG_SMOKING;
-    bork_map_add_item(&d->map, new_id);
     ent->flags |= BORK_ENTFLAG_DEAD;
 
 }

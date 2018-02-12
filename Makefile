@@ -6,7 +6,7 @@ CFLAGS_RELEASE := -Wall -g -O3 -flto -std=c11
 INCLUDES := -Isrc
 # On Linux, only static link with my custom libcurl
 LIBS_LINUX := -l:src/libs/linux/GL/libGLEW.a \
- -lcrypto -lssl -lSDL2 -lGL -lm
+ -lSDL2 -lGL -lm
 # On Windows, static link with custom libcurl, GLEW, and SDL2
 LIBS_WIN32 := -lmingw32 \
  -l:src/libs/win32/GL/libglew32.a \

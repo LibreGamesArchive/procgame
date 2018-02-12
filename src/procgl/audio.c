@@ -79,24 +79,25 @@ static void pg_buffer_audio(void* udata, Uint8* stream, int len)
         if(!em->chunk->len) {
             ARR_SWAPSPLICE(pg_audio_active_emitters, i, 1);
             continue;
-        }
-        if(channels[em->channel].paused) continue;
+        } else if(channels[em->channel].paused) continue;
         float vol = vec3_dist(em->pos, channels[em->channel].listener);
         if(vol > em->area) continue;
         vol = (1 - (vol / em->area)) * em->volume * channels[em->channel].volume;
-        int segment = em->progress % em->chunk->len;
-        int segment_len = MIN(em->chunk->len - em->progress, s_len);
-        int pos_to_end = MIN(em->chunk->len - segment, segment_len);
-        int pos_from_beginning = MAX(0, segment_len - pos_to_end);
-        int first_end = segment + pos_to_end;
-        int em_i = segment;
-        int stream_i = 0;
-        em->progress = (segment_len + em->progress) % em->chunk->len;
-        for(em_i = segment; em_i < first_end; ++em_i, ++stream_i) {
-            mix[stream_i] += em->chunk->samples[em_i] * vol;
-        }
-        for(em_i = 0; em_i < pos_from_beginning; ++em_i, ++stream_i) {
-            mix[stream_i] += em->chunk->samples[em_i] * vol;
+        int em_len = MIN(em->chunk->len, s_len);
+        int em_i = 0, stream_i = 0;
+        int samples_left = s_len;
+        while(samples_left > 0) {
+            int play_samples = MIN(em_len, samples_left);
+            int play = em->progress;
+            int play_len = play + play_samples;
+            int leftover = MAX(0, play_len - em->chunk->len);
+            int play_to_end = MIN(play_len, em->chunk->len);
+            for(em_i = play; em_i < play_to_end; ++em_i, ++stream_i)
+                mix[stream_i] += em->chunk->samples[em_i] * vol;
+            for(em_i = 0; em_i < leftover; ++em_i, ++stream_i)
+                mix[stream_i] += em->chunk->samples[em_i] * vol;
+            em->progress = (play + play_samples) % em->chunk->len;
+            samples_left -= em_len;
         }
     }
     for(i = 0; i < s_len; ++i) {

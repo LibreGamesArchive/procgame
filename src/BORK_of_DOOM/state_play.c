@@ -129,15 +129,14 @@ static void bork_play_update(struct pg_game_state* state)
     if(d->menu.state == BORK_MENU_CLOSED) {
         vec2 mouse_motion;
         pg_mouse_motion(mouse_motion);
+        if(d->core->invert_y) mouse_motion[1] *= -1;
         vec2_scale(mouse_motion, mouse_motion, d->core->mouse_sensitivity);
-        if(d->core->invert_y) vec2_add(d->mouse_motion, d->mouse_motion, mouse_motion);
-        else vec2_sub(d->mouse_motion, d->mouse_motion, mouse_motion);
+        vec2_sub(d->mouse_motion, d->mouse_motion, mouse_motion);
         if(d->core->gpad_idx >= 0) {
             vec2 stick;
             pg_gamepad_stick(1, stick);
             vec2_scale(stick, stick, 0.05 * d->core->joy_sensitivity);
-            if(d->core->invert_y) vec2_add(d->mouse_motion, d->mouse_motion, stick);
-            else vec2_sub(d->mouse_motion, d->mouse_motion, stick);
+            vec2_sub(d->mouse_motion, d->mouse_motion, stick);
         }
     }
     if(pg_user_exit()) {
@@ -160,6 +159,68 @@ static void tick_particles(struct bork_play_data* d);
 static void tick_fires(struct bork_play_data* d);
 static void tick_music(struct bork_play_data* d);
 static void tick_ambient_sound(struct bork_play_data* d);
+
+void show_tut_message(struct bork_play_data* d, enum bork_play_tutorial_msg msg)
+{
+    uint8_t* kmap = d->core->ctrl_map;
+    int8_t* gmap = d->core->gpad_map;
+    if(d->tutorial_msg_seen & (1 << msg)) return;
+    else {
+        d->tutorial_msg_seen |= (1 << msg);
+        char msg_text[64] = {};
+        int gpad = (d->core->gpad_idx >= 0) ? 1 : 0;
+        switch(msg) {
+            case BORK_TUT_PICKUP_ITEM:
+                snprintf(msg_text, 64, "<%s> PICK UP ITEMS",
+                         gpad ? pg_gamepad_name(gmap[BORK_CTRL_INTERACT])
+                              : pg_input_name(kmap[BORK_CTRL_INTERACT]));
+                break;
+            case BORK_TUT_VIEW_INVENTORY:
+                snprintf(msg_text, 64, "<%s> OPEN MENU AND VIEW INVENTORY",
+                         gpad ? pg_gamepad_name(gmap[BORK_CTRL_MENU])
+                              : pg_input_name(kmap[BORK_CTRL_MENU]));
+                break;
+            case BORK_TUT_DATAPADS:
+                snprintf(msg_text, 64, "DATAPADS CAN BE READ AGAIN IN THE MENU");
+                break;
+            case BORK_TUT_CROUCH_FLASHLIGHT:
+                snprintf(msg_text, 64, "<%s> CROUCH    <%s> FLASHLIGHT",
+                         gpad ? pg_gamepad_name(gmap[BORK_CTRL_CROUCH])
+                              : pg_input_name(kmap[BORK_CTRL_CROUCH]),
+                         gpad ? pg_gamepad_name(gmap[BORK_CTRL_FLASHLIGHT])
+                              : pg_input_name(kmap[BORK_CTRL_FLASHLIGHT]));
+                break;
+            case BORK_TUT_SCHEMATIC:
+                snprintf(msg_text, 64, "SCHEMATIC DETAILS AVAILABLE IN THE MENU");
+                break;
+            case BORK_TUT_RECYCLER:
+                snprintf(msg_text, 64, "<%s> USE RECYCLER",
+                         gpad ? pg_gamepad_name(gmap[BORK_CTRL_INTERACT])
+                              : pg_input_name(kmap[BORK_CTRL_INTERACT]));
+                break;
+            case BORK_TUT_USE_UPGRADE:
+                snprintf(msg_text, 64, "INSTALL UPGRADES IN THE MENU");
+                break;
+            case BORK_TUT_SWITCH_UPGRADE:
+                snprintf(msg_text, 64, "<%s / %s> SWITCH / USE UPGRADES",
+                         gpad ? pg_gamepad_name(gmap[BORK_CTRL_NEXT_TECH])
+                              : pg_input_name(kmap[BORK_CTRL_NEXT_TECH]),
+                         gpad ? pg_gamepad_name(gmap[BORK_CTRL_USE_TECH])
+                              : pg_input_name(kmap[BORK_CTRL_USE_TECH]));
+                break;
+            case BORK_TUT_SWITCH_AMMO:
+                snprintf(msg_text, 64, "SWITCH AMMUNITION IN YOUR INVENTORY");
+                break;
+            case BORK_TUT_DOORS:
+                snprintf(msg_text, 64, "<%s> USE KEYPADS TO OPEN DOORS",
+                         gpad ? pg_gamepad_name(gmap[BORK_CTRL_INTERACT])
+                              : pg_input_name(kmap[BORK_CTRL_INTERACT]));
+                break;
+            default: snprintf(msg_text, 64, "TUTORIAL YEAH"); break;
+        }
+        hud_announce(d, msg_text);
+    }
+}
 
 void bork_play_tick(struct pg_game_state* state)
 {
@@ -409,6 +470,7 @@ static void tick_ambient_sound(struct bork_play_data* d)
     int i;
     struct bork_sound_emitter* snd;
     ARR_FOREACH_PTR(d->map.sounds, snd, i) {
+        if((i + d->play_ticks) % 20 != 0) continue;
         vec3 snd_pos;
         vec3_mul(snd_pos, snd->pos, (vec3){ 1, 1, 2 });
         float dist = vec3_dist2(snd_pos, plr_pos);
@@ -496,6 +558,14 @@ static void tick_control_play(struct bork_play_data* d)
     || pg_check_gamepad(gmap[BORK_CTRL_DROP], PG_CONTROL_HIT)) {
         drop_item(d);
     }
+    /*  Check if we're looking at an item and need to show the tutorial */
+    if(d->looked_item != -1) {
+        struct bork_entity* item = bork_entity_get(d->looked_item);
+        if(vec3_dist2(item->pos, d->plr.pos) < (3 * 3)) show_tut_message(d, BORK_TUT_PICKUP_ITEM);
+    } else if(d->looked_obj) {
+        if(d->looked_obj->type == BORK_MAP_DOORPAD) show_tut_message(d, BORK_TUT_DOORS);
+        else if(d->looked_obj->type == BORK_MAP_RECYCLER) show_tut_message(d, BORK_TUT_RECYCLER);
+    }
     if(pg_check_input(kmap[BORK_CTRL_INTERACT], PG_CONTROL_HIT)
     || pg_check_gamepad(gmap[BORK_CTRL_INTERACT], PG_CONTROL_HIT)) {
         struct bork_entity* item = bork_entity_get(d->looked_item);
@@ -507,20 +577,28 @@ static void tick_control_play(struct bork_play_data* d)
             const struct bork_entity_profile* prof = &BORK_ENT_PROFILES[item->type];
             if(item->flags & BORK_ENTFLAG_IS_AMMO) {
                 int ammo_type = item->type - BORK_ITEM_BULLETS;
+                if(item->type != BORK_ITEM_BULLETS
+                && item->type != BORK_ITEM_SHELLS
+                && item->type != BORK_ITEM_PLAZMA)
+                    show_tut_message(d, BORK_TUT_SWITCH_AMMO);
                 d->ammo[ammo_type] += prof->ammo_capacity;
                 item->flags |= BORK_ENTFLAG_DEAD;
             } else if(item->type == BORK_ITEM_DATAPAD) {
+                show_tut_message(d, BORK_TUT_DATAPADS);
                 d->hud_datapad_id = item->counter[0];
                 d->hud_datapad_ticks = -500;
                 d->held_datapads[d->num_held_datapads++] = item->counter[0];
                 item->flags |= BORK_ENTFLAG_DEAD;
             } else if(item->type == BORK_ITEM_UPGRADE) {
+                show_tut_message(d, BORK_TUT_USE_UPGRADE);
                 item->flags |= BORK_ENTFLAG_IN_INVENTORY;
                 ARR_PUSH(d->held_upgrades, d->looked_item);
             } else if(item->type == BORK_ITEM_SCHEMATIC) {
+                show_tut_message(d, BORK_TUT_SCHEMATIC);
                 item->flags |= BORK_ENTFLAG_DEAD;
                 d->held_schematics |= (1 << item->counter[0]);
             } else {
+                show_tut_message(d, BORK_TUT_VIEW_INVENTORY);
                 item->flags |= BORK_ENTFLAG_IN_INVENTORY;
                 add_inventory_item(d, d->looked_item);
             }
@@ -573,7 +651,7 @@ static void tick_control_play(struct bork_play_data* d)
             }
         }
     }
-    if(d->held_item >= 0 && !d->switch_ticks
+    if(d->held_item >= 0 && !d->reload_ticks && !d->switch_ticks
     && (pg_check_input(kmap[BORK_CTRL_RELOAD], PG_CONTROL_HIT)
         || pg_check_gamepad(gmap[BORK_CTRL_RELOAD], PG_CONTROL_HIT))) {
         struct bork_entity* ent = bork_entity_get(d->inventory.data[d->held_item]);
@@ -614,7 +692,7 @@ static void tick_control_play(struct bork_play_data* d)
         }
     }
     int kbd_input = 0;
-    float move_speed = d->player_speed * (d->plr.flags & BORK_ENTFLAG_GROUND ? 1 : 0.1);
+    float move_speed = d->player_speed * (d->plr.flags & BORK_ENTFLAG_GROUND ? 1 : 0.125);
     if(d->plr.flags & BORK_ENTFLAG_CROUCH) move_speed *= 0.6;
     vec2 move_dir = {};
     d->plr.flags &= ~BORK_ENTFLAG_SLIDE;
@@ -1008,7 +1086,7 @@ static void tick_item(struct bork_play_data* d, struct bork_entity* ent)
 {
     if(ent->flags & BORK_ENTFLAG_SMOKING) {
         if(ent->counter[3] % 60 == 0) {
-            create_smoke(d, 
+            create_smoke(d,
                 (vec3){ ent->pos[0] + (RANDF - 0.5) * 0.5,
                         ent->pos[1] + (RANDF - 0.5) * 0.5,
                         ent->pos[2] + (RANDF - 0.5) * 0.5 },
@@ -1171,7 +1249,7 @@ static void tick_fires(struct bork_play_data* d)
             struct bork_entity* surr_ent;
             ARR_FOREACH(surr, surr_ent_id, j) {
                 surr_ent = bork_entity_get(surr_ent_id);
-                if(!surr_ent || surr_ent->flags & BORK_ENTFLAG_FIREPROOF
+                if(!surr_ent || (surr_ent->flags & BORK_ENTFLAG_FIREPROOF)
                 || surr_ent->last_fire_tick == d->play_ticks) continue;
                 surr_ent->last_fire_tick = d->play_ticks;
                 surr_ent->HP -= 5;
@@ -1306,7 +1384,7 @@ static void bork_play_draw(struct pg_game_state* state)
         ARR_PUSH(d->lights_buf, jp_light);
     }
     draw_lights(d);
-    pg_ppbuffer_dst(&d->core->ppbuf);
+    pg_ppbuffer_swapdst(&d->core->ppbuf);
     pg_gbuffer_finish(&d->core->gbuf, (vec3){ 0.025, 0.025, 0.025 });
     if(d->menu.state == BORK_MENU_CLOSED) {
         //pg_ppbuffer_swapdst(&d->core->ppbuf);
@@ -1775,13 +1853,16 @@ static void draw_enemies(struct bork_play_data* d, float lerp)
             vec3 pos_lerp;
             vec3_scale(pos_lerp, ent->vel, lerp);
             vec3_add(pos_lerp, pos_lerp, ent->pos);
+            vec3 ent_to_plr;
+            vec3_sub(ent_to_plr, pos_lerp, d->plr.pos);
             if(ent->flags & BORK_ENTFLAG_ON_FIRE) {
                 struct pg_light new_light = {};
-                pg_light_pointlight(&new_light, pos_lerp, 2.5, (vec3){ 2.0, 1.5, 0 });
+                vec3 fire_pos;
+                vec3_set_len(fire_pos, ent_to_plr, 0.25);
+                vec3_sub(fire_pos, pos_lerp, fire_pos);
+                pg_light_pointlight(&new_light, fire_pos, 2.5, (vec3){ 2.0, 1.5, 0 });
                 ARR_PUSH(d->lights_buf, new_light);
             }
-            vec2 ent_to_plr;
-            vec2_sub(ent_to_plr, pos_lerp, d->plr.pos);
             float dir_adjust = 1.0f / (float)prof->dir_frames * 0.5;
             float angle = M_PI - atan2(ent_to_plr[0], ent_to_plr[1]) - ent->dir[0];
             angle = FMOD(angle, M_PI * 2);
@@ -2118,6 +2199,7 @@ void save_game(struct bork_play_data* d, char* name)
     size_t r = 0;
     /*  Player data */
     r += sizeof(struct bork_entity) * fwrite(&d->plr, sizeof(struct bork_entity), 1, f);
+    r += sizeof(uint32_t) * fwrite(&d->tutorial_msg_seen, sizeof(uint32_t), 1, f);
     r += sizeof(int) * fwrite(&d->flashlight_on, sizeof(int), 1, f);
     r += sizeof(int) * fwrite(d->held_datapads, sizeof(int), NUM_DATAPADS, f);
     r += sizeof(int) * fwrite(&d->num_held_datapads, sizeof(int), 1, f);
@@ -2216,6 +2298,7 @@ void load_game(struct bork_play_data* d, char* name)
     size_t r = 0;
     /*  Player data */
     r += sizeof(struct bork_entity) * fread(&d->plr, sizeof(struct bork_entity), 1, f);
+    r += sizeof(uint32_t) * fread(&d->tutorial_msg_seen, sizeof(uint32_t), 1, f);
     r += sizeof(int) * fread(&d->flashlight_on, sizeof(int), 1, f);
     r += sizeof(int) * fread(d->held_datapads, sizeof(int), NUM_DATAPADS, f);
     r += sizeof(int) * fread(&d->num_held_datapads, sizeof(int), 1, f);
@@ -2269,11 +2352,13 @@ void load_game(struct bork_play_data* d, char* name)
     ARR_RESERVE_CLEAR(d->map.fires, len);
     r += sizeof(struct bork_fire) * fread(d->map.fires.data, sizeof(struct bork_fire), len, f);
     d->map.fires.len = len;
-    /*  Fire objects    */
+    /*  Fire objects (ignored in the save file for compatibility...)    */
     r += sizeof(uint32_t) * fread(&len, sizeof(uint32_t), 1, f);
-    ARR_RESERVE_CLEAR(d->map.fire_objs, len);
-    r += sizeof(struct bork_map_object) * fread(d->map.fire_objs.data, sizeof(struct bork_map_object), len, f);
-    d->map.fire_objs.len = len;
+    fseek(f, sizeof(struct bork_map_object) * len, SEEK_CUR);
+    //ARR_RESERVE_CLEAR(d->map.fire_objs, len);
+    //r += sizeof(struct bork_map_object) * fread(d->map.fire_objs.data, sizeof(struct bork_map_object), len, f);
+    //d->map.fire_objs.len = len;
+    //ARR_TRUNCATE(d->map.fire_objs, len);
     /*  Doors   */
     r += sizeof(uint32_t) * fread(&len, sizeof(uint32_t), 1, f);
     ARR_RESERVE_CLEAR(d->map.doors, len);
@@ -2297,4 +2382,7 @@ void load_game(struct bork_play_data* d, char* name)
     pg_audio_channel_pause(1, 0);
     pg_audio_channel_pause(2, 0);
     pg_reset_input();
+    char announcement[64];
+    snprintf(announcement, 64, "LOADED SAVE: %s", name);
+    hud_announce(d, announcement);
 }

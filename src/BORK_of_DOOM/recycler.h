@@ -34,7 +34,7 @@ static const struct bork_schematic_detail {
     enum bork_entity_type product;
 } BORK_SCHEMATIC_DETAIL[] = {
     [BORK_SCHEMATIC_FIRSTAID] = { .product = BORK_ITEM_FIRSTAID,
-        .resources = { 15, 1, 0, 10 } },
+        .resources = { 10, 1, 0, 10 } },
     [BORK_SCHEMATIC_GRENADE_EMP] = { .product = BORK_ITEM_GRENADE_EMP,
         .resources = { 0, 1, 10, 10 } },
     [BORK_SCHEMATIC_GRENADE_FRAG] = { .product = BORK_ITEM_GRENADE_FRAG,

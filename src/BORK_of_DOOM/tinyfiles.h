@@ -35,20 +35,25 @@
 	(-1, 1) range specified for those functions. The new code for
 	tfCompareFileTimes, and tfCompareFileTimesByPath (on Linux) properly
 	account for this behavior.
+	
+	2018: Added tfDirOpenCreate function to open a directory, creating
+	it if it doesn't already exist. Also added tfTraverseDir, to traverse
+	a directory object already created with tfDirOpen/Create
 */
 
 
 #if !defined( TINYFILES_H )
 
 // change to 0 to compile out any debug checks
-#define TF_DEBUG_CHECKS 1
+#define TF_DEBUG_CHECKS 0
 
+#include <stdio.h>  // printf
+#include <string.h> // strerror
+#include <errno.h>
+	
 #if TF_DEBUG_CHECKS
 
-	#include <stdio.h>  // printf
 	#include <assert.h> // assert
-	#include <string.h> // strerror
-	#include <errno.h>
 	#define TF_ASSERT assert
 	
 #else
@@ -87,6 +92,7 @@ const char* tfGetExt( tfFILE* file );
 // Applies a function (cb) to all files in a directory. Will recursively visit
 // all subdirectories. Useful for asset management, file searching, indexing, etc.
 void tfTraverse( const char* path, tfCallback cb, void* udata );
+void tfTraverseDir( tfDIR* dir, tfCallback cb, void* udata );
 
 // Fills out a tfFILE struct with file information. Does not actually open the
 // file contents, and instead performs more lightweight OS-specific calls.
@@ -101,6 +107,7 @@ void tfDirClose( tfDIR* dir );
 
 // Performs lightweight OS-specific call to open a file handle on a directory.
 int tfDirOpen( tfDIR* dir, const char* path );
+int tfDirOpenCreate( tfDIR* dir, const char* path );
 
 // Compares file last write times. -1 if file at path_a was modified earlier than path_b.
 // 0 if they are equal. 1 if file at path_b was modified earlier than path_a.
@@ -246,6 +253,27 @@ void tfTraverse( const char* path, tfCallback cb, void* udata )
 	tfDirClose( &dir );
 }
 
+void tfTraverseDir( tfDIR* dir, tfCallback cb, void* udata )
+{
+	while ( dir->has_next )
+	{
+		tfFILE file;
+		tfReadFile( dir, &file );
+
+		if ( file.is_dir && file.name[ 0 ] != '.' )
+		{
+			char path2[ TF_MAX_PATH ];
+			int n = tfSafeStrCpy( path2, dir->path, 0, TF_MAX_PATH );
+			n = tfSafeStrCpy( path2, "/", n - 1, TF_MAX_PATH );
+			tfSafeStrCpy( path2, file.name, n -1, TF_MAX_PATH );
+			tfTraverse( path2, cb, udata );
+		}
+
+		if ( file.is_reg ) cb( &file, udata );
+		tfDirNext( dir );
+	}
+}
+
 #if TF_PLATFORM == TF_WINDOWS
 
 	int tfReadFile( tfDIR* dir, tfFILE* file )
@@ -313,6 +341,27 @@ void tfTraverse( const char* path, tfCallback cb, void* udata )
 		dir->has_next = 1;
 
 		return 1;
+	}
+
+	int tfDirOpenCreate( tfDIR* dir, const char* path )
+	{
+		int n = tfSafeStrCpy( dir->path, path, 0, TF_MAX_PATH );
+		n = tfSafeStrCpy( dir->path, "\\*", n - 1, TF_MAX_PATH );
+		dir->handle = FindFirstFileA( dir->path, &dir->fdata );
+		dir->path[ n - 3 ] = 0;
+
+		if ( dir->handle == INVALID_HANDLE_VALUE )
+		{
+			if(!CreateDirectory( path, NULL )) {
+				printf( "ERROR: Failed to create directory (%s)\n", path );
+			}
+			return tfDirOpen( dir, path );
+		}
+		else
+		{
+			dir->has_next = 1;
+			return 1;
+		}
 	}
 
 	int tfCompareFileTimesByPath( const char* path_a, const char* path_b )
@@ -414,6 +463,28 @@ void tfTraverse( const char* path, tfCallback cb, void* udata )
 		if ( !dir->dir ) dir->has_next = 0;
 
 		return 1;
+	}
+
+	int tfDirOpenCreate( tfDIR* dir, const char* path )
+	{
+		tfSafeStrCpy( dir->path, path, 0, TF_MAX_PATH );
+		dir->dir = opendir( path );
+
+		if ( !dir->dir )
+		{
+			if(mkdir( path, 0755 ) == -1) {
+				printf( "ERROR: Could not create directory (%s): %s.\n", path, strerror( errno ) );
+				return 0;
+			}
+			return tfDirOpen( dir, path );
+		}
+		else
+		{
+			dir->has_next = 1;
+			dir->entry = readdir( dir->dir );
+			if ( !dir->dir ) dir->has_next = 0;
+			return 1;
+		}
 	}
 
 	// Warning : untested code! (let me know if it breaks)

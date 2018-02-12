@@ -100,7 +100,6 @@ void bork_init(struct bork_game_core* core, char* base_path)
     /*  Attach the font texture to the text shader  */
     pg_shader_text_font(&core->shader_text, &core->font);
     pg_gamepad_config(0.125, 0.65, 0.125, 0.75);
-    core->gpad_idx = -1;
     bork_read_saves(core);
 }
 
@@ -398,7 +397,12 @@ void bork_read_saves(struct bork_game_core* core)
     ARR_TRUNCATE_CLEAR(core->save_files, 0);
     char filename[1024];
     snprintf(filename, 1024, "%ssaves", core->base_path);
-    tfTraverse(filename, list_save, core);
+    tfDIR dir;
+    if(tfDirOpenCreate(&dir, filename)) {
+        tfTraverseDir(&dir, list_save, core);
+    } else {
+        printf("Couldn't open saves directory! Game save/load disabled.");
+    }
     ARR_SORT(core->save_files, save_compare);
 }
 

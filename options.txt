@@ -1,4 +1,10 @@
 x:1280
 y:720
 fullscreen:0
-mouse:0.005
+gamma:1.000000
+mouse:0.001000
+joy:1.999999
+invert_mouse:0
+music_vol:0.200000
+sfx_vol:1.000000
+show_fps:0

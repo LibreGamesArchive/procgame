@@ -42,24 +42,57 @@ void tick_game_menu(struct bork_play_data* d, struct pg_game_state* state)
         }
     }
     if(d->menu.game.mode == GAME_MENU_SELECT_SAVE
-    || d->menu.game.mode == GAME_MENU_LOAD) {
+    || d->menu.game.mode == GAME_MENU_LOAD
+    || d->menu.game.mode == GAME_MENU_EDIT_SAVE) {
         int num_saves = MIN(d->core->save_files.len, 6);
+        if(d->menu.game.mode != GAME_MENU_LOAD && d->menu.game.save_scroll == -1) {
+            num_saves = MIN(num_saves + 1, 6);
+        }
         for(i = 0; i < num_saves; ++i) {
             if(mouse_pos[0] > ar * 0.55 && mouse_pos[0] < ar
-            && mouse_pos[1] > (0.25 + 0.1 * i) && mouse_pos[1] < (0.28 + 0.1 * i)) {
-                d->menu.game.save_idx = d->menu.game.save_scroll + i;
-                if(click && d->menu.game.mode == GAME_MENU_LOAD) {
-                    struct bork_save* save = &d->core->save_files.data[d->menu.game.save_idx];
-                    load_game(d, save->name);
-                    d->menu.game.mode = GAME_MENU_BASE;
-                } else if(click && d->menu.game.mode == GAME_MENU_SELECT_SAVE) {
-                    if(d->menu.game.save_idx == -1) {
-                        d->menu.game.save_name_len = snprintf(d->menu.game.save_name, 32, "SAVE_%03d",
-                                                              (int)d->core->save_files.len);
-                        d->menu.game.mode = GAME_MENU_EDIT_SAVE;
-                        pg_text_mode(1);
-                    } else {
-                        d->menu.game.mode = GAME_MENU_CONFIRM_OVERWRITE;
+            && mouse_pos[1] > (0.23 + 0.1 * i) && mouse_pos[1] < (0.31 + 0.1 * i)) {
+                if(d->menu.game.mode != GAME_MENU_EDIT_SAVE) {
+                    d->menu.game.save_idx = d->menu.game.save_scroll + i;
+                }
+                if(click) {
+                    if(d->menu.game.mode == GAME_MENU_LOAD) {
+                        struct bork_save* save = &d->core->save_files.data[d->menu.game.save_idx];
+                        load_game(d, save->name);
+                        d->menu.game.mode = GAME_MENU_BASE;
+                    } else if(d->menu.game.mode == GAME_MENU_SELECT_SAVE) {
+                        if(d->menu.game.save_idx == -1) {
+                            if(d->menu.game.save_name_len == 0) {
+                                d->menu.game.save_name_len = snprintf(d->menu.game.save_name, 32, "SAVE_%03d",
+                                                                      (int)d->core->save_files.len);
+                            }
+                            d->menu.game.mode = GAME_MENU_EDIT_SAVE;
+                            pg_text_mode(1);
+                        } else {
+                            d->menu.game.mode = GAME_MENU_CONFIRM_OVERWRITE;
+                        }
+                    } else if(d->menu.game.mode == GAME_MENU_EDIT_SAVE) {
+                        if(d->menu.game.save_scroll + i == -1) {
+                            pg_audio_play(&d->core->menu_sound, 0.5);
+                            int i;
+                            struct bork_save* save;
+                            ARR_FOREACH_PTR(d->core->save_files, save, i) {
+                                if(strncmp(save->name, d->menu.game.save_name, 32) == 0) {
+                                    d->menu.game.mode = GAME_MENU_CONFIRM_OVERWRITE;
+                                    pg_text_mode(0);
+                                }
+                            }
+                            struct bork_save new_save;
+                            strncpy(new_save.name, d->menu.game.save_name, 32);
+                            ARR_PUSH(d->core->save_files, new_save);
+                            save_game(d, new_save.name);
+                            d->menu.game.save_idx = 0;
+                            d->menu.game.save_scroll = 0;
+                            d->menu.game.mode = GAME_MENU_BASE;
+                        } else {
+                            d->menu.game.mode = GAME_MENU_SELECT_SAVE;
+                            d->menu.game.save_idx = d->menu.game.save_scroll + i;
+                            pg_text_mode(0);
+                        }
                     }
                 }
             }
@@ -225,8 +258,10 @@ void tick_game_menu(struct bork_play_data* d, struct pg_game_state* state)
         || pg_check_gamepad(gmap[BORK_CTRL_SELECT], PG_CONTROL_HIT)) {
             pg_audio_play(&d->core->menu_sound, 0.5);
             if(d->menu.game.save_idx == -1) {
-                d->menu.game.save_name_len = snprintf(d->menu.game.save_name, 32, "SAVE_%03d",
-                                                      (int)d->core->save_files.len);
+                if(d->menu.game.save_name_len == 0) {
+                    d->menu.game.save_name_len = snprintf(d->menu.game.save_name, 32, "SAVE_%03d",
+                                                          (int)d->core->save_files.len);
+                }
                 d->menu.game.mode = GAME_MENU_EDIT_SAVE;
                 pg_text_mode(1);
             } else {
@@ -285,8 +320,10 @@ void tick_game_menu(struct bork_play_data* d, struct pg_game_state* state)
         || pg_check_gamepad(gmap[BORK_CTRL_MENU_BACK], PG_CONTROL_HIT)) {
             pg_audio_play(&d->core->menu_sound, 0.5);
             if(d->menu.game.save_idx == -1) {
-                d->menu.game.save_name_len = snprintf(d->menu.game.save_name, 32, "SAVE_%03d",
-                                                      (int)d->core->save_files.len);
+                if(d->menu.game.save_name_len == 0) {
+                    d->menu.game.save_name_len = snprintf(d->menu.game.save_name, 32, "SAVE_%03d",
+                                                          (int)d->core->save_files.len);
+                }
                 d->menu.game.mode = GAME_MENU_EDIT_SAVE;
                 pg_text_mode(1);
             }

@@ -157,9 +157,9 @@ void tick_recycler_menu(struct bork_play_data* d)
     }
     enum bork_schematic sch = d->menu.recycler.selection_idx;
     const struct bork_schematic_detail* sch_d = &BORK_SCHEMATIC_DETAIL[sch];
-    if((pg_check_input(kmap[BORK_CTRL_SELECT], PG_CONTROL_HIT)
-    || pg_check_gamepad(gmap[BORK_CTRL_SELECT], PG_CONTROL_HIT))
-    && d->held_schematics & (1 << sch)) {
+    if(d->menu.recycler.obj && (d->held_schematics & (1 << sch))
+    && (pg_check_input(kmap[BORK_CTRL_SELECT], PG_CONTROL_HIT)
+    || pg_check_gamepad(gmap[BORK_CTRL_SELECT], PG_CONTROL_HIT))) {
         if(d->menu.recycler.resources[0] >= sch_d->resources[0]
         && d->menu.recycler.resources[1] >= sch_d->resources[1]
         && d->menu.recycler.resources[2] >= sch_d->resources[2]

@@ -15,13 +15,13 @@ void pg_model_quad(struct pg_model* model, vec2 tex_scale)
     uint32_t c = PG_MODEL_COMPONENT_POSITION | PG_MODEL_COMPONENT_UV;
     model->components = c;
     pg_model_add_vertex(model, &(struct pg_vertex_full) { c,
-        .pos = { -0.5, -0.5, 0 }, .uv = { 0, tex_scale[1] } });
+        .pos = { -0.5, -0.5, 0 }, .uv = { 0.001, 0.999 } });
     pg_model_add_vertex(model, &(struct pg_vertex_full) { c,
-        .pos = { -0.5, 0.5, 0 }, .uv = { 0, 0 } });
+        .pos = { -0.5, 0.5, 0 }, .uv = { 0.001, 0.001 } });
     pg_model_add_vertex(model, &(struct pg_vertex_full) { c,
-        .pos = { 0.5, -0.5, 0 }, .uv = { tex_scale[0], tex_scale[1] } });
+        .pos = { 0.5, -0.5, 0 }, .uv = { 0.999, 0.999 } });
     pg_model_add_vertex(model, &(struct pg_vertex_full) { c,
-        .pos = { 0.5, 0.5, 0 }, .uv = { tex_scale[0], 0 } });
+        .pos = { 0.5, 0.5, 0 }, .uv = { 0.999, 0.001 } });
     pg_model_add_triangle(model, 0, 2, 1);
     pg_model_add_triangle(model, 1, 2, 3);
 }

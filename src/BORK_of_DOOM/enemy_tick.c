@@ -42,6 +42,7 @@ static void robot_die(struct bork_play_data* d, struct bork_entity* ent)
     case BORK_ENEMY_BOTTWEILER: num_parts = 2; break;
     case BORK_ENEMY_FANG_BANGER: num_parts = 2; break;
     case BORK_ENEMY_GREAT_BANE: num_parts = 10; break;
+    case BORK_ENEMY_LAIKA: num_parts = 10; break;
     default: return;
     }
     robot_explosion(d, ent->pos, num_parts);
@@ -612,12 +613,13 @@ void bork_tick_great_bane(struct bork_entity* ent, struct bork_play_data* d)
         robot_die(d, ent);
         return;
     }
+    if(d->plr.HP <= 0) return;
     if(ent->flags & BORK_ENTFLAG_ON_FIRE) entity_on_fire(d, ent);
     if(ent->flags & BORK_ENTFLAG_EMP) {
         entity_emp(d, ent);
         return;
     }
-    if(d->plr.HP <= 0) return;
+    if(ent->freeze_ticks) --ent->freeze_ticks;
     vec3 ent_head, plr_head;
     get_plr_pos_for_ai(d, plr_head);
     vec3_add(ent_head, ent->pos, (vec3){ 0, 0, 0.5 });
@@ -628,7 +630,7 @@ void bork_tick_great_bane(struct bork_entity* ent, struct bork_play_data* d)
         vis = bork_map_check_vis(&d->map, ent_head, plr_head);
         if(vis) ent->aware_ticks = PLAY_SECONDS(12);
     }
-    if(ent->aware_ticks) {
+    if(ent->aware_ticks && !ent->freeze_ticks) {
         --ent->aware_ticks;
         vec3 ent_to_plr;
         vec3_sub(ent_to_plr, plr_head, ent->pos);
@@ -671,7 +673,17 @@ void bork_tick_laika(struct bork_entity* ent, struct bork_play_data* d)
 {
     bork_entity_t this_id = bork_entity_id(ent);
     bork_entity_move(ent, d);
-    if(d->plr.HP <= 0) return;
+    if(ent->HP <= 0) {
+        d->killed_laika = 1;
+        robot_die(d, ent);
+        return;
+    }
+    if(ent->flags & BORK_ENTFLAG_ON_FIRE) entity_on_fire(d, ent);
+    if(ent->freeze_ticks) --ent->freeze_ticks;
+    if(ent->flags & BORK_ENTFLAG_EMP) {
+        entity_emp(d, ent);
+        return;
+    }
     vec3 ent_head, plr_head;
     get_plr_pos_for_ai(d, plr_head);
     vec3_add(ent_head, ent->pos, (vec3){ 0, 0, 0.5 });
@@ -685,7 +697,7 @@ void bork_tick_laika(struct bork_entity* ent, struct bork_play_data* d)
         if(vis) ent->aware_ticks = PLAY_SECONDS(12);
     }
     static const vec2 center_spire = { 31, 33 };
-    if(!ent->aware_ticks) return;
+    if(!ent->aware_ticks || ent->freeze_ticks) return;
     if(ent->counter[0] == 0) {
         if(ent->counter[1] < 2 && rand() % 4 == 0) {
             ent->counter[0] = 600;

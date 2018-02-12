@@ -1,5 +1,19 @@
 #include "datapad_content.h"
 
+enum bork_play_tutorial_msg {
+    BORK_TUT_PICKUP_ITEM,
+    BORK_TUT_VIEW_INVENTORY,
+    BORK_TUT_DATAPADS,
+    BORK_TUT_CROUCH_FLASHLIGHT,
+    BORK_TUT_SCHEMATIC,
+    BORK_TUT_RECYCLER,
+    BORK_TUT_USE_UPGRADE,
+    BORK_TUT_SWITCH_UPGRADE,
+    BORK_TUT_SWITCH_AMMO,
+    BORK_TUT_DOORS,
+    BORK_TUT_MAX
+};
+
 #define PLAY_SECONDS(s)     ((int)(s * 120))
 struct bork_play_data {
     /*  Core data   */
@@ -49,6 +63,7 @@ struct bork_play_data {
     ARR_T(struct bork_bullet) bullets;
     ARR_T(struct bork_particle) particles;
     int killed_laika;
+    uint32_t tutorial_msg_seen;
     /*  The HUD-item animation  */
     vec3 hud_anim[5];
     float hud_angle[5];
@@ -162,6 +177,7 @@ void game_explosion(struct bork_play_data* d, vec3 pos, float intensity);
 void drop_item(struct bork_play_data* d);
 void hud_announce(struct bork_play_data* d, char* str);
 void hurt_player(struct bork_play_data* d, int damage, int can_block);
+void show_tut_message(struct bork_play_data* d, enum bork_play_tutorial_msg msg);
 
 /*  Cosmetic/mainly visual type stuff   game_effects.c  */
 void create_explosion(struct bork_play_data* d, vec3 pos, float intensity);

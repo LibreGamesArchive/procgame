@@ -36,7 +36,8 @@ void entity_on_fire(struct bork_play_data* d, struct bork_entity* ent)
         };
         ARR_PUSH(d->particles, new_part);
     } else if(ent->fire_ticks % 30 == 0) {
-        ent->HP -= 1;
+        if(ent->flags & BORK_ENTFLAG_PLAYER) ent->HP -= 1;
+        else ent->HP -= 5;
         ent->pain_ticks += 30;
     }
     --ent->fire_ticks;

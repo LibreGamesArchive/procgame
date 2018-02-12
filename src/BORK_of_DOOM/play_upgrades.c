@@ -93,7 +93,8 @@ static void tick_bothack(struct bork_play_data* d, int l, int idx)
         vec3 eye, dir;
         float vis_dist, dist;
         bork_entity_get_eye(&d->plr, dir, eye);
-        vis_dist = bork_map_vis_dist(&d->map, eye, dir, 12);
+        eye[2] -= 0.25;
+        vis_dist = bork_map_vis_dist(&d->map, eye, dir, l == 1 ? 12 : 6);
         if(d->looked_enemy == -1) {
             vec3_set_len(dir, dir, vis_dist - 0.25);
             vec3_add(part_pos, eye, dir);
@@ -110,12 +111,16 @@ static void tick_bothack(struct bork_play_data* d, int l, int idx)
                 } else {
                     vec3_set_len(dir, dir, dist - 0.25);
                     vec3_add(part_pos, eye, dir);
-                    if(l == 1 && ent->type != BORK_ENEMY_LAIKA) {
-                        ent->HP = 0;
-                        ent->flags |= BORK_ENTFLAG_ON_FIRE;
-                    } else {
+                    if(ent->type == BORK_ENEMY_LAIKA
+                    || ent->type == BORK_ENEMY_GREAT_BANE) {
                         ent->flags |= BORK_ENTFLAG_EMP;
-                        ent->emp_ticks = PLAY_SECONDS(5);
+                        ent->emp_ticks = (l == 1) ? PLAY_SECONDS(7) : PLAY_SECONDS(4);
+                    } else {
+                        if(l == 1) ent->HP = 0;
+                        else {
+                            ent->flags |= BORK_ENTFLAG_EMP;
+                            ent->emp_ticks = PLAY_SECONDS(5);
+                        }
                     }
                 }
             }
@@ -143,6 +148,7 @@ static void tick_decoy(struct bork_play_data* d, int l, int idx)
                     || pg_check_gamepad(gmap[BORK_CTRL_USE_TECH], PG_CONTROL_HIT));
     if(d->upgrade_counters[idx] <= 0) {
         if(d->upgrade_selected == idx && pressed) {
+            pg_audio_play_ch(&d->core->sounds[BORK_SND_HACK], 1, 1);
             vec3 dir, pos;
             bork_entity_get_eye(&d->plr, dir, pos);
             if(l == 0) {
@@ -181,19 +187,10 @@ static void tick_healing(struct bork_play_data* d, int l, int idx)
     int pressed = (pg_check_input(kmap[BORK_CTRL_USE_TECH], PG_CONTROL_HIT)
                     || pg_check_gamepad(gmap[BORK_CTRL_USE_TECH], PG_CONTROL_HIT));
     if(d->upgrade_counters[idx] > 0) --d->upgrade_counters[idx];
-    if(d->plr.HP >= 100) return;
-    if(l == 1) {
-        if(d->upgrade_counters[idx] <= 0) {
-            d->upgrade_counters[idx] = PLAY_SECONDS(0.25);
-            d->plr.HP = MIN(100, d->plr.HP + 1);
-        }
-    } else {
-        if(d->upgrade_selected == idx && d->upgrade_counters[idx] <= 0
-        && pressed) {
-            pg_audio_play_ch(&d->core->sounds[BORK_SND_HEAL_TECH], 1, 1);
-            d->plr.HP = MIN(100, d->plr.HP + 25);
-            d->upgrade_counters[idx] = PLAY_SECONDS(8);
-        }
+    if(d->plr.HP >= 100 || d->plr.HP <= 0) return;
+    if(d->upgrade_counters[idx] <= 0) {
+        d->upgrade_counters[idx] = (l == 1 ? PLAY_SECONDS(0.2) : PLAY_SECONDS(0.4));
+        d->plr.HP = MIN(100, d->plr.HP + 1);
     }
 }
 
@@ -220,22 +217,31 @@ static void tick_defense(struct bork_play_data* d, int l, int idx)
                 .ticks_left = 40 };
             vec3_dup(new_part.pos, d->plr.pos);
             ARR_PUSH(d->particles, new_part);
-            blue_sparks(d, d->plr.pos, 0.45, rand() % 4 + 16 + (8 * l));
-            red_sparks(d, d->plr.pos, 0.45, rand() % 4 + 8 + (8 * l));
+            red_sparks(d, d->plr.pos, 0.45, rand() % 4 + 16 + (8 * l));
+            blue_sparks(d, d->plr.pos, 0.45, rand() % 4 + 8 + (8 * l));
             pg_audio_play_ch(&d->core->sounds[BORK_SND_DEFENSE_FIELD], 1, 1);
             d->upgrade_counters[idx] = PLAY_SECONDS(6);
+            float vis_dist;
+            vec3 eye, dir;
+            bork_entity_get_eye(&d->plr, NULL, eye);
+            eye[2] -= 0.25;
             ARR_FOREACH(d->plr_enemy_query, ent_id, i) {
                 ent = bork_entity_get(ent_id);
                 if(!ent) continue;
-                float dist = vec3_dist(d->plr.pos, ent->pos);
-                if(dist < 6) {
-                    ent->HP -= (l == 1) ? 75 : 25;
-                    create_sparks(d, ent->pos, 0.1, 3);
-                    vec3 push;
-                    vec3_sub(push, ent->pos, d->plr.pos);
-                    vec3_set_len(push, push, 0.25);
-                    push[2] += 0.05;
-                    vec3_add(ent->vel, ent->vel, push);
+                float dist = vec3_dist(ent->pos, eye);
+                if(dist < 12) {
+                    vec3_sub(dir, ent->pos, eye);
+                    vec3_normalize(dir, dir);
+                    vis_dist = bork_map_vis_dist(&d->map, eye, dir, 12);
+                    if(dist - 0.5 > vis_dist) continue;
+                    dist = 1 - (dist / 12);
+                    dist = MAX(0.5, dist);
+                    ent->HP -= (l == 1) ? 80 * dist : 40 * dist;
+                    red_sparks(d, ent->pos, 0.1, 5);
+                    if(ent->flags & BORK_ENTFLAG_STATIONARY) continue;
+                    vec3_set_len(dir, dir, dist * 0.25);
+                    dir[2] = MAX(0.1, dir[2]);
+                    vec3_add(ent->vel, ent->vel, dir);
                 }
             }
         }
@@ -391,26 +397,6 @@ void hud_decoy(struct bork_play_data* d, int l, int idx)
     }
 }
 
-void hud_healing(struct bork_play_data* d, int l, int idx, int passive_i)
-{
-    if(l == 1) {
-        hud_passive(d, l, idx, passive_i);
-        return;
-    }
-    if(d->upgrade_selected == idx) {
-        pg_shader_2d_tex_frame(&d->core->shader_2d, BORK_UPGRADE_HEALING);
-        pg_shader_2d_transform(&d->core->shader_2d, (vec2){ 0.2, 0.75 },
-                               (vec2){ 0.1, 0.1 }, 0);
-        float a = 1.0f;
-        if(d->upgrade_counters[idx] > 0) {
-            a = (1.0f - (d->upgrade_counters[idx] / (float)PLAY_SECONDS(8))) * 0.7 + 0.05;
-        }
-        pg_shader_2d_color_mod(&d->core->shader_2d, (vec4){ 1, 1, 1, a }, (vec4){});
-        pg_model_draw(&d->core->quad_2d_ctr, NULL);
-        pg_shader_2d_color_mod(&d->core->shader_2d, (vec4){ 1, 1, 1, 1 }, (vec4){});
-    }
-}
-
 void hud_defense(struct bork_play_data* d, int l, int idx, int passive_i)
 {
     if(d->upgrade_selected == idx) {
@@ -473,13 +459,10 @@ void draw_upgrade_hud(struct bork_play_data* d)
         case BORK_UPGRADE_DECOY:
             hud_decoy(d, d->upgrade_level[i], i);
             break;
-        case BORK_UPGRADE_HEALING:
-            hud_healing(d, d->upgrade_level[i], i, passive_i);
-            if(d->upgrade_level[i] == 1) ++passive_i;
-            break;
         case BORK_UPGRADE_DEFENSE:
             hud_defense(d, d->upgrade_level[i], i, passive_i);
             break;
+        case BORK_UPGRADE_HEALING:
         case BORK_UPGRADE_HEATSHIELD:
         case BORK_UPGRADE_STRENGTH:
             hud_passive(d, d->upgrade_level[i], i, passive_i);
@@ -630,6 +613,7 @@ void tick_control_upgrade_menu(struct bork_play_data* d)
                     d->upgrade_level[d->menu.upgrades.replace_idx] = 0;
                     ARR_SPLICE(d->held_upgrades, d->menu.upgrades.selection_idx, 1);
                     d->menu.upgrades.confirm = 0;
+                    show_tut_message(d, BORK_TUT_SWITCH_UPGRADE);
                 }
             } else if(fabs(mouse_pos[0] - (ar * 0.65)) < 0.05
             && fabs(mouse_pos[1] - 0.615) < 0.03) {

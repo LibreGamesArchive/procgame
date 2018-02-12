@@ -171,13 +171,6 @@ void bork_entity_move(struct bork_entity* ent, struct bork_play_data* d)
                 coll.push[2] / (coll_size[2] * coll_size[2]) };
             vec3_normalize(ell_norm, ell_norm);
             float down_angle = vec3_mul_inner(ell_norm, coll.face_norm);
-            /*
-            if(ent->flags & BORK_ENTFLAG_PLAYER && d->log_colls) {
-                fprintf(d->logfile, "Player collide: face norm: %f %f %f\n"
-                       "coll push: %f %f %f\n",
-                       coll.face_norm[0], coll.face_norm[1], coll.face_norm[2],
-                       coll.push[0], coll.push[1], coll.push[2]);
-            }*/
             if(ent->flags & BORK_ENTFLAG_BOUNCE) {
                 vec3 bounce_dir;
                 vec3 vel_norm;
@@ -194,10 +187,8 @@ void bork_entity_move(struct bork_entity* ent, struct bork_play_data* d)
                 }
                 return;
             } else if(down_angle >= 0.8 && face_down_angle >= 0.9) {
-                //if(ent->flags & BORK_ENTFLAG_PLAYER) printf("Fuck off 1\n");
                 ent->flags |= BORK_ENTFLAG_GROUND;
             } else if(down_angle >= 0.8 && face_down_angle > 0.75 && face_down_angle < 0.9) {
-                //if(ent->flags & BORK_ENTFLAG_PLAYER) printf("Fuck off 2\n");
                 if(vec3_mul_inner(ell_norm, coll.face_norm) > 0.9) {
                     ent->flags |= BORK_ENTFLAG_GROUND;
                     if(!(ent->flags & BORK_ENTFLAG_SLIDE)) {
@@ -230,7 +221,7 @@ void bork_entity_move(struct bork_entity* ent, struct bork_play_data* d)
     vec3_dup(ent->pos, new_pos);
     int friction = 0;
     if((ent->flags & BORK_ENTFLAG_PLAYER) && ladder) {
-        if(ent->dir[1] >= -0.75) ent->vel[2] = 0.05;
+        if(ent->dir[1] >= -0.25) ent->vel[2] = 0.05;
         else ent->vel[2] = -0.05;
         friction = 1;
     } else if(ent->flags & BORK_ENTFLAG_GROUND) {
