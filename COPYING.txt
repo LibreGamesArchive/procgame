@@ -1,0 +1,29 @@
+The Communist Dogifesto (source code, graphical assets, and sound effects)
+Copyright © 2018 Joshua Giles
+
+---
+
+The Communist Dogifesto (source code) is free software: you can redistribute it
+and/or modify it under the terms of the GNU General Public License as published
+by the Free Software Foundation, either version 3 of the License, or (at your
+option) any later version.
+
+The Communist Dogifesto is distributed in the hope that it will be useful, but
+WITHOUT ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for more
+details.
+
+You should have received a copy of the GNU General Public License along with
+The Communist Dogifesto.  If not, see <http://www.gnu.org/licenses/>.
+
+---
+
+The Communist Dogifesto (graphical assets and sound effects) are distributed
+under the Creative Commons BY-NC-SA license:
+https://creativecommons.org/licenses/by-nc-sa/4.0/
+
+---
+
+All music in The Communist Dogifesto was created by Eric Matyas and is licensed
+under the Soundimage International Public License which can be found on his
+website: www.soundimage.org
